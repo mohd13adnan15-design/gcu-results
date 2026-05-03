@@ -1,0 +1,22 @@
+services:
+  - type: web
+    runtime: static
+    name: gcu-results
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_LIBRARY_SUPABASE_URL
+        sync: false
+      - key: VITE_LIBRARY_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_LIBRARY_PROFILE_MAP_JSON
+        sync: false
