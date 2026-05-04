@@ -1,3 +1,6 @@
+# Static SPA (Vite + TanStack Router): deep links and reloads must serve index.html.
+# If reload still 404s on Render, add the same rule in Dashboard → your Static Site →
+# Redirects/Rewrites → Rewrite: source /* → destination /index.html (Blueprint may not be linked).
 services:
   - type: web
     runtime: static
