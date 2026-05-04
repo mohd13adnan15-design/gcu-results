@@ -73,7 +73,8 @@ export function buildMainGradeCardRows(
       0,
     );
   const semesterGpa =
-    header.semester_gpa ?? (totalCredits > 0 ? Number((totalCreditPoints / totalCredits).toFixed(2)) : 0);
+    header.semester_gpa ??
+    (totalCredits > 0 ? Number((totalCreditPoints / totalCredits).toFixed(2)) : 0);
   const rowSource = marks.length > 0 ? marks : ([{}] as StudentMarkRow[]);
 
   return rowSource.map((mark, index) => ({
@@ -105,8 +106,7 @@ export function buildMainGradeCardRows(
     subject_code: mark.subject_code ?? null,
     credits: mark.credits ?? null,
     practical_1: header.practical_1 ?? null,
-    ability_enhancement_compulsory_course:
-      header.ability_enhancement_compulsory_course ?? null,
+    ability_enhancement_compulsory_course: header.ability_enhancement_compulsory_course ?? null,
     skill_enhancement_course: header.skill_enhancement_course ?? null,
     practical_2: header.practical_2 ?? null,
     objective_enhancement_course: header.objective_enhancement_course ?? null,

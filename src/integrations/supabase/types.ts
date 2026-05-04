@@ -105,8 +105,10 @@ export type Database = {
           created_at: string;
           id: string;
           is_read: boolean;
+          is_resolved: boolean;
           message: string;
           recipient_portal: Database["public"]["Enums"]["portal_type"];
+          resolved_at: string | null;
           sender_portal: Database["public"]["Enums"]["portal_type"];
           student_id: string | null;
           title: string;
@@ -115,8 +117,10 @@ export type Database = {
           created_at?: string;
           id?: string;
           is_read?: boolean;
+          is_resolved?: boolean;
           message: string;
           recipient_portal: Database["public"]["Enums"]["portal_type"];
+          resolved_at?: string | null;
           sender_portal: Database["public"]["Enums"]["portal_type"];
           student_id?: string | null;
           title: string;
@@ -125,8 +129,10 @@ export type Database = {
           created_at?: string;
           id?: string;
           is_read?: boolean;
+          is_resolved?: boolean;
           message?: string;
           recipient_portal?: Database["public"]["Enums"]["portal_type"];
+          resolved_at?: string | null;
           sender_portal?: Database["public"]["Enums"]["portal_type"];
           student_id?: string | null;
           title?: string;
@@ -307,6 +313,95 @@ export type Database = {
             foreignKeyName: "grade_card_details_student_id_fkey";
             columns: ["student_id"];
             isOneToOne: false;
+            referencedRelation: "students";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      student_marksheets: {
+        Row: {
+          courses: Json;
+          created_at: string;
+          exam_month_year: string;
+          final_grade: string;
+          grade_card_no: string;
+          id: string;
+          issue_date: string;
+          photo_bucket: string | null;
+          photo_path: string | null;
+          programme_code: string;
+          programme_title: string;
+          qr_data: string;
+          registration_no: string;
+          school_name: string;
+          semester_label: string;
+          sgpa: number;
+          student_id: string;
+          student_name: string;
+          student_roll_no: string;
+          total_credit_points: number;
+          total_credits: number;
+          total_credits_earned: number;
+          university: string;
+          updated_at: string;
+        };
+        Insert: {
+          courses: Json;
+          created_at?: string;
+          exam_month_year: string;
+          final_grade?: string;
+          grade_card_no: string;
+          id?: string;
+          issue_date: string;
+          photo_bucket?: string | null;
+          photo_path?: string | null;
+          programme_code: string;
+          programme_title: string;
+          qr_data: string;
+          registration_no: string;
+          school_name: string;
+          semester_label: string;
+          sgpa?: number;
+          student_id: string;
+          student_name: string;
+          student_roll_no: string;
+          total_credit_points?: number;
+          total_credits?: number;
+          total_credits_earned?: number;
+          university?: string;
+          updated_at?: string;
+        };
+        Update: {
+          courses?: Json;
+          created_at?: string;
+          exam_month_year?: string;
+          final_grade?: string;
+          grade_card_no?: string;
+          id?: string;
+          issue_date?: string;
+          photo_bucket?: string | null;
+          photo_path?: string | null;
+          programme_code?: string;
+          programme_title?: string;
+          qr_data?: string;
+          registration_no?: string;
+          school_name?: string;
+          semester_label?: string;
+          sgpa?: number;
+          student_id?: string;
+          student_name?: string;
+          student_roll_no?: string;
+          total_credit_points?: number;
+          total_credits?: number;
+          total_credits_earned?: number;
+          university?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "student_marksheets_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: true;
             referencedRelation: "students";
             referencedColumns: ["id"];
           },

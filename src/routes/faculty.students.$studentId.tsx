@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AdminLayout } from "@/components/AdminLayout";
+
 import { StudentMarksReviewPanel } from "@/components/StudentMarksReviewPanel";
 
 export const Route = createFileRoute("/faculty/students/$studentId")({
@@ -9,14 +9,5 @@ export const Route = createFileRoute("/faculty/students/$studentId")({
 
 function FacultyStudentMarksPage() {
   const { studentId } = Route.useParams();
-
-  return (
-    <AdminLayout
-      requirePortal="faculty"
-      title="Faculty Portal"
-      subtitle="Review student marks"
-    >
-      {() => <StudentMarksReviewPanel studentId={studentId} portal="faculty" />}
-    </AdminLayout>
-  );
+  return <StudentMarksReviewPanel studentId={studentId} portal="faculty" />;
 }

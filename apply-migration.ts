@@ -8,13 +8,16 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function runMigration() {
   try {
-    const migrationSql = fs.readFileSync("./supabase/migrations/20260502_create_main_grade_card.sql", "utf-8");
-    
+    const migrationSql = fs.readFileSync(
+      "./supabase/migrations/20260502_create_main_grade_card.sql",
+      "utf-8",
+    );
+
     // Split by newlines and filter out comments and empty lines
     const statements = migrationSql
       .split(";")
-      .map(s => s.trim())
-      .filter(s => s && !s.startsWith("--"));
+      .map((s) => s.trim())
+      .filter((s) => s && !s.startsWith("--"));
 
     console.log(`Running ${statements.length} SQL statements...`);
 

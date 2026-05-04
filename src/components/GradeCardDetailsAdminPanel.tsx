@@ -25,6 +25,8 @@ export type GradeCardApplicationFormProps = {
   students: Student[];
   onCancel: () => void;
   onSaved: () => void;
+  /** When false, hides the Cancel control (e.g. embedded in Super Admin student hub). */
+  showCancel?: boolean;
 };
 
 /** Full-page or embedded grade card header form (no modal). */
@@ -33,6 +35,7 @@ export function GradeCardApplicationForm({
   students,
   onCancel,
   onSaved,
+  showCancel = true,
 }: GradeCardApplicationFormProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -61,7 +64,8 @@ export function GradeCardApplicationForm({
             .from("grade_card_details")
             .select("*")
             .eq("student_id", sid)
-            .eq("row_number", 1)
+            .order("updated_at", { ascending: false })
+            .limit(1)
             .maybeSingle();
           if (error) throw error;
           const header = (data as GradeCardDetailRow | null) ?? null;
@@ -188,7 +192,9 @@ export function GradeCardApplicationForm({
           ((marksRes.data as StudentMarkRow[]) ?? []).filter(Boolean),
         );
         await supabase.from("main_grade_card").delete().eq("student_id", sid);
-        const { error: mainGradeError } = await supabase.from("main_grade_card").insert(mainGradeRows);
+        const { error: mainGradeError } = await supabase
+          .from("main_grade_card")
+          .insert(mainGradeRows);
         if (mainGradeError) throw mainGradeError;
       }
 
@@ -471,13 +477,15 @@ export function GradeCardApplicationForm({
       )}
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md border border-border bg-cream px-5 py-2.5 text-sm font-medium text-primary hover:bg-secondary"
-        >
-          Cancel
-        </button>
+        {showCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md border border-border bg-cream px-5 py-2.5 text-sm font-medium text-primary hover:bg-secondary"
+          >
+            Cancel
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={loading || saving}
@@ -503,12 +511,7 @@ export function GradeCardDetailsAdminPanel() {
     setLoading(true);
     const [{ data: detailRows, error: dErr }, { data: studentRows, error: sErr }] =
       await Promise.all([
-        supabase
-          .from("grade_card_details")
-          .select("*")
-          .eq("row_number", 1)
-          .order("updated_at", { ascending: false })
-          .limit(500),
+        supabase.from("grade_card_details").select("*").order("updated_at", { ascending: false }).limit(500),
         supabase.from("students").select("*").order("student_id", { ascending: true }),
       ]);
     if (dErr) {

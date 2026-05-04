@@ -19,6 +19,8 @@ import { Route as DeveloperRouteImport } from './routes/developer'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuperAdminIndexRouteImport } from './routes/super-admin.index'
+import { Route as FacultyIndexRouteImport } from './routes/faculty.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as SuperAdminGradeCardApplicationRouteImport } from './routes/super-admin.grade-card-application'
 import { Route as SuperAdminCredentialsRouteImport } from './routes/super-admin.credentials'
 import { Route as StudentMarksCardRouteImport } from './routes/student.marks-card'
@@ -81,6 +83,16 @@ const SuperAdminIndexRoute = SuperAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => SuperAdminRoute,
+} as any)
+const FacultyIndexRoute = FacultyIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FacultyRoute,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const SuperAdminGradeCardApplicationRoute =
   SuperAdminGradeCardApplicationRouteImport.update({
@@ -165,6 +177,8 @@ export interface FileRoutesByFullPath {
   '/student/marks-card': typeof StudentMarksCardRoute
   '/super-admin/credentials': typeof SuperAdminCredentialsRoute
   '/super-admin/grade-card-application': typeof SuperAdminGradeCardApplicationRoute
+  '/admin/': typeof AdminIndexRoute
+  '/faculty/': typeof FacultyIndexRoute
   '/super-admin/': typeof SuperAdminIndexRoute
   '/admin/students/$studentId': typeof AdminStudentsStudentIdRoute
   '/faculty/students/$studentId': typeof FacultyStudentsStudentIdRoute
@@ -172,9 +186,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
   '/developer': typeof DeveloperRoute
-  '/faculty': typeof FacultyRouteWithChildren
   '/fees': typeof FeesRoute
   '/hostel': typeof HostelRoute
   '/library': typeof LibraryRoute
@@ -188,6 +200,8 @@ export interface FileRoutesByTo {
   '/student/marks-card': typeof StudentMarksCardRoute
   '/super-admin/credentials': typeof SuperAdminCredentialsRoute
   '/super-admin/grade-card-application': typeof SuperAdminGradeCardApplicationRoute
+  '/admin': typeof AdminIndexRoute
+  '/faculty': typeof FacultyIndexRoute
   '/super-admin': typeof SuperAdminIndexRoute
   '/admin/students/$studentId': typeof AdminStudentsStudentIdRoute
   '/faculty/students/$studentId': typeof FacultyStudentsStudentIdRoute
@@ -213,6 +227,8 @@ export interface FileRoutesById {
   '/student/marks-card': typeof StudentMarksCardRoute
   '/super-admin/credentials': typeof SuperAdminCredentialsRoute
   '/super-admin/grade-card-application': typeof SuperAdminGradeCardApplicationRoute
+  '/admin/': typeof AdminIndexRoute
+  '/faculty/': typeof FacultyIndexRoute
   '/super-admin/': typeof SuperAdminIndexRoute
   '/admin/students/$studentId': typeof AdminStudentsStudentIdRoute
   '/faculty/students/$studentId': typeof FacultyStudentsStudentIdRoute
@@ -239,6 +255,8 @@ export interface FileRouteTypes {
     | '/student/marks-card'
     | '/super-admin/credentials'
     | '/super-admin/grade-card-application'
+    | '/admin/'
+    | '/faculty/'
     | '/super-admin/'
     | '/admin/students/$studentId'
     | '/faculty/students/$studentId'
@@ -246,9 +264,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin'
     | '/developer'
-    | '/faculty'
     | '/fees'
     | '/hostel'
     | '/library'
@@ -262,6 +278,8 @@ export interface FileRouteTypes {
     | '/student/marks-card'
     | '/super-admin/credentials'
     | '/super-admin/grade-card-application'
+    | '/admin'
+    | '/faculty'
     | '/super-admin'
     | '/admin/students/$studentId'
     | '/faculty/students/$studentId'
@@ -286,6 +304,8 @@ export interface FileRouteTypes {
     | '/student/marks-card'
     | '/super-admin/credentials'
     | '/super-admin/grade-card-application'
+    | '/admin/'
+    | '/faculty/'
     | '/super-admin/'
     | '/admin/students/$studentId'
     | '/faculty/students/$studentId'
@@ -382,6 +402,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperAdminIndexRouteImport
       parentRoute: typeof SuperAdminRoute
     }
+    '/faculty/': {
+      id: '/faculty/'
+      path: '/'
+      fullPath: '/faculty/'
+      preLoaderRoute: typeof FacultyIndexRouteImport
+      parentRoute: typeof FacultyRoute
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/super-admin/grade-card-application': {
       id: '/super-admin/grade-card-application'
       path: '/grade-card-application'
@@ -471,21 +505,25 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
+  AdminIndexRoute: typeof AdminIndexRoute
   AdminStudentsStudentIdRoute: typeof AdminStudentsStudentIdRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
+  AdminIndexRoute: AdminIndexRoute,
   AdminStudentsStudentIdRoute: AdminStudentsStudentIdRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface FacultyRouteChildren {
+  FacultyIndexRoute: typeof FacultyIndexRoute
   FacultyStudentsStudentIdRoute: typeof FacultyStudentsStudentIdRoute
 }
 
 const FacultyRouteChildren: FacultyRouteChildren = {
+  FacultyIndexRoute: FacultyIndexRoute,
   FacultyStudentsStudentIdRoute: FacultyStudentsStudentIdRoute,
 }
 

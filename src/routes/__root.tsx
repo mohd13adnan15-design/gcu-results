@@ -27,7 +27,18 @@ function RootComponent() {
   return (
     <>
       <Outlet />
-      <Toaster richColors position="top-right" />
+      <Toaster
+        richColors
+        position="top-right"
+        closeButton
+        toastOptions={{
+          classNames: {
+            closeButton:
+              "h-6 w-6 border-0 bg-background/80 opacity-70 transition-opacity hover:opacity-100 [&>svg]:h-3.5 [&>svg]:w-3.5",
+          },
+          closeButtonAriaLabel: "Dismiss notification",
+        }}
+      />
     </>
   );
 }

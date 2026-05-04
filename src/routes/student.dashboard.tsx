@@ -11,6 +11,7 @@ import {
   getOutstandingPenaltyTotal,
   resolveLibraryRemoteProfileId,
 } from "@/lib/library-remote";
+import { getMarksheetEligibility } from "@/lib/marksheet-verification";
 
 export const Route = createFileRoute("/student/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — GCU Result Portal" }] }),
@@ -26,15 +27,20 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [hasLibraryPenalty, setHasLibraryPenalty] = useState(false);
   const [libraryPenaltyTotal, setLibraryPenaltyTotal] = useState(0);
+  const [hasMarksheet, setHasMarksheet] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const s = getStudentSession();
     if (!s) return;
     const load = async () => {
-      const { data } = await supabase.from("students").select("*").eq("id", s.id).maybeSingle();
+      const [{ data }, { data: marksheetData }] = await Promise.all([
+        supabase.from("students").select("*").eq("id", s.id).maybeSingle(),
+        supabase.from("student_marksheets").select("id").eq("student_id", s.id).maybeSingle(),
+      ]);
       const st = data as Student | null;
       setStudent(st);
+      setHasMarksheet(Boolean(marksheetData));
 
       if (!st?.in_library || !isLibraryRemoteConfigured()) {
         setHasLibraryPenalty(false);
@@ -72,6 +78,16 @@ function Dashboard() {
         { event: "*", schema: "public", table: "students", filter: `id=eq.${s.id}` },
         () => load(),
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "student_marksheets",
+          filter: `student_id=eq.${s.id}`,
+        },
+        () => load(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -90,13 +106,12 @@ function Dashboard() {
   const feesOk = student.fees_cleared;
   const hostelOk = !student.in_hostel || student.hostel_cleared;
   const libraryOk = !student.in_library || (student.library_cleared && !hasLibraryPenalty);
+  const eligibility = getMarksheetEligibility({ student, hasMarksheet, hasLibraryPenalty });
   const noDue = feesOk && hostelOk && libraryOk;
-  const facultyOk = Boolean(student.faculty_verified);
-  const adminOk = Boolean(student.admin_verified);
-  const eligible = noDue && facultyOk && adminOk;
+  const eligible = eligibility.eligible;
   const cardStatus = eligible
     ? "Grade Card Ready to Generate"
-    : noDue
+    : noDue && hasMarksheet
       ? "Grade Card Under Verification"
       : "Grade Card Pending";
 
@@ -172,6 +187,14 @@ function Dashboard() {
                   <Lock className="h-4 w-4 text-muted-foreground" />
                 )}
                 Library clearance {!student.in_library && "(not required)"}
+              </li>
+              <li className="flex items-center gap-2">
+                {hasMarksheet ? (
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                ) : (
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                )}
+                Marksheet data
               </li>
               {student.in_library && hasLibraryPenalty && (
                 <li className="text-xs text-amber-800">
