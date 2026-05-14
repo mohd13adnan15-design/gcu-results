@@ -1,0 +1,187 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * GCU Result Portal — Design System
+ *
+ * Strict 5-color palette (per user requirement):
+ *   #FEFAF6 (cream)        — background
+ *   #EADBC8 (sand)         — secondary surface
+ *   #DAC0A3 (khaki)        — accent / highlights
+ *   #102C57 (deep navy)    — primary / text
+ *   #000000 (black)        — strong text / borders
+ *
+ * All values are expressed as oklch.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Brand palette tokens */
+  --color-cream: var(--cream);
+  --color-sand: var(--sand);
+  --color-khaki: var(--khaki);
+  --color-navy: var(--navy);
+  --color-ink: var(--ink);
+}
+
+:root {
+  --radius: 0.75rem;
+
+  /* Palette (oklch equivalents of #FEFAF6 #EADBC8 #DAC0A3 #102C57 #000000) */
+  --cream: oklch(0.984 0.008 75);
+  --sand: oklch(0.892 0.034 75);
+  --khaki: oklch(0.812 0.055 70);
+  --navy: oklch(0.275 0.075 260);
+  --ink: oklch(0 0 0);
+
+  --background: var(--cream);
+  --foreground: var(--navy);
+
+  --card: var(--cream);
+  --card-foreground: var(--navy);
+
+  --popover: var(--cream);
+  --popover-foreground: var(--navy);
+
+  --primary: var(--navy);
+  --primary-foreground: var(--cream);
+
+  --secondary: var(--sand);
+  --secondary-foreground: var(--navy);
+
+  --muted: var(--sand);
+  --muted-foreground: oklch(0.4 0.05 260);
+
+  --accent: var(--khaki);
+  --accent-foreground: var(--navy);
+
+  --destructive: oklch(0.275 0.075 260);
+  --destructive-foreground: var(--cream);
+
+  --border: var(--khaki);
+  --input: var(--sand);
+  --ring: var(--navy);
+
+  --chart-1: var(--navy);
+  --chart-2: var(--khaki);
+  --chart-3: var(--sand);
+  --chart-4: var(--ink);
+  --chart-5: oklch(0.4 0.05 260);
+
+  --sidebar: var(--sand);
+  --sidebar-foreground: var(--navy);
+  --sidebar-primary: var(--navy);
+  --sidebar-primary-foreground: var(--cream);
+  --sidebar-accent: var(--khaki);
+  --sidebar-accent-foreground: var(--navy);
+  --sidebar-border: var(--khaki);
+  --sidebar-ring: var(--navy);
+}
+
+.dark {
+  --background: var(--navy);
+  --foreground: var(--cream);
+  --card: var(--navy);
+  --card-foreground: var(--cream);
+  --popover: var(--navy);
+  --popover-foreground: var(--cream);
+  --primary: var(--cream);
+  --primary-foreground: var(--navy);
+  --secondary: oklch(0.35 0.05 260);
+  --secondary-foreground: var(--cream);
+  --muted: oklch(0.35 0.05 260);
+  --muted-foreground: var(--khaki);
+  --accent: var(--khaki);
+  --accent-foreground: var(--navy);
+  --border: oklch(0.4 0.05 260);
+  --input: oklch(0.4 0.05 260);
+  --ring: var(--khaki);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: "Georgia", "Cambria", "Times New Roman", serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Georgia", "Cambria", "Times New Roman", serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Reusable utility patterns */
+@layer utilities {
+  .bg-grain {
+    background-image: radial-gradient(circle at 1px 1px, var(--color-khaki) 1px, transparent 0);
+    background-size: 24px 24px;
+    background-color: var(--color-cream);
+  }
+  .card-elevated {
+    background-color: var(--color-cream);
+    border: 1px solid var(--color-khaki);
+    box-shadow:
+      0 1px 0 var(--color-khaki),
+      0 12px 30px -18px var(--color-navy);
+  }
+  .locked-blur {
+    filter: blur(4px) grayscale(0.5);
+    pointer-events: none;
+    user-select: none;
+  }
+}

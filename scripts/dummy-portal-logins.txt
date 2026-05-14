@@ -1,0 +1,43 @@
+================================================================================
+  Dummy portal logins (staff — same password for all demo accounts)
+================================================================================
+
+  Password for every account below (see seed script; default):
+
+    123456
+
+  Sign in at:  http://localhost:5173/login   (use Email + Password)
+
+  ------------------------------------------------------------------------------------------
+  Portal           Email                         Route after login (approx.)
+  ------------------------------------------------------------------------------------------
+  Head of COE      coe@gcu-portal.local          /head-of-coe
+  Admin 1          admin1@gcu-portal.local       /admin-1
+  Admin 2          admin2@gcu-portal.local       /admin-2
+  Hostel           hostel@gcu-portal.local       /hostel
+  Academic fees    fees@gcu-portal.local         /fees
+  Library          library@gcu-portal.local      /library
+  ------------------------------------------------------------------------------------------
+
+  These users must exist in Supabase Auth + public.portal_profiles.
+
+  One-time setup (from project root):
+
+    1. Supabase Dashboard → Project Settings → API → copy "service_role" secret.
+
+    2. Add to your .env file (never commit the real key):
+
+         SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...
+
+       You already need SUPABASE_URL or VITE_SUPABASE_URL for the app.
+
+    3. Run:
+
+         npm run seed:portal-credentials
+
+       That creates/updates the six accounts and portal_profiles rows.
+
+  If login fails: confirm migration 20260505120100 ran; check Auth → Users;
+  confirm portal_profiles has a row per user_id.
+
+================================================================================
