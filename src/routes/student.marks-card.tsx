@@ -15,6 +15,7 @@ import { isLibraryRemoteConfigured } from "@/integrations/supabase/library-remot
 import { supabase } from "@/integrations/supabase/client";
 import {
   fetchStudentMarksheet,
+  fetchAllStudentMarksheets,
   resolveStudentPhotoUrl,
   type StudentMarksheet,
 } from "@/lib/marksheet";
@@ -27,6 +28,7 @@ export function StudentMarksCardPage() {
 function MarksCard() {
   const [student, setStudent] = useState<Student | null>(null);
   const [marksheet, setMarksheet] = useState<StudentMarksheet | null>(null);
+  const [allMarksheets, setAllMarksheets] = useState<StudentMarksheet[]>([]);
   const [marksheetError, setMarksheetError] = useState<string | null>(null);
   const [hasLibraryPenalty, setHasLibraryPenalty] = useState(false);
   const [verified, setVerified] = useState(false);
@@ -34,7 +36,7 @@ function MarksCard() {
   const [otp, setOtp] = useState("");
   const [sentOtp, setSentOtp] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [downloadBusy, setDownloadBusy] = useState<"pdf" | null>(null);
+  const [downloadBusy, setDownloadBusy] = useState<"current" | "all" | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
@@ -59,12 +61,16 @@ function MarksCard() {
       }
 
       let nextMarksheet: StudentMarksheet | null = null;
+      let nextAllMarksheets: StudentMarksheet[] = [];
       try {
         setMarksheetError(null);
         nextMarksheet = await fetchStudentMarksheet(supabase, nextStudent.id);
+        nextAllMarksheets = await fetchAllStudentMarksheets(supabase, nextStudent.id);
         setMarksheet(nextMarksheet);
+        setAllMarksheets(nextAllMarksheets);
       } catch (error) {
         setMarksheet(null);
+        setAllMarksheets([]);
         setMarksheetError(error instanceof Error ? error.message : "Could not load marksheet data");
       }
 
@@ -209,7 +215,7 @@ function MarksCard() {
       return;
     }
 
-    setDownloadBusy("pdf");
+    setDownloadBusy("current");
     try {
       const [{ downloadMarksheetBlob, generateMarksheetPdf }, photoUrl] = await Promise.all([
         import("@/lib/marksheet-documents"),
@@ -220,6 +226,44 @@ function MarksCard() {
       toast.success("PDF marksheet generated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not generate marksheet");
+    } finally {
+      setDownloadBusy(null);
+    }
+  }
+
+  async function downloadAllSemesters() {
+    if (allMarksheets.length === 0) {
+      toast.error("No marksheet data found for this student.");
+      return;
+    }
+    if (!student) return;
+    const eligibility = getMarksheetEligibility({
+      student,
+      hasMarksheet: true,
+      hasLibraryPenalty,
+    });
+    if (!eligibility.eligible) {
+      toast.error(eligibility.missing.map(missingReasonLabel).join(", "));
+      return;
+    }
+
+    setDownloadBusy("all");
+    try {
+      const [{ downloadBlob, generateAllSemestersPdf }, photoUrl] = await Promise.all([
+        import("@/lib/marksheet-documents"),
+        resolveStudentPhotoUrl(supabase, marksheet || allMarksheets[0]),
+      ]);
+      const blob = await generateAllSemestersPdf(allMarksheets, { photoUrl });
+      // Build file name similar to single marksheet but with AllSemesters
+      const studentSlug = (marksheet || allMarksheets[0]).student_name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const rollNo = (marksheet || allMarksheets[0]).student_roll_no.toLowerCase();
+      downloadBlob(blob, `GradeCard_AllSemesters.pdf`);
+      toast.success("PDF with all semesters generated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not generate all semesters PDF");
     } finally {
       setDownloadBusy(null);
     }
@@ -313,7 +357,7 @@ function MarksCard() {
               </div>
               {sentOtp && (
                 <p className="text-center text-xs text-muted-foreground">
-                  Demo mode — OTP is also shown above. In production this is sent only to your
+                  Demo mode - OTP is also shown above. In production this is sent only to your
                   email.
                 </p>
               )}
@@ -366,16 +410,28 @@ function MarksCard() {
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => void downloadMarksheet()}
-                  disabled={!marksheet || Boolean(downloadBusy)}
-                  className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-60"
-                >
-                  <FileText className="h-4 w-4" />
-                  {downloadBusy === "pdf" ? "Generating PDF..." : "Download PDF"}
-                </button>
+              <div className="flex flex-col gap-4 pt-2">
+                <h3 className="font-bold text-primary">Download Grade Cards</h3>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void downloadMarksheet()}
+                    disabled={!marksheet || Boolean(downloadBusy)}
+                    className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-60"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {downloadBusy === "current" ? "Generating..." : "Download Current Semester"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void downloadAllSemesters()}
+                    disabled={allMarksheets.length === 0 || Boolean(downloadBusy)}
+                    className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-5 py-2.5 text-primary hover:bg-muted disabled:opacity-60"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {downloadBusy === "all" ? "Generating..." : "Download All Semesters"}
+                  </button>
+                </div>
               </div>
 
               <p className="text-xs text-muted-foreground">

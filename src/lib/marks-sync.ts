@@ -86,12 +86,11 @@ export async function syncStudentGradeAndMarksheet(
       total_credits_earned: merged.total_credits_earned,
       total_credit_points: merged.total_credit_points,
       sgpa: merged.sgpa,
-      cgpa: merged.sgpa,
       final_grade: merged.final_grade,
       courses: merged.courses as unknown as Json,
       updated_at: now,
     },
-    { onConflict: "student_id" },
+    { onConflict: "student_id,semester_label" }
   );
   if (msErr) throw msErr;
 
@@ -106,7 +105,6 @@ export async function syncStudentGradeAndMarksheet(
       exam_month_year: merged.exam_month_year,
       issue_date: merged.issue_date,
       semester_gpa: merged.sgpa,
-      cgpa: merged.sgpa,
       final_grade: merged.final_grade,
       updated_at: now,
       created_at: now,

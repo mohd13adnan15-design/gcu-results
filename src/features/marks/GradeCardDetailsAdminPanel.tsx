@@ -340,7 +340,7 @@ export function GradeCardApplicationForm({
           <div className="sm:col-span-2">
             <label className="text-sm font-medium">Student account *</label>
             <FieldHint>
-              Pick the student who signs in on the portal — this links the grade card to their UUID
+              Pick the student who signs in on the portal - this links the grade card to their UUID
               in <code className="rounded bg-muted px-1">students</code>.
             </FieldHint>
             <select
@@ -361,7 +361,7 @@ export function GradeCardApplicationForm({
               <option value="">Select student…</option>
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.student_id} — {s.full_name}
+                  {s.student_id} - {s.full_name}
                 </option>
               ))}
             </select>
@@ -549,7 +549,7 @@ export function GradeCardDetailsAdminPanel() {
             Grade card details (Supabase)
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Data from <code className="rounded bg-muted px-1 text-xs">grade_card_details</code> —
+            Data from <code className="rounded bg-muted px-1 text-xs">grade_card_details</code> -
             header lines for each student&apos;s printed card. Course rows still come from{" "}
             <code className="rounded bg-muted px-1 text-xs">student_marks</code>.
           </p>
@@ -588,15 +588,15 @@ export function GradeCardDetailsAdminPanel() {
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-border/60">
                   <td className="px-2 py-2 font-medium text-primary">{row.student_name}</td>
-                  <td className="px-2 py-2 text-muted-foreground">{row.roll ?? "—"}</td>
+                  <td className="px-2 py-2 text-muted-foreground">{row.roll ?? "-"}</td>
                   <td className="px-2 py-2">{row.programme_title}</td>
                   <td className="px-2 py-2">{row.programme_code}</td>
-                  <td className="px-2 py-2">{row.registration_no ?? "—"}</td>
-                  <td className="px-2 py-2">{row.semester_label ?? "—"}</td>
-                  <td className="px-2 py-2">{row.exam_month_year ?? "—"}</td>
-                  <td className="px-2 py-2">{row.semester_gpa != null ? row.semester_gpa : "—"}</td>
-                  <td className="px-2 py-2">{row.final_grade ?? "—"}</td>
-                  <td className="px-2 py-2 text-muted-foreground">{row.updated_at ?? "—"}</td>
+                  <td className="px-2 py-2">{row.registration_no ?? "-"}</td>
+                  <td className="px-2 py-2">{row.semester_label ?? "-"}</td>
+                  <td className="px-2 py-2">{row.exam_month_year ?? "-"}</td>
+                  <td className="px-2 py-2">{row.semester_gpa != null ? row.semester_gpa : "-"}</td>
+                  <td className="px-2 py-2">{row.final_grade ?? "-"}</td>
+                  <td className="px-2 py-2 text-muted-foreground">{row.updated_at ?? "-"}</td>
                 </tr>
               ))}
             </tbody>

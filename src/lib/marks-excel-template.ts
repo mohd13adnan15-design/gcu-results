@@ -1,6 +1,6 @@
 import { TEJASHVI_MARKSHEET_SEED } from "@/lib/marksheet";
 
-/** Full template — one row per course; repeat student/header columns on every row (same as typical Excel marks uploads). */
+/** Full template - one row per course; repeat student/header columns on every row (same as typical Excel marks uploads). */
 export const MARKS_TEMPLATE_HEADERS_FULL = [
   "Sl No",
   "Student ID",
@@ -246,13 +246,13 @@ export function validateMarksTemplateColumns(sampleRow: Record<string, unknown>)
   }
 }
 
-/** Build 11 example rows from the Tejashvi (24btre152) reference marksheet for the downloadable template. */
 export function buildTejashviTemplateExampleRows(): (string | number)[][] {
   const m = TEJASHVI_MARKSHEET_SEED;
   const roll = m.student_roll_no;
   const email = `${roll.toLowerCase()}@gcu.edu.in`;
 
-  return m.courses.map((c, index) => {
+  // Helper to map a course to an excel row
+  const mapCourse = (c: any, index: number, semLabel: string, examMonth: string) => {
     const approxMarks =
       c.grade_obtained === "O"
         ? 95
@@ -270,16 +270,16 @@ export function buildTejashviTemplateExampleRows(): (string | number)[][] {
       "student123",
       m.student_name,
       "SET",
-      4,
+      parseInt(semLabel.replace(/\D/g, "") || "1", 10),
       1,
       m.university,
       m.school_name,
       m.programme_title,
       m.programme_code,
       m.registration_no,
-      m.exam_month_year,
+      examMonth,
       m.issue_date,
-      m.semester_label,
+      semLabel,
       m.grade_card_no,
       c.section,
       c.course_code,
@@ -291,5 +291,15 @@ export function buildTejashviTemplateExampleRows(): (string | number)[][] {
       c.grade_obtained,
       c.grade_points,
     ];
-  });
+  };
+
+  // Generate Semester 4 rows
+  const sem4Rows = m.courses.map((c, index) => mapCourse(c, index, "4", "April - 2026"));
+
+  // Generate Semester 5 rows (just duplicate with different codes and semester label for example)
+  const sem5Rows = m.courses.slice(0, 5).map((c, index) => 
+    mapCourse({ ...c, course_code: c.course_code.replace("241", "351"), grade_obtained: "O", grade_points: 10 }, index, "5", "December - 2026")
+  );
+
+  return [...sem4Rows, ...sem5Rows];
 }

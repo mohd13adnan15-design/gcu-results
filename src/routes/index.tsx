@@ -12,9 +12,9 @@ import {
 const FEATURES = [
   {
     icon: FileCheck2,
-    title: "Instant Marks Card",
+    title: "Instant Grade card",
     description:
-      "Generate and download your official marks card the moment your clearance completes — no waiting at the office.",
+      "Generate and download your official Grade card the moment your clearance completes - no waiting at the office.",
   },
   {
     icon: ShieldCheck,
@@ -32,13 +32,13 @@ const FEATURES = [
     icon: LockKeyhole,
     title: "Secure Sign-in",
     description:
-      "Role-aware authentication routes you to the right workspace automatically — only what you need, nothing more.",
+      "Role-aware authentication routes you to the right workspace automatically - only what you need, nothing more.",
   },
   {
     icon: Globe,
     title: "Anywhere Access",
     description:
-      "Fully responsive — pick up where you left off on a phone, tablet or desktop, with the same experience.",
+      "Fully responsive - pick up where you left off on a phone, tablet or desktop, with the same experience.",
   },
   {
     icon: Sparkles,
@@ -82,7 +82,7 @@ export function Landing() {
               One smart portal.
             </h2>
             <p className="mt-6 max-w-md text-lg text-muted-foreground">
-              Securely access your marks cards, academic updates, and verified student records in
+              Securely access your Grade cards, academic updates, and verified student records in
               one seamless experience.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -110,11 +110,11 @@ export function Landing() {
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                    Marks Card Ready
+                    Grade card Ready
                   </p>
                   <p className="mt-1 text-2xl font-semibold text-primary">Cleared & Verified</p>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    All dues settled — your official marks card is one click away.
+                    All dues settled - your official Grade card is one click away.
                   </p>
                 </div>
               </div>

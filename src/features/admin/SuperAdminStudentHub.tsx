@@ -551,7 +551,7 @@ export function SuperAdminStudentHub({ studentId }: Props) {
 
       {tab === "marks" && (
         <div className="rounded-2xl border-2 border-primary/25 bg-cream p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-primary">Marksheet — edit in place</h2>
+          <h2 className="text-xl font-bold text-primary">Marksheet - edit in place</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Everything below is editable: header lines, each course row, then{" "}
             <strong className="text-foreground">Save</strong> on a row or{" "}

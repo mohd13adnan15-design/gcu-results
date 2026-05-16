@@ -19,7 +19,7 @@ export type MarksheetEligibility = {
   missing: MarksheetMissingReason[];
 };
 
-/** Academic + hostel + library (and penalties) — unlocks the student "certificate" flow entry point. */
+/** Academic + hostel + library (and penalties) - unlocks the student "certificate" flow entry point. */
 export type FeeClearanceForCertificate = {
   ok: boolean;
   feesOk: boolean;

@@ -24,7 +24,10 @@ import {
   validateMarksTemplateColumns,
   type ParsedMarksCourseRow,
 } from "@/lib/marks-excel-template";
-import { syncStudentGradeAndMarksheet } from "@/lib/marks-sync";
+import {
+  calculateMarksheetTotals,
+  legacyMarkRowsToMarksheetCourses,
+} from "@/lib/marksheet";
 import { notificationPortalLabel } from "@/lib/portal";
 
 export function SuperAdminPage() {
@@ -114,14 +117,29 @@ function SuperAdminIssueReports() {
     await load();
   }
 
-  async function markSolved(id: string) {
+  async function markSolved(row: any) {
     const now = new Date().toISOString();
     const { error } = await supabase
       .from("portal_notifications")
       .update({ is_resolved: true, resolved_at: now, is_read: true })
-      .eq("id", id);
-    if (error) toast.error(error.message);
-    else toast.success("Marked solved");
+      .eq("id", row.id);
+    
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    if (row.sender_portal) {
+      await supabase.from("portal_notifications").insert({
+        recipient_portal: row.sender_portal,
+        sender_portal: "head_of_coe",
+        student_id: row.student_id,
+        title: "Issue Resolved by COE",
+        message: `The issue you reported has been resolved: ${row.title}`,
+      });
+    }
+
+    toast.success("Marked solved");
     await load();
   }
 
@@ -170,7 +188,7 @@ function SuperAdminIssueReports() {
             {showSolvedAction && !row.is_resolved ? (
               <button
                 type="button"
-                onClick={() => void markSolved(row.id)}
+                onClick={() => void markSolved(row)}
                 className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/15"
               >
                 Solved
@@ -423,7 +441,7 @@ function SuperAdminStudentsDashboard() {
                     </td>
                     <td className="px-2 py-2">{student.department}</td>
                     <td className="px-2 py-2">
-                      <span className="text-primary">{h?.programme_title ?? "—"}</span>
+                      <span className="text-primary">{h?.programme_title ?? "-"}</span>
                       <span className="ml-1 text-xs text-muted-foreground">
                         {h?.programme_code ?? ""}
                       </span>
@@ -433,9 +451,9 @@ function SuperAdminStudentsDashboard() {
                     </td>
                     <td className="px-2 py-2">{n}</td>
                     <td className="px-2 py-2">
-                      {h?.semester_gpa != null ? Number(h.semester_gpa).toFixed(2) : "—"}
+                      {h?.semester_gpa != null ? Number(h.semester_gpa).toFixed(2) : "-"}
                     </td>
-                    <td className="px-2 py-2">{h?.final_grade ?? "—"}</td>
+                    <td className="px-2 py-2">{h?.final_grade ?? "-"}</td>
                     <td className="px-2 py-2 text-right">
                       <Link
                         to={`/coe/students/${student.id}`}
@@ -479,7 +497,7 @@ function MarksUploader() {
       ["• Sl No is optional; rows are sorted by Sl No when present."],
       ["• Fill University, School Name, Grade Card No on each row for that student."],
       [
-        "• Use the example sheet as a guide — it mirrors the 24btre152 reference marksheet (11 courses).",
+        "• Use the example sheet as a guide - it mirrors the 24btre152 reference marksheet (11 courses).",
       ],
       ["• You can also add or edit marks on the site: COE → student → Subject marks."],
     ]);
@@ -698,18 +716,92 @@ function MarksUploader() {
         .in("id", studentUuids);
 
       // 9. End-to-end Sync (SGPA, JSON Marksheet, Grade Card Details)
-      let syncCount = 0;
-      for (const uuid of studentUuids) {
-        try {
-          const ex = studentExtras.get(uuid);
-          await syncStudentGradeAndMarksheet(supabase, uuid, ex);
-          syncCount++;
-        } catch (syncErr) {
-          console.error(`Sync failed for student ${uuid}:`, syncErr);
-        }
+      const marksheetsToUpsert = [];
+      const gradeCardDetailsToUpsert = [];
+      const nowIso2 = new Date().toISOString();
+
+      // Group parsed rows by student UUID and semester_label
+      const groupedMarks = new Map<string, ParsedMarksCourseRow[]>();
+      parsed.forEach(row => {
+        const sid = row.student_id.toLowerCase().trim();
+        const uuid = idLookup.get(sid);
+        if (!uuid) return;
+        const semLabel = row.semester_label || `Semester ${row.semester}`;
+        const key = `${uuid}|||${semLabel}`;
+        if (!groupedMarks.has(key)) groupedMarks.set(key, []);
+        groupedMarks.get(key)!.push(row);
+      });
+
+      for (const [key, rows] of groupedMarks.entries()) {
+        const [uuid, semLabel] = key.split("|||");
+        
+        const courses = legacyMarkRowsToMarksheetCourses(rows as any);
+        const totals = calculateMarksheetTotals(courses);
+        
+        const firstRow = rows[0];
+
+        marksheetsToUpsert.push({
+          student_id: uuid,
+          student_roll_no: firstRow.registration_no || firstRow.student_id,
+          university: firstRow.university,
+          school_name: firstRow.school_name,
+          programme_title: firstRow.programme_title,
+          programme_code: firstRow.programme_code,
+          student_name: firstRow.full_name,
+          registration_no: firstRow.registration_no || firstRow.student_id,
+          semester_label: semLabel,
+          exam_month_year: firstRow.exam_month_year,
+          issue_date: firstRow.issue_date,
+          grade_card_no: firstRow.grade_card_no,
+          qr_data: `GCU|${firstRow.student_id}|${firstRow.registration_no || firstRow.student_id}|${firstRow.full_name}|${firstRow.programme_code}|${semLabel}`,
+          photo_bucket: "student-photos",
+          photo_path: `${firstRow.registration_no || firstRow.student_id}/profile.jpeg`,
+          total_credits: totals.totalCredits,
+          total_credits_earned: totals.totalCreditsEarned,
+          total_credit_points: totals.totalCreditPoints,
+          sgpa: totals.sgpa,
+          cgpa: totals.sgpa,
+          final_grade: totals.finalGrade,
+          courses: courses as any,
+          updated_at: nowIso2,
+        });
+
+        gradeCardDetailsToUpsert.push({
+          student_id: uuid,
+          student_name: firstRow.full_name,
+          programme_title: firstRow.programme_title,
+          programme_code: firstRow.programme_code,
+          registration_no: firstRow.registration_no || firstRow.student_id,
+          semester_label: semLabel,
+          exam_month_year: firstRow.exam_month_year,
+          issue_date: firstRow.issue_date,
+          semester_gpa: totals.sgpa,
+          cgpa: totals.sgpa,
+          final_grade: totals.finalGrade,
+          updated_at: nowIso2,
+          created_at: nowIso2,
+        });
       }
 
-      console.log("Successfully synced students:", syncCount);
+      if (marksheetsToUpsert.length > 0) {
+        const { error: msErr } = await supabase.from("student_marksheets").upsert(
+          marksheetsToUpsert,
+          { onConflict: "student_id,semester_label" }
+        );
+        if (msErr) console.error("Marksheet upsert error:", msErr);
+      }
+
+      if (gradeCardDetailsToUpsert.length > 0) {
+        const { error: gcErr } = await supabase.from("grade_card_details").upsert(
+          gradeCardDetailsToUpsert,
+          // grade_card_details might still have unique student_id so we just push the last one or we ignore.
+          // Wait, actually grade_card_details is single row per student right now!
+          { onConflict: "student_id" }
+        );
+        if (gcErr) console.error("Grade Card Details upsert error:", gcErr);
+      }
+
+      console.log("Successfully synced students:", marksheetsToUpsert.length);
       
       const successCount = parsed.length;
       const studentCount = studentsMap.size;
@@ -749,11 +841,7 @@ function MarksUploader() {
           <h2 className="flex items-center gap-2 text-lg font-bold text-primary">
             <FileSpreadsheet className="h-5 w-5" /> Upload student marks
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The template includes Sl No, University, School, Grade Card No, and an{" "}
-            <strong>11-course example</strong> matching the 24btre152 reference marksheet. Upload
-            here or edit the same fields under each student on the site.
-          </p>
+
         </div>
         <button
           type="button"

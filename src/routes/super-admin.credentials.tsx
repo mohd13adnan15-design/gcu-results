@@ -63,7 +63,7 @@ function CredentialCreator() {
       return;
     }
     toast.success(
-      "Invitation sent — if email confirmation is enabled, the user must confirm before sign-in.",
+      "Invitation sent - if email confirmation is enabled, the user must confirm before sign-in.",
     );
     setForm({ email: "", password: "", portal: form.portal });
     window.dispatchEvent(new CustomEvent("portal-profiles:refresh"));

@@ -13,6 +13,7 @@ const ASSET_PATHS = {
   seal: "/templates/assets/gcu-seal.png",
   embossedSeal: "/templates/assets/ChatGPT Image May 10, 2026, 11_02_44 PM.png",
   rightSignature: "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png",
+  backPage: "/templates/assets/file_00000000f02871f897434ec5582a144c.png",
 };
 
 const GOLD: [number, number, number] = [184, 134, 11]; // DarkGoldenRod
@@ -45,12 +46,13 @@ export async function generateMarksheetPdf(
 ) {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const qr = await generateDynamicQrDataUrl(marksheet);
-  const [background, logo, seal, embossedSeal, rightSignature, photo] = await Promise.all([
+  const [background, logo, seal, embossedSeal, rightSignature, backPage, photo] = await Promise.all([
     loadDataUrl(ASSET_PATHS.background),
     loadDataUrl(ASSET_PATHS.logo),
     loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
     loadDataUrl(ASSET_PATHS.embossedSeal),
     loadDataUrl(ASSET_PATHS.rightSignature, { dropLightBackground: true }),
+    loadDataUrl(ASSET_PATHS.backPage),
     options.photoUrl
       ? loadDataUrl(options.photoUrl, { dropLightBackground: true, trimEdges: 18 })
       : Promise.resolve(null),
@@ -65,6 +67,67 @@ export async function generateMarksheetPdf(
     rightSignature,
     photo,
   });
+
+  if (backPage) {
+    doc.addPage();
+    doc.addImage(
+      backPage.dataUrl,
+      backPage.type,
+      0,
+      0,
+      doc.internal.pageSize.getWidth(),
+      doc.internal.pageSize.getHeight(),
+    );
+  }
+
+  return doc.output("blob");
+}
+
+export async function generateAllSemestersPdf(
+  marksheets: StudentMarksheet[],
+  options: MarksheetDocumentOptions = {},
+) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  
+  const [background, logo, seal, embossedSeal, rightSignature, backPage, photo] = await Promise.all([
+    loadDataUrl(ASSET_PATHS.background),
+    loadDataUrl(ASSET_PATHS.logo),
+    loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
+    loadDataUrl(ASSET_PATHS.embossedSeal),
+    loadDataUrl(ASSET_PATHS.rightSignature, { dropLightBackground: true }),
+    loadDataUrl(ASSET_PATHS.backPage),
+    options.photoUrl
+      ? loadDataUrl(options.photoUrl, { dropLightBackground: true, trimEdges: 18 })
+      : Promise.resolve(null),
+  ]);
+
+  for (let i = 0; i < marksheets.length; i++) {
+    const marksheet = marksheets[i];
+    if (i > 0) doc.addPage();
+    
+    const qr = await generateDynamicQrDataUrl(marksheet);
+    drawMarksheetPage(doc, marksheet, {
+      background,
+      logo,
+      qr,
+      seal,
+      embossedSeal,
+      rightSignature,
+      photo,
+    });
+  }
+
+  if (backPage && marksheets.length > 0) {
+    doc.addPage();
+    doc.addImage(
+      backPage.dataUrl,
+      backPage.type,
+      0,
+      0,
+      doc.internal.pageSize.getWidth(),
+      doc.internal.pageSize.getHeight(),
+    );
+  }
 
   return doc.output("blob");
 }
@@ -158,7 +221,7 @@ function drawHeader(
   if (images.logo) {
     const centerX = x + leftWidth;
     const centerWidth = width - leftWidth - rightWidth;
-    const logoWidth = 410;
+    const logoWidth = 250;
     const logoHeight = 170;
     const logoX = centerX + (centerWidth - logoWidth) / 2;
     doc.addImage(images.logo.dataUrl, images.logo.type, logoX, y - 42, logoWidth, logoHeight);

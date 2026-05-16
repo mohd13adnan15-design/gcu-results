@@ -165,7 +165,7 @@ export function AdminPage() {
 
     if (next && !canAdminVerifyMarksheet(student, true)) {
       toast.error(
-        \"Admin verification is only available after the student requests verification and COE approves.\",
+        "Admin verification is only available after the student requests verification and COE approves.",
       );
       return;
     }

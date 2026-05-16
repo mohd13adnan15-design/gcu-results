@@ -38,7 +38,7 @@ function HostelView() {
           <h2 className="mt-4 text-2xl font-bold text-primary">Not a hostel resident</h2>
           <p className="mt-2 text-muted-foreground">
             You aren't enrolled in the hostel portal, so this clearance isn't required for you. You
-            can generate your marks card directly from the dashboard.
+            can generate your Grade card directly from the dashboard.
           </p>
         </div>
       </div>

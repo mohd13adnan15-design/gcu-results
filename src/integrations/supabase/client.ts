@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
 function createSupabaseClient() {
-  // Browser bundles must not reference `process` — it is not defined in Vite client code.
+  // Browser bundles must not reference `process` - it is not defined in Vite client code.
   // Keys are injected via import.meta.env (see vite.config.ts define + .env).
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as

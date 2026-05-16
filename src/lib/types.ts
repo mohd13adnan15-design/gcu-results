@@ -29,7 +29,7 @@ export interface Student {
   fees_paid: number;
   hostel_total: number;
   hostel_paid: number;
-  /** UUID of `profiles.id` in the external library Supabase project — for penalty sync. */
+  /** UUID of `profiles.id` in the external library Supabase project - for penalty sync. */
   library_remote_profile_id?: string | null;
 }
 

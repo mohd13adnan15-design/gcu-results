@@ -298,7 +298,7 @@ export const TEJASHVI_MARKSHEET_SEED: StudentMarksheet = {
   ],
 };
 
-/** Demo marksheet for 24btre148 — same shape as Tejashvi seed but different semester, courses, and totals. */
+/** Demo marksheet for 24btre148 - same shape as Tejashvi seed but different semester, courses, and totals. */
 export const AARAV_MARKSHEET_SEED: StudentMarksheet = {
   student_id: "",
   student_roll_no: "24btre148",
@@ -473,11 +473,9 @@ export function groupCoursesBySection(courses: MarksheetCourse[]): MarksheetCour
 }
 
 export function buildMarksheetFileName(marksheet: StudentMarksheet, extension: "pdf") {
-  const studentSlug = marksheet.student_name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  return `${marksheet.student_roll_no.toLowerCase()}-${studentSlug}-marksheet.${extension}`;
+  const semMatch = marksheet.semester_label.match(/\d+/);
+  const semNum = semMatch ? semMatch[0] : marksheet.semester_label;
+  return `GradeCard_Sem${semNum}.${extension}`;
 }
 
 export function getStudentPhotoPublicUrl(
@@ -559,7 +557,7 @@ export function pickStudentPhotoPath({
   );
 }
 
-/** Rows from `student_marks` / Excel pipeline — shape matches Supabase insert. */
+/** Rows from `student_marks` / Excel pipeline - shape matches Supabase insert. */
 export type LegacyMarkRow = {
   subject: string;
   subject_code: string;
@@ -627,8 +625,8 @@ export function studentMarksToMarksheet(
   const courses = legacyMarkRowsToMarksheetCourses(marks);
 
   const totals = calculateMarksheetTotals(courses);
-  const programmeTitle = text(header?.programme_title) || "—";
-  const programmeCode = text(header?.programme_code) || "—";
+  const programmeTitle = text(header?.programme_title) || "-";
+  const programmeCode = text(header?.programme_code) || "-";
   const studentName = text(header?.student_name) || student.full_name;
   const registrationNo = text(header?.registration_no) || student.student_id;
   const semesterLabel = text(header?.semester_label) || `Semester ${student.semester}`;
@@ -670,6 +668,8 @@ export async function fetchStudentMarksheet(supabase: SupabaseClient, studentId:
     .from("student_marksheets")
     .select("*")
     .eq("student_id", studentId)
+    .order("semester_label", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) throw error;
@@ -705,6 +705,25 @@ export async function fetchStudentMarksheet(supabase: SupabaseClient, studentId:
   );
 }
 
+export async function fetchAllStudentMarksheets(supabase: SupabaseClient, studentId: string) {
+  // Try to fetch all saved marksheets for this student
+  const { data, error } = await supabase
+    .from("student_marksheets")
+    .select("*")
+    .eq("student_id", studentId)
+    .order("semester_label", { ascending: true });
+
+  if (error && error.code !== "PGRST116") throw error; // Ignore not found if it's returning empty array anyway
+  
+  if (data && data.length > 0) {
+    return data.map(normalizeMarksheet);
+  }
+
+  // Fallback: If no saved marksheets exist, fetch the current one using fallback logic
+  const currentMarksheet = await fetchStudentMarksheet(supabase, studentId);
+  return currentMarksheet ? [currentMarksheet] : [];
+}
+
 export async function fetchMarksheetByRegistrationNo(
   supabase: SupabaseClient,
   registrationNo: string,
@@ -715,6 +734,8 @@ export async function fetchMarksheetByRegistrationNo(
     .from("student_marksheets")
     .select("*")
     .ilike("registration_no", normalized)
+    .order("semester_label", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) throw error;

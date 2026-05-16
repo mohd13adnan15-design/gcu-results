@@ -1,3 +1,4 @@
+
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,7 +65,7 @@ function Dashboard() {
     const load = async () => {
       const [{ data }, { data: marksheetData }] = await Promise.all([
         supabase.from("students").select("*").eq("id", s.id).maybeSingle(),
-        supabase.from("student_marksheets").select("id").eq("student_id", s.id).maybeSingle(),
+        supabase.from("student_marksheets").select("id").eq("student_id", s.id).limit(1).maybeSingle(),
       ]);
       const st = data as Student | null;
       setStudent(st);
@@ -204,13 +205,13 @@ function Dashboard() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h3 className="text-xl font-bold text-primary flex items-center gap-2">
-              <FileText className="h-5 w-5" /> Marks card
+              <FileText className="h-5 w-5" /> Grade card
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {eligible
-                ? "Your Grade Card passed all checks — open downloads from the certificate page."
+                ? "Your Grade Card passed all checks - open downloads from the certificate page."
                 : certificateEntryUnlocked
-                  ? "Fees are clear — open the certificate page to start the process (one tap) and track Admin / COE review."
+                  ? "Fees are clear - open the certificate page to start the process (one tap) and track Admin / COE review."
                   : "Clear academic, hostel (if applicable), and library dues (including penalties) to continue."}
             </p>
             <ul className="mt-3 space-y-1 text-sm">
@@ -263,16 +264,14 @@ function Dashboard() {
           </div>
           <button
             onClick={() =>
-              eligible
-                ? navigate("/student/marks-card")
-                : navigate("/student/certificate-flow", {
-                  state: { autoStartCertificate: true },
-                })
+              navigate("/student/certificate-flow", {
+                state: { autoStartCertificate: !eligible },
+              })
             }
-            disabled={!certificateEntryUnlocked || (student.marksheet_verification_requested_at && !eligible)}
+            disabled={!certificateEntryUnlocked}
             className="rounded-md bg-primary px-6 py-3 text-primary-foreground font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {eligible ? "Download certificate" : student.marksheet_verification_requested_at ? "Verification in progress" : "Generate Grade card"}
+            {eligible ? "Download certificate" : student.marksheet_verification_requested_at ? "View Verification Status" : "Generate Grade card"}
           </button>
         </div>
       </section>

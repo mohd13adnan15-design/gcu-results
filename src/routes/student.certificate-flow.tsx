@@ -158,7 +158,7 @@ function CertificateFlow() {
       }
       if (hasRequest) {
         if (!opts?.silent) {
-          toast.message("Your certificate process is already running — watch the steps below.");
+          toast.message("Your certificate process is already running - watch the steps below.");
         }
         return true;
       }
@@ -302,27 +302,14 @@ function CertificateFlow() {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-primary">Official certificate</h2>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                Use <strong>Generate certificate</strong> once — we check fees, queue verification
-                automatically, and unlock PDF download when every step is green. Status updates in
-                real time.
-              </p>
             </div>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
-          <Clock className="h-4 w-4 shrink-0" aria-hidden />
-          <span>
-            <strong>Review timing:</strong> Internal verification shares one{" "}
-            <strong>48-hour</strong> target from when you start. No extra buttons — one start, then
-            wait for green checks.
-          </span>
-        </div>
       </section>
 
-      {hasRequest && !pdfOk && (
+      {hasRequest && !pdfOk && student?.marksheet_verification_requested_at && (
         <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Your Grade card will be generated in 48 hours.
+          <CountdownTimer requestedAtStr={student.marksheet_verification_requested_at} />
         </section>
       )}
 
@@ -358,15 +345,6 @@ function CertificateFlow() {
         <FlowDiagram nodes={flowNodes} />
       </section>
 
-      {eligibility && !eligibility.eligible && (
-        <section className="rounded-2xl border border-border bg-white/80 p-4 text-sm">
-          <p className="font-semibold text-primary">Waiting on</p>
-          <p className="mt-1 text-muted-foreground">
-            {eligibility.missing.map(missingReasonLabel).join(" · ")}
-          </p>
-        </section>
-      )}
-
       {/* Single primary action */}
       <section className="flex flex-col gap-4 rounded-2xl border-2 border-primary/20 bg-gradient-to-b from-cream to-white p-6 md:p-8">
         {!feesOk && (
@@ -385,7 +363,7 @@ function CertificateFlow() {
               <p className="text-sm text-muted-foreground">
                   {hasRequest
                     ? "Internal verification is in progress. This page updates automatically."
-                    : "One tap submits your file for verification — no separate request step."}
+                    : "One tap submits your file for verification - no separate request step."}
               </p>
             </div>
             <button
@@ -402,7 +380,7 @@ function CertificateFlow() {
         {pdfOk && (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-medium text-emerald-900">
-              All steps complete — open the secure download page (email OTP).
+              All steps complete - open the secure download page (email OTP).
             </p>
             <button
               type="button"
@@ -467,6 +445,45 @@ function FlowDiagram({
       </div>
     </>
   );
+}
+
+function CountdownTimer({ requestedAtStr }: { requestedAtStr: string }) {
+  const [timeLeft, setTimeLeft] = useState("");
+  const [isOverdue, setIsOverdue] = useState(false);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const requestedAt = new Date(requestedAtStr).getTime();
+      const targetTime = requestedAt + 48 * 60 * 60 * 1000;
+      const now = Date.now();
+      const diff = targetTime - now;
+
+      if (diff <= 0) {
+        setIsOverdue(true);
+        setTimeLeft("");
+      } else {
+        setIsOverdue(false);
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        const hStr = String(hours).padStart(2, "0");
+        const mStr = String(minutes).padStart(2, "0");
+        const sStr = String(seconds).padStart(2, "0");
+
+        setTimeLeft(`${hStr} : ${mStr} : ${sStr}`);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000); // update every second
+    return () => clearInterval(interval);
+  }, [requestedAtStr]);
+
+  if (isOverdue) {
+    return <span>Your Grade Card will be generated soon it's still under Verification</span>;
+  }
+  return <span>Your Grade card will be generated in {timeLeft}</span>;
 }
 
 function FlowNode({

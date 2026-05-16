@@ -79,7 +79,7 @@ function FeesView() {
         {!paidFull && (
           <div className="mt-6 rounded-xl border border-border bg-secondary p-4 text-sm text-primary">
             <strong>Reminder:</strong> Please complete the remaining ₹{pending.toLocaleString()} to
-            obtain fees clearance and unlock your marks card.
+            obtain fees clearance and unlock your Grade card.
           </div>
         )}
       </div>

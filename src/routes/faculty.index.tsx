@@ -23,12 +23,12 @@ export function FacultyPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<"roll" | "name" | "dept">("roll");
   const [verifiedFilter, setVerifiedFilter] = useState<"all" | "pending" | "done">("all");
+  const [unresolvedReports, setUnresolvedReports] = useState<Set<string>>(new Set());
   const [issueModal, setIssueModal] = useState<{
     student: Student;
     marksheet: StudentMarksheet | null;
     legacyCourseCount: number;
   } | null>(null);
-  const [issueDate, setIssueDate] = useState<string>(new Date().toISOString().split("T")[0]);
 
   async function load() {
     setLoading(true);
@@ -36,15 +36,22 @@ export function FacultyPage() {
       { data: studentRows, error: studentError },
       { data: marksheetRows, error: marksheetError },
       { data: markRows, error: markErr },
+      { data: notificationRows, error: notificationErr },
     ] = await Promise.all([
       supabase.from("students").select("*").order("student_id", { ascending: true }),
       supabase.from("student_marksheets").select("*").order("updated_at", { ascending: false }),
       supabase.from("student_marks").select("student_id"),
+      supabase
+        .from("portal_notifications")
+        .select("student_id")
+        .eq("recipient_portal", "head_of_coe")
+        .eq("is_resolved", false),
     ]);
 
     if (studentError) toast.error(studentError.message);
     if (marksheetError) toast.error(marksheetError.message);
     if (markErr) toast.error(markErr.message);
+    if (notificationErr) toast.error(notificationErr.message);
 
     setStudents((studentRows as Student[]) ?? []);
     setMarksheets(
@@ -57,6 +64,15 @@ export function FacultyPage() {
       countMap.set(row.student_id, (countMap.get(row.student_id) ?? 0) + 1);
     }
     setLegacyMarkCount(countMap);
+    
+    setUnresolvedReports(
+      new Set(
+        ((notificationRows ?? []) as { student_id: string | null }[])
+          .map((r) => r.student_id)
+          .filter(Boolean) as string[],
+      ),
+    );
+
     setLoading(false);
   }
 
@@ -68,6 +84,9 @@ export function FacultyPage() {
         void load();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "student_marksheets" }, () => {
+        void load();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "portal_notifications" }, () => {
         void load();
       })
       .subscribe();
@@ -166,7 +185,7 @@ export function FacultyPage() {
         await hasRecentDuplicateSuperAdminReport(supabase, {
           studentId: student.id,
           title,
-          senderPortal: "admin_1",
+          senderPortal: "admin_2",
         })
       ) {
         toast.message("Already reported", {
@@ -178,7 +197,7 @@ export function FacultyPage() {
 
       const { error: notificationError } = await supabase.from("portal_notifications").insert({
         recipient_portal: "head_of_coe",
-        sender_portal: "admin_1",
+        sender_portal: "admin_2",
         student_id: student.id,
         title: "Admin reported a mismatch",
         message: `Please recheck and edit marksheet data for ${student.student_id} (${student.full_name}).`,
@@ -213,12 +232,12 @@ export function FacultyPage() {
           next: true,
           hasMarksheet: hasMarksheetData,
         }),
-        grade_card_issue_date: issueDate,
+        grade_card_issue_date: marksheet?.issue_date || student.grade_card_issue_date || new Date().toISOString().split("T")[0],
       };
       const { error } = await supabase.from("students").update(payload).eq("id", student.id);
       if (error) throw error;
 
-      await syncStudentGradeAndMarksheet(supabase, student.id, { issue_date: issueDate });
+      await syncStudentGradeAndMarksheet(supabase, student.id);
 
       toast.success("Grade card issued for student.");
       setIssueModal(null);
@@ -333,6 +352,7 @@ export function FacultyPage() {
                         checked={Boolean(student.faculty_verified)}
                         disabled={
                           busyStudentId === student.id ||
+                          unresolvedReports.has(student.id) ||
                           (!hasMarks && !student.faculty_verified) ||
                           (!student.marksheet_verification_requested_at &&
                             !student.faculty_verified)
@@ -340,6 +360,7 @@ export function FacultyPage() {
                         onChange={() =>
                           void toggleFacultyVerified(student, marksheet, legacyCourseCount)
                         }
+                        title={unresolvedReports.has(student.id) ? "Waiting for COE to resolve report" : ""}
                         aria-label={`Admin for ${student.student_id}`}
                       />
                     </td>
@@ -348,8 +369,9 @@ export function FacultyPage() {
                         <button
                           type="button"
                           onClick={() => setIssueModal({ student, marksheet, legacyCourseCount })}
-                          disabled={busyStudentId === student.id}
-                          className="inline-flex items-center gap-1 rounded-md border border-border bg-cream px-2 py-1 text-xs text-primary hover:bg-secondary disabled:opacity-60"
+                          disabled={busyStudentId === student.id || unresolvedReports.has(student.id)}
+                          title={unresolvedReports.has(student.id) ? "Waiting for COE to resolve report" : ""}
+                          className="inline-flex items-center gap-1 rounded-md border border-border bg-cream px-2 py-1 text-xs text-primary hover:bg-secondary disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           <ShieldCheck className="h-3.5 w-3.5" /> Issue grade card
                         </button>
@@ -398,18 +420,9 @@ export function FacultyPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Please select the date to be printed on the Grade Card for {issueModal.student.full_name} ({issueModal.student.student_id}).
+            <p className="text-sm text-muted-foreground mb-6">
+              Please confirm that you want to issue the Grade Card for {issueModal.student.full_name} ({issueModal.student.student_id}). The issue date will be fetched from the marksheet data uploaded by the COE.
             </p>
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-primary mb-1">Issue Date</label>
-              <input
-                type="date"
-                value={issueDate}
-                onChange={(e) => setIssueDate(e.target.value)}
-                className="w-full rounded-md border border-border bg-cream px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
             <div className="flex justify-end gap-3">
               <button
                 type="button"

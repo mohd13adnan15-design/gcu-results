@@ -6,7 +6,7 @@ export const DUPLICATE_REPORT_WINDOW_MS = 20 * 60 * 1000;
 
 /**
  * Returns true if a matching unresolved report to Admin was created recently
- * (same student, title, sender) — caller should block insert and show a toast.
+ * (same student, title, sender) - caller should block insert and show a toast.
  */
 export async function hasRecentDuplicateSuperAdminReport(
   supabase: SupabaseClient,

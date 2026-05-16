@@ -85,11 +85,11 @@ function LibraryView() {
           <Lock className="mx-auto h-10 w-10 text-muted-foreground" />
           <h2 className="mt-4 text-2xl font-bold text-primary">Not registered with library</h2>
           <p className="mt-2 text-muted-foreground">
-            Library clearance and central-library penalties aren’t shown for your account — this is
+            Library clearance and central-library penalties aren’t shown for your account - this is
             expected if you aren’t enrolled in the library portal.
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
-            You can still complete other clearance steps and generate your marks card when eligible.
+            You can still complete other clearance steps and generate your Grade card when eligible.
           </p>
         </div>
       </div>
@@ -111,7 +111,7 @@ function LibraryView() {
         <ArrowLeft className="h-4 w-4" /> Back
       </Link>
 
-      {/* Central library DB — overdue penalties */}
+      {/* Central library DB - overdue penalties */}
       <div className="card-elevated rounded-2xl p-6">
         <div className="flex items-start gap-3">
           <AlertCircle className="h-6 w-6 shrink-0 text-primary mt-0.5" />
@@ -132,7 +132,7 @@ function LibraryView() {
         )}
         {remoteConfigured && !remoteProfileId && (
           <p className="mt-4 text-sm text-amber-900">
-            Your account isn’t linked to the central library system yet — fees from that system
+            Your account isn’t linked to the central library system yet - fees from that system
             won’t appear. Ask an administrator to set{" "}
             <code className="text-xs">library_remote_profile_id</code> for your profile or configure{" "}
             <code className="text-xs">VITE_LIBRARY_PROFILE_MAP_JSON</code>.

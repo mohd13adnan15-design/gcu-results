@@ -8,7 +8,7 @@ import type { Student, StudentMarkRow } from "@/lib/types";
 import { toast } from "sonner";
 import { RefreshCw, Plus, Save, Trash2 } from "lucide-react";
 
-/** Matches marksheet preview boxes — clearly interactive on Super Admin. */
+/** Matches marksheet preview boxes - clearly interactive on Super Admin. */
 const PRETTY_PROGRAMME =
   "rounded-lg border border-border bg-white px-3 py-2 text-lg font-bold text-primary shadow-sm outline-none transition hover:border-primary/45 focus:border-primary focus:ring-2 focus:ring-primary/20";
 const PRETTY_FIELD =
@@ -52,9 +52,9 @@ type Props = {
   studentId: string;
   /** Fires after a successful sync to `student_marksheets` (e.g. refresh Super Admin preview). */
   onMarksheetSynced?: () => void;
-  /** Fewer headings/tooltips — used on Super Admin student hub. */
+  /** Fewer headings/tooltips - used on Super Admin student hub. */
   compact?: boolean;
-  /** Marks card layout like faculty View — same fields, all inputs + save (Super Admin). */
+  /** Grade card layout like faculty View - same fields, all inputs + save (Super Admin). */
   prettyCard?: boolean;
 };
 
@@ -410,7 +410,7 @@ export function StudentMarksAdminEditor({
       {prettyCard ? (
         <div className="mb-2 rounded-2xl border-2 border-primary/30 bg-gradient-to-b from-white to-cream/80 p-5 shadow-md">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">
-            Edit marksheet header — click fields below
+            Edit marksheet header - click fields below
           </p>
           <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-lg font-bold text-primary">
@@ -442,7 +442,7 @@ export function StudentMarksAdminEditor({
               </p>
               <p>
                 SGPA: <strong>{header.semester_gpa}</strong> · Grade{" "}
-                <strong>{header.final_grade || "—"}</strong>
+                <strong>{header.final_grade || "-"}</strong>
               </p>
             </div>
           </div>
@@ -539,7 +539,7 @@ export function StudentMarksAdminEditor({
         </div>
       ) : (
         <div className="flex items-start justify-between gap-4">
-          <h3 className="text-lg font-bold text-primary">Course table — edit cells, then Save</h3>
+          <h3 className="text-lg font-bold text-primary">Course table - edit cells, then Save</h3>
           <div className="rounded-lg border border-border bg-secondary/20 px-3 py-2 text-sm">
             Total credits: <strong>{totalCredits.toFixed(1)}</strong>
           </div>
@@ -695,7 +695,7 @@ export function StudentMarksAdminEditor({
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <span className="text-muted-foreground">
               SGPA (after sync): <strong className="text-primary">{header.semester_gpa}</strong> ·
-              Grade <strong className="text-primary">{header.final_grade || "—"}</strong>
+              Grade <strong className="text-primary">{header.final_grade || "-"}</strong>
             </span>
             <button
               type="button"

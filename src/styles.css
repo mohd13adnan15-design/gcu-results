@@ -5,14 +5,14 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * GCU Result Portal — Design System
+ * GCU Result Portal - Design System
  *
  * Strict 5-color palette (per user requirement):
- *   #FEFAF6 (cream)        — background
- *   #EADBC8 (sand)         — secondary surface
- *   #DAC0A3 (khaki)        — accent / highlights
- *   #102C57 (deep navy)    — primary / text
- *   #000000 (black)        — strong text / borders
+ *   #FEFAF6 (cream)        - background
+ *   #EADBC8 (sand)         - secondary surface
+ *   #DAC0A3 (khaki)        - accent / highlights
+ *   #102C57 (deep navy)    - primary / text
+ *   #000000 (black)        - strong text / borders
  *
  * All values are expressed as oklch.
  */
@@ -151,7 +151,8 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: "Georgia", "Cambria", "Times New Roman", serif;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 18px;
   }
 
   h1,
@@ -160,7 +161,7 @@
   h4,
   h5,
   h6 {
-    font-family: "Georgia", "Cambria", "Times New Roman", serif;
+    font-family: "Times New Roman", Times, serif;
     letter-spacing: -0.02em;
   }
 }
