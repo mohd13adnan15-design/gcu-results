@@ -1,0 +1,23 @@
+-- Manual portal assignment when you created the Auth user in Supabase Dashboard
+-- (Authentication → Users → Add user) instead of the app's "Create auth account" form.
+--
+-- The trigger on auth.users only fills portal_profiles when sign-up metadata includes
+-- `portal`. Dashboard-created users often have no metadata — insert here instead.
+--
+-- Steps:
+-- 1. Dashboard → create user (email + password). Copy their UUID from the user row.
+-- 2. Replace placeholders below and run in SQL Editor.
+--
+-- portal must be one of: library | hostel | fees | admin_1 | admin_2 | head_of_coe
+--
+-- Example (Head of COE bootstrap — do once):
+--
+-- insert into public.portal_profiles (user_id, portal, email)
+-- values (
+--   'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'::uuid,
+--   'head_of_coe',
+--   'head.coe@your-domain.edu'
+-- )
+-- on conflict (user_id) do update set
+--   portal = excluded.portal,
+--   email = excluded.email;
