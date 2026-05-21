@@ -242,7 +242,7 @@ function drawDetailsTable(
   y: number,
   width: number,
 ) {
-  const rowHeight = 16;
+  const baseRowHeight = 16;
   const col1X = x;
 
   const rows = [
@@ -259,30 +259,41 @@ function drawDetailsTable(
   }
 
   const col1ValueX = col1X + maxL1Width + 18;
+  let currentY = y;
 
   for (let i = 0; i < rows.length; i++) {
     const [l1, v1, l2, v2] = rows[i];
-    const rowY = y + i * rowHeight;
+
+    const rightValue = v2;
+    const rightLabel = `${l2} : `;
+    doc.setFont("times", "bold");
+    const rightValueWidth = doc.getTextWidth(rightValue);
+    doc.setFont("times", "normal");
+    const rightLabelWidth = doc.getTextWidth(rightLabel);
+    
+    // Max width for the left value so it doesn't overlap with the right column
+    const maxV1Width = (x + width) - rightValueWidth - rightLabelWidth - col1ValueX - 10;
+
+    doc.setFont("times", "bold");
+    const v1Lines = fitLines(doc, v1, maxV1Width, 3);
 
     // Left Column
     doc.setFont("times", "normal");
     doc.setTextColor(0, 0, 0);
-    doc.text(l1, col1X, rowY);
-    doc.text(":", col1ValueX - 10, rowY);
+    doc.text(l1, col1X, currentY);
+    doc.text(":", col1ValueX - 10, currentY);
     doc.setFont("times", "bold");
-    doc.text(v1, col1ValueX, rowY);
+    doc.text(v1Lines, col1ValueX, currentY);
 
     // Right Column (Aligning from the right edge)
-    const rightValue = v2;
-    const rightLabel = `${l2} : `;
-    doc.setFont("times", "bold");
-    doc.text(rightValue, x + width, rowY, { align: "right" });
-    const vWidth = doc.getTextWidth(rightValue);
+    doc.text(rightValue, x + width, currentY, { align: "right" });
     doc.setFont("times", "normal");
-    doc.text(rightLabel, x + width - vWidth - 2, rowY, { align: "right" });
+    doc.text(rightLabel, x + width - rightValueWidth - 2, currentY, { align: "right" });
+
+    currentY += baseRowHeight + (v1Lines.length - 1) * 14;
   }
 
-  return y + rows.length * rowHeight;
+  return currentY;
 }
 
 function drawMarksTable(

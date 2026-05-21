@@ -383,9 +383,6 @@ function MarksCard() {
                       Student: <strong>{marksheet.student_name}</strong>
                     </p>
                     <p>
-                      Roll no: <strong>{marksheet.student_roll_no}</strong>
-                    </p>
-                    <p>
                       Registration: <strong>{marksheet.registration_no}</strong>
                     </p>
                     <p>
@@ -393,9 +390,6 @@ function MarksCard() {
                     </p>
                     <p>
                       Courses: <strong>{marksheet.courses.length}</strong>
-                    </p>
-                    <p>
-                      SGPA: <strong>{marksheet.sgpa.toFixed(2)}</strong>
                     </p>
                   </div>
                 ) : (

@@ -242,6 +242,29 @@ export function StudentMarksAdminEditor({
     if (!student || !header) return;
     setHeaderBusy(true);
     try {
+      // Auto-save all row edits before syncing
+      for (const row of marks) {
+        if (!row.id) continue;
+        const grade = String(row.grade ?? "").trim().toUpperCase();
+        const credits = Number(row.credits ?? 0);
+        const creditsEarned = Number(row.credits_earned ?? 0) || (grade === "RA" ? 0 : credits);
+        const gradePoints = Number(row.grade_points ?? 0) || gradePointsFromGradeLetter(grade || "RA");
+        await supabase
+          .from("student_marks")
+          .update({
+            subject: row.subject,
+            subject_code: row.subject_code,
+            course_category: row.course_category,
+            credits,
+            credits_earned: creditsEarned,
+            marks_obtained: Number(row.marks_obtained ?? 0),
+            max_marks: Number(row.max_marks ?? 100),
+            grade,
+            grade_points: gradePoints,
+          })
+          .eq("id", row.id);
+      }
+
       const now = new Date().toISOString();
       const { error } = await supabase.from("grade_card_details").upsert(
         {
