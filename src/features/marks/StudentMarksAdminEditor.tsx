@@ -383,6 +383,10 @@ export function StudentMarksAdminEditor({
     }
   }
 
+  const updateMark = (id: string, updates: Partial<DraftMark>) => {
+    setMarks((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)));
+  };
+
   const totalCredits = useMemo(
     () => marks.reduce((sum, row) => sum + Number(row.credits ?? 0), 0),
     [marks],
@@ -471,33 +475,6 @@ export function StudentMarksAdminEditor({
                 value={header.registration_no}
                 onChange={(e) =>
                   setHeader((h) => (h ? { ...h, registration_no: e.target.value } : h))
-                }
-                className={PRETTY_FIELD}
-              />
-            </PrettyField>
-            <PrettyField label="Semester">
-              <input
-                value={header.semester_label}
-                onChange={(e) =>
-                  setHeader((h) => (h ? { ...h, semester_label: e.target.value } : h))
-                }
-                className={PRETTY_FIELD}
-              />
-            </PrettyField>
-            <PrettyField label="Exam">
-              <input
-                value={header.exam_month_year}
-                onChange={(e) =>
-                  setHeader((h) => (h ? { ...h, exam_month_year: e.target.value } : h))
-                }
-                className={PRETTY_FIELD}
-              />
-            </PrettyField>
-            <PrettyField label="Grade card no">
-              <input
-                value={header.grade_card_no}
-                onChange={(e) =>
-                  setHeader((h) => (h ? { ...h, grade_card_no: e.target.value } : h))
                 }
                 className={PRETTY_FIELD}
               />
@@ -746,21 +723,13 @@ export function StudentMarksAdminEditor({
           </thead>
           <tbody>
             {marks.map((row, index) => {
-              const editing = draft.id === row.id;
-              const current = editing ? { ...row, ...draft } : row;
               return (
                 <tr key={row.id} className="border-b border-border/60">
                   <td className="px-2 py-2 text-muted-foreground">{index + 1}</td>
                   <td className="px-2 py-2">
                     <input
-                      value={String(current.subject_code ?? "")}
-                      onChange={(e) =>
-                        setDraft((value) => ({
-                          ...value,
-                          id: row.id,
-                          subject_code: e.target.value,
-                        }))
-                      }
+                      value={String(row.subject_code ?? "")}
+                      onChange={(e) => updateMark(row.id!, { subject_code: e.target.value })}
                       className={
                         prettyCard
                           ? `${PRETTY_TABLE_INPUT} w-24`
@@ -770,10 +739,8 @@ export function StudentMarksAdminEditor({
                   </td>
                   <td className="px-2 py-2">
                     <input
-                      value={String(current.subject ?? "")}
-                      onChange={(e) =>
-                        setDraft((value) => ({ ...value, id: row.id, subject: e.target.value }))
-                      }
+                      value={String(row.subject ?? "")}
+                      onChange={(e) => updateMark(row.id!, { subject: e.target.value })}
                       className={
                         prettyCard
                           ? `${PRETTY_TABLE_INPUT} min-w-[11rem]`
@@ -783,14 +750,8 @@ export function StudentMarksAdminEditor({
                   </td>
                   <td className="px-2 py-2">
                     <input
-                      value={String(current.course_category ?? "CORE COURSE")}
-                      onChange={(e) =>
-                        setDraft((value) => ({
-                          ...value,
-                          id: row.id,
-                          course_category: e.target.value,
-                        }))
-                      }
+                      value={String(row.course_category ?? "CORE COURSE")}
+                      onChange={(e) => updateMark(row.id!, { course_category: e.target.value })}
                       className={
                         prettyCard
                           ? `${PRETTY_TABLE_INPUT} min-w-[9rem]`
@@ -804,28 +765,16 @@ export function StudentMarksAdminEditor({
                         <input
                           type="number"
                           title="Credits earned"
-                          value={String(current.credits_earned ?? 0)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              credits_earned: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.credits_earned ?? 0)}
+                          onChange={(e) => updateMark(row.id!, { credits_earned: Number(e.target.value) })}
                           className={`${PRETTY_TABLE_INPUT} w-11`}
                         />
                         <span className="text-muted-foreground">/</span>
                         <input
                           type="number"
                           title="Course credits"
-                          value={String(current.credits ?? 0)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              credits: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.credits ?? 0)}
+                          onChange={(e) => updateMark(row.id!, { credits: Number(e.target.value) })}
                           className={`${PRETTY_TABLE_INPUT} w-11`}
                         />
                       </div>
@@ -835,28 +784,16 @@ export function StudentMarksAdminEditor({
                       <td className="px-2 py-2">
                         <input
                           type="number"
-                          value={String(current.credits ?? 0)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              credits: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.credits ?? 0)}
+                          onChange={(e) => updateMark(row.id!, { credits: Number(e.target.value) })}
                           className="w-16 rounded border border-border bg-cream px-2 py-1"
                         />
                       </td>
                       <td className="px-2 py-2">
                         <input
                           type="number"
-                          value={String(current.credits_earned ?? 0)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              credits_earned: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.credits_earned ?? 0)}
+                          onChange={(e) => updateMark(row.id!, { credits_earned: Number(e.target.value) })}
                           className="w-16 rounded border border-border bg-cream px-2 py-1"
                         />
                       </td>
@@ -866,52 +803,32 @@ export function StudentMarksAdminEditor({
                     <>
                       <td className="px-2 py-2">
                         <input
-                          value={String(current.grade ?? "")}
-                          onChange={(e) =>
-                            setDraft((value) => ({ ...value, id: row.id, grade: e.target.value }))
-                          }
+                          value={String(row.grade ?? "")}
+                          onChange={(e) => updateMark(row.id!, { grade: e.target.value })}
                           className={`${PRETTY_TABLE_INPUT} w-12`}
                         />
                       </td>
                       <td className="px-2 py-2">
                         <input
                           type="number"
-                          value={String(current.grade_points ?? 0)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              grade_points: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.grade_points ?? 0)}
+                          onChange={(e) => updateMark(row.id!, { grade_points: Number(e.target.value) })}
                           className={`${PRETTY_TABLE_INPUT} w-12`}
                         />
                       </td>
                       <td className="px-2 py-2">
                         <input
                           type="number"
-                          value={String(current.marks_obtained ?? 0)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              marks_obtained: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.marks_obtained ?? 0)}
+                          onChange={(e) => updateMark(row.id!, { marks_obtained: Number(e.target.value) })}
                           className={`${PRETTY_TABLE_INPUT} w-14`}
                         />
                       </td>
                       <td className="px-2 py-2">
                         <input
                           type="number"
-                          value={String(current.max_marks ?? 100)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              max_marks: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.max_marks ?? 100)}
+                          onChange={(e) => updateMark(row.id!, { max_marks: Number(e.target.value) })}
                           className={`${PRETTY_TABLE_INPUT} w-14`}
                         />
                       </td>
@@ -921,51 +838,31 @@ export function StudentMarksAdminEditor({
                       <td className="px-2 py-2">
                         <input
                           type="number"
-                          value={String(current.marks_obtained ?? 0)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              marks_obtained: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.marks_obtained ?? 0)}
+                          onChange={(e) => updateMark(row.id!, { marks_obtained: Number(e.target.value) })}
                           className="w-16 rounded border border-border bg-cream px-2 py-1"
                         />
                       </td>
                       <td className="px-2 py-2">
                         <input
                           type="number"
-                          value={String(current.max_marks ?? 100)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              max_marks: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.max_marks ?? 100)}
+                          onChange={(e) => updateMark(row.id!, { max_marks: Number(e.target.value) })}
                           className="w-16 rounded border border-border bg-cream px-2 py-1"
                         />
                       </td>
                       <td className="px-2 py-2">
                         <input
-                          value={String(current.grade ?? "")}
-                          onChange={(e) =>
-                            setDraft((value) => ({ ...value, id: row.id, grade: e.target.value }))
-                          }
+                          value={String(row.grade ?? "")}
+                          onChange={(e) => updateMark(row.id!, { grade: e.target.value })}
                           className="w-14 rounded border border-border bg-cream px-2 py-1"
                         />
                       </td>
                       <td className="px-2 py-2">
                         <input
                           type="number"
-                          value={String(current.grade_points ?? 0)}
-                          onChange={(e) =>
-                            setDraft((value) => ({
-                              ...value,
-                              id: row.id,
-                              grade_points: Number(e.target.value),
-                            }))
-                          }
+                          value={String(row.grade_points ?? 0)}
+                          onChange={(e) => updateMark(row.id!, { grade_points: Number(e.target.value) })}
                           className="w-14 rounded border border-border bg-cream px-2 py-1"
                         />
                       </td>
@@ -975,7 +872,7 @@ export function StudentMarksAdminEditor({
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        onClick={() => void saveRow({ ...current, id: row.id })}
+                        onClick={() => void saveRow(row)}
                         disabled={savingId === row.id}
                         className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-60"
                       >
@@ -1000,71 +897,98 @@ export function StudentMarksAdminEditor({
       <div className={`rounded-xl border border-border bg-cream p-4 ${compact ? "mt-4" : "mt-6"}`}>
         <h4 className="text-sm font-semibold text-primary">Add subject</h4>
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <input
-            value={draft.subject_code ?? ""}
-            onChange={(e) => setDraft((value) => ({ ...value, subject_code: e.target.value }))}
-            placeholder="Course code"
-            className="rounded border border-border bg-white px-3 py-2"
-          />
-          <input
-            value={draft.subject ?? ""}
-            onChange={(e) => setDraft((value) => ({ ...value, subject: e.target.value }))}
-            placeholder="Course title"
-            className="rounded border border-border bg-white px-3 py-2 md:col-span-2"
-          />
-          <input
-            value={draft.course_category ?? "CORE COURSE"}
-            onChange={(e) => setDraft((value) => ({ ...value, course_category: e.target.value }))}
-            placeholder="Category (e.g. PRACTICAL)"
-            className="rounded border border-border bg-white px-3 py-2"
-          />
-          <input
-            type="number"
-            value={String(draft.credits ?? 4)}
-            onChange={(e) => setDraft((value) => ({ ...value, credits: Number(e.target.value) }))}
-            placeholder="Credits"
-            className="rounded border border-border bg-white px-3 py-2"
-          />
-          <input
-            type="number"
-            value={String(draft.credits_earned ?? 4)}
-            onChange={(e) =>
-              setDraft((value) => ({ ...value, credits_earned: Number(e.target.value) }))
-            }
-            placeholder="Credits earned"
-            className="rounded border border-border bg-white px-3 py-2"
-          />
-          <input
-            type="number"
-            value={String(draft.marks_obtained ?? 0)}
-            onChange={(e) =>
-              setDraft((value) => ({ ...value, marks_obtained: Number(e.target.value) }))
-            }
-            placeholder="Marks obtained"
-            className="rounded border border-border bg-white px-3 py-2"
-          />
-          <input
-            type="number"
-            value={String(draft.max_marks ?? 100)}
-            onChange={(e) => setDraft((value) => ({ ...value, max_marks: Number(e.target.value) }))}
-            placeholder="Max marks"
-            className="rounded border border-border bg-white px-3 py-2"
-          />
-          <input
-            value={String(draft.grade ?? "")}
-            onChange={(e) => setDraft((value) => ({ ...value, grade: e.target.value }))}
-            placeholder="Grade (e.g. A+)"
-            className="rounded border border-border bg-white px-3 py-2"
-          />
-          <input
-            type="number"
-            value={String(draft.grade_points ?? 0)}
-            onChange={(e) =>
-              setDraft((value) => ({ ...value, grade_points: Number(e.target.value) }))
-            }
-            placeholder="Grade points (optional)"
-            className="rounded border border-border bg-white px-3 py-2"
-          />
+          <label className="text-xs font-medium text-muted-foreground">
+            Course code
+            <input
+              value={draft.subject_code ?? ""}
+              onChange={(e) => setDraft((value) => ({ ...value, subject_code: e.target.value }))}
+              placeholder="e.g. 23BCA101"
+              className="mt-1 w-full rounded border border-border bg-white px-3 py-2"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground md:col-span-2">
+            Course title
+            <input
+              value={draft.subject ?? ""}
+              onChange={(e) => setDraft((value) => ({ ...value, subject: e.target.value }))}
+              placeholder="e.g. Data Structures"
+              className="mt-1 w-full rounded border border-border bg-white px-3 py-2"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Section / Category
+            <input
+              value={draft.course_category ?? "CORE COURSE"}
+              onChange={(e) => setDraft((value) => ({ ...value, course_category: e.target.value }))}
+              placeholder="e.g. CORE COURSE"
+              className="mt-1 w-full rounded border border-border bg-white px-3 py-2"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Total Credits
+            <input
+              type="number"
+              value={String(draft.credits ?? 4)}
+              onChange={(e) => setDraft((value) => ({ ...value, credits: Number(e.target.value) }))}
+              placeholder="4"
+              className="mt-1 w-full rounded border border-border bg-white px-3 py-2"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Credits Earned
+            <input
+              type="number"
+              value={String(draft.credits_earned ?? 4)}
+              onChange={(e) =>
+                setDraft((value) => ({ ...value, credits_earned: Number(e.target.value) }))
+              }
+              placeholder="4"
+              className="mt-1 w-full rounded border border-border bg-white px-3 py-2"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Marks Obtained
+            <input
+              type="number"
+              value={String(draft.marks_obtained ?? 0)}
+              onChange={(e) =>
+                setDraft((value) => ({ ...value, marks_obtained: Number(e.target.value) }))
+              }
+              placeholder="e.g. 85"
+              className="mt-1 w-full rounded border border-border bg-white px-3 py-2"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Max Marks
+            <input
+              type="number"
+              value={String(draft.max_marks ?? 100)}
+              onChange={(e) => setDraft((value) => ({ ...value, max_marks: Number(e.target.value) }))}
+              placeholder="e.g. 100"
+              className="mt-1 w-full rounded border border-border bg-white px-3 py-2"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Grade (Letter)
+            <input
+              value={String(draft.grade ?? "")}
+              onChange={(e) => setDraft((value) => ({ ...value, grade: e.target.value }))}
+              placeholder="e.g. A+"
+              className="mt-1 w-full rounded border border-border bg-white px-3 py-2"
+            />
+          </label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Grade Points
+            <input
+              type="number"
+              value={String(draft.grade_points ?? 0)}
+              onChange={(e) =>
+                setDraft((value) => ({ ...value, grade_points: Number(e.target.value) }))
+              }
+              placeholder="e.g. 9"
+              className="mt-1 w-full rounded border border-border bg-white px-3 py-2"
+            />
+          </label>
         </div>
         <button
           type="button"

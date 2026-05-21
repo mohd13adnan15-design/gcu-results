@@ -284,12 +284,6 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
       <div className="card-elevated rounded-2xl p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <StudentIdentity student={student} />
-          <VerificationSummary
-            portal={portal}
-            student={student}
-            marksheet={marksheet}
-            eligibility={eligibility}
-          />
         </div>
 
         {portal === "admin_2" && <AdminClearanceReview student={student} />}
@@ -379,43 +373,7 @@ function StudentIdentity({ student }: { student: Student }) {
   );
 }
 
-function VerificationSummary({
-  portal,
-  student,
-  marksheet,
-  eligibility,
-}: {
-  portal: PortalMode;
-  student: Student;
-  marksheet: StudentMarksheet | null;
-  eligibility: ReturnType<typeof getMarksheetEligibility> | null;
-}) {
-  const pending = eligibility?.missing ?? [];
-  return (
-    <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3 text-sm">
-      <p>
-        Grade Card: <strong>{marksheet ? "Available" : "Missing"}</strong>
-      </p>
-      <p>
-        Verification: <strong>{student.faculty_verified ? "Verified" : "Pending"}</strong>
-      </p>
-      {portal === "admin_2" && (
-        <p>
-          COE: <strong>{student.admin_verified ? "Issued" : "Pending"}</strong>
-        </p>
-      )}
-      {pending.length > 0 ? (
-        <p className="mt-2 max-w-xs text-xs text-muted-foreground">
-          Pending: {pending.map(missingReasonLabel).join(", ")}
-        </p>
-      ) : (
-        <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Ready
-        </p>
-      )}
-    </div>
-  );
-}
+
 function AdminClearanceReview({ student }: { student: Student }) {
   const academic = calculateFeeStatus({
     paid: student.fees_paid,
@@ -441,7 +399,7 @@ function AdminClearanceReview({ student }: { student: Student }) {
       />
       <ClearanceBox
         label="Hostel Fee"
-        status={!student.in_hostel ? "Not enrolled" : hostel.cleared ? "Clear" : "Pending"}
+        status={!student.in_hostel ? "No Penalty" : hostel.cleared ? "Clear" : "Pending"}
         lines={
           student.in_hostel
             ? [
@@ -455,7 +413,7 @@ function AdminClearanceReview({ student }: { student: Student }) {
       <ClearanceBox
         label="Library"
         status={
-          !student.in_library ? "Not enrolled" : student.library_cleared ? "Clear" : "Pending"
+          !student.in_library ? "No Penalty" : student.library_cleared ? "Clear" : "Pending"
         }
         lines={
           student.in_library

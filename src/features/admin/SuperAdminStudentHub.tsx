@@ -16,6 +16,7 @@ import {
   Loader2,
   User,
   Wallet,
+  Plus,
 } from "lucide-react";
 
 type TabId = "overview" | "fees" | "marks";
@@ -42,6 +43,11 @@ export function SuperAdminStudentHub({ studentId }: Props) {
   const [tab, setTab] = useState<TabId>("overview");
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState<Student | null>(null);
+  const [localDepts, setLocalDepts] = useState<string[]>([...DEPARTMENTS]);
+  const [selectedDept, setSelectedDept] = useState("");
+  const [inFees, setInFees] = useState(false);
+  const [inHostel, setInHostel] = useState(false);
+  const [inLibrary, setInLibrary] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,7 +60,17 @@ export function SuperAdminStudentHub({ studentId }: Props) {
       toast.error(error.message);
       setStudent(null);
     } else {
-      setStudent((data as Student) ?? null);
+      const s = data as Student;
+      setStudent(s ?? null);
+      if (s) {
+        if (!localDepts.includes(s.department)) {
+          setLocalDepts((prev) => [...prev, s.department]);
+        }
+        setSelectedDept(s.department);
+        setInFees(s.in_fees);
+        setInHostel(s.in_hostel);
+        setInLibrary(s.in_library);
+      }
     }
     setLoading(false);
   }, [studentId]);
@@ -72,8 +88,6 @@ export function SuperAdminStudentHub({ studentId }: Props) {
       .trim()
       .toLowerCase();
     const department = String(fd.get("department") ?? "");
-    const semester = Number(fd.get("semester") ?? 1);
-    const year = Number(fd.get("year") ?? 1);
     if (!full_name || !email) {
       toast.error("Name and email are required.");
       return;
@@ -82,11 +96,9 @@ export function SuperAdminStudentHub({ studentId }: Props) {
       full_name,
       email,
       department,
-      semester: Number.isFinite(semester) ? semester : student.semester,
-      year: Number.isFinite(year) ? year : student.year,
-      in_fees: fd.get("in_fees") === "on",
-      in_hostel: fd.get("in_hostel") === "on",
-      in_library: fd.get("in_library") === "on",
+      in_fees: inFees,
+      in_hostel: inHostel,
+      in_library: inLibrary,
     };
     const { error } = await supabase.from("students").update(patch).eq("id", student.id);
     if (error) {
@@ -105,7 +117,6 @@ export function SuperAdminStudentHub({ studentId }: Props) {
     const fees_total = Number(fd.get("fees_total") ?? 0);
     const hostel_paid = Number(fd.get("hostel_paid") ?? 0);
     const hostel_total = Number(fd.get("hostel_total") ?? 0);
-    const library_remote = String(fd.get("library_remote_profile_id") ?? "").trim();
 
     const { error } = await supabase
       .from("students")
@@ -117,7 +128,6 @@ export function SuperAdminStudentHub({ studentId }: Props) {
         fees_cleared: fd.get("fees_cleared") === "on",
         hostel_cleared: fd.get("hostel_cleared") === "on",
         library_cleared: fd.get("library_cleared") === "on",
-        library_remote_profile_id: library_remote || null,
       })
       .eq("id", student.id);
     if (error) {
@@ -202,21 +212,21 @@ export function SuperAdminStudentHub({ studentId }: Props) {
   const tabs: { id: TabId; label: string; icon: LucideIcon; hint: string }[] = [
     {
       id: "overview",
-      label: "Profile & access",
+      label: "Profile",
       icon: User,
-      hint: "Identity, portal membership, verification",
+      hint: "",
     },
     {
       id: "fees",
       label: "Fees, hostel & library",
       icon: Wallet,
-      hint: "Amounts and clearance flags",
+      hint: "",
     },
     {
       id: "marks",
       label: "Grade card & marks",
       icon: GraduationCap,
-      hint: "Header, subjects, sync to grade card",
+      hint: "",
     },
   ];
 
@@ -282,7 +292,7 @@ export function SuperAdminStudentHub({ studentId }: Props) {
               />
               <span>
                 <span className="block text-sm font-semibold text-primary">{t.label}</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">{t.hint}</span>
+                {t.hint && <span className="mt-0.5 block text-xs text-muted-foreground">{t.hint}</span>}
               </span>
             </button>
           );
@@ -321,59 +331,45 @@ export function SuperAdminStudentHub({ studentId }: Props) {
               </div>
               <div>
                 <label className="text-sm font-medium">Department</label>
-                <select
-                  name="department"
-                  defaultValue={student.department}
-                  className="mt-1 w-full rounded-md border border-border bg-cream px-3 py-2 text-sm"
-                >
-                  {DEPARTMENTS.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Semester</label>
-                <select
-                  name="semester"
-                  defaultValue={student.semester}
-                  className="mt-1 w-full rounded-md border border-border bg-cream px-3 py-2 text-sm"
-                >
-                  {SEMESTERS.map((s) => (
-                    <option key={s} value={s}>
-                      {["I", "II", "III", "IV", "V", "VI", "VII", "VIII"][s - 1]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Year</label>
-                <select
-                  name="year"
-                  defaultValue={student.year}
-                  className="mt-1 w-full rounded-md border border-border bg-cream px-3 py-2 text-sm"
-                >
-                  {YEARS.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    name="department"
+                    value={selectedDept}
+                    onChange={(e) => setSelectedDept(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-border bg-cream px-3 py-2 text-sm"
+                  >
+                    {localDepts.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newDept = window.prompt("Enter new department name:");
+                      if (newDept && newDept.trim()) {
+                        const trimmed = newDept.trim();
+                        if (!localDepts.includes(trimmed)) setLocalDepts([...localDepts, trimmed]);
+                        setSelectedDept(trimmed);
+                      }
+                    }}
+                    className="mt-1 rounded-md bg-secondary/50 px-3 py-2 text-primary hover:bg-secondary"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="rounded-lg border border-border/80 bg-secondary/20 p-4">
               <p className="text-sm font-medium text-primary">Include in portal lists</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Each portal only sees students when the corresponding box is checked.
-              </p>
               <div className="mt-3 flex flex-wrap gap-4">
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    name="in_fees"
-                    defaultChecked={student.in_fees}
+                    checked={inFees}
+                    onChange={(e) => setInFees(e.target.checked)}
                     className="h-4 w-4 accent-[var(--color-primary)]"
                   />
                   Academic fees
@@ -381,8 +377,8 @@ export function SuperAdminStudentHub({ studentId }: Props) {
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    name="in_hostel"
-                    defaultChecked={student.in_hostel}
+                    checked={inHostel}
+                    onChange={(e) => setInHostel(e.target.checked)}
                     className="h-4 w-4 accent-[var(--color-primary)]"
                   />
                   Hostel
@@ -390,8 +386,8 @@ export function SuperAdminStudentHub({ studentId }: Props) {
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    name="in_library"
-                    defaultChecked={student.in_library}
+                    checked={inLibrary}
+                    onChange={(e) => setInLibrary(e.target.checked)}
                     className="h-4 w-4 accent-[var(--color-primary)]"
                   />
                   Library
@@ -507,20 +503,8 @@ export function SuperAdminStudentHub({ studentId }: Props) {
                 defaultChecked={student.library_cleared}
                 className="h-4 w-4 accent-[var(--color-primary)]"
               />
-              All books returned / library cleared
+              All books returned
             </label>
-            <div>
-              <label className="text-sm font-medium">Library profile ID (optional)</label>
-              <p className="text-xs text-muted-foreground">
-                External library system profile UUID, if you use sync.
-              </p>
-              <input
-                name="library_remote_profile_id"
-                defaultValue={student.library_remote_profile_id ?? ""}
-                className="mt-1 w-full max-w-lg rounded-md border border-border bg-cream px-3 py-2 font-mono text-sm"
-                placeholder="UUID or leave empty"
-              />
-            </div>
           </div>
 
           <div className="flex justify-end">
