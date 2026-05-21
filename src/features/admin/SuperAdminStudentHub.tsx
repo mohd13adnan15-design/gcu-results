@@ -336,9 +336,9 @@ export function SuperAdminStudentHub({ studentId }: Props) {
                     name="department"
                     value={selectedDept}
                     onChange={(e) => setSelectedDept(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-border bg-cream px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-md border border-border bg-cream px-3 py-2 text-base font-medium"
                   >
-                    {localDepts.map((d) => (
+                    {Array.from(new Set(localDepts)).map((d) => (
                       <option key={d} value={d}>
                         {d}
                       </option>

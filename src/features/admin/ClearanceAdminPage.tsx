@@ -241,7 +241,7 @@ export function ClearanceAdminPage({ kind }: Props) {
 
   function downloadTemplate() {
     const wb = XLSX.utils.book_new();
-    const headers = money ? ["Student ID", "Name", "Department", "Sem", "Year", "Paid", "Total"] : ["Student ID", "Name", "Department", "Sem", "Year", cfg.label];
+    const headers = money ? ["Student ID", "Name", "Department", "Sem", "Year", "Paid", "Total"] : ["Student ID", "Name", "Department", cfg.label];
     const sample =
       kind === "fees"
         ? [
@@ -254,8 +254,8 @@ export function ClearanceAdminPage({ kind }: Props) {
               ["24btre149", "Priya Patel", "Robotics", 4, 2, 50000, 50000],
             ]
           : [
-              ["24btre148", "Aarav Sharma", "Robotics", 4, 2, "Returned"],
-              ["24btre149", "Priya Patel", "Robotics", 4, 2, "Returned"],
+              ["24btre148", "Aarav Sharma", "Robotics", "Returned"],
+              ["24btre149", "Priya Patel", "Robotics", "Returned"],
             ];
     const ws = XLSX.utils.aoa_to_sheet([headers, ...sample]);
     XLSX.utils.book_append_sheet(wb, ws, "Data");
@@ -512,18 +512,22 @@ export function ClearanceAdminPage({ kind }: Props) {
             options={["ALL", ...DEPARTMENTS]}
             label="Department"
           />
-          <FilterSelect
-            value={sem}
-            onChange={setSem}
-            options={["ALL", ...SEMESTERS.map(String)]}
-            label="Semester"
-          />
-          <FilterSelect
-            value={year}
-            onChange={setYear}
-            options={["ALL", ...YEARS.map(String)]}
-            label="Year"
-          />
+          {kind !== "library" && (
+            <>
+              <FilterSelect
+                value={sem}
+                onChange={setSem}
+                options={["ALL", ...SEMESTERS.map(String)]}
+                label="Semester"
+              />
+              <FilterSelect
+                value={year}
+                onChange={setYear}
+                options={["ALL", ...YEARS.map(String)]}
+                label="Year"
+              />
+            </>
+          )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <p className="ml-auto text-sm text-muted-foreground">
@@ -544,8 +548,8 @@ export function ClearanceAdminPage({ kind }: Props) {
                   <th className="py-3 px-4 font-medium">Student ID</th>
                   <th className="py-3 px-4 font-medium">Name</th>
                   <th className="py-3 px-4 font-medium">Department</th>
-                  {kind !== "fees" && <th className="py-3 px-4 font-medium">Sem</th>}
-                  {kind !== "fees" && <th className="py-3 px-4 font-medium">Year</th>}
+                  {kind !== "library" && <th className="py-3 px-4 font-medium">Sem</th>}
+                  {kind !== "library" && <th className="py-3 px-4 font-medium">Year</th>}
                   {money && <th className="py-3 px-4 font-medium text-right">Paid / Total</th>}
                   <th className="py-3 px-4 font-medium text-center">{cfg.label}</th>
                   <th className="py-3 px-4 font-medium"></th>
@@ -562,8 +566,8 @@ export function ClearanceAdminPage({ kind }: Props) {
                       <td className="py-2 px-4 font-mono text-xs text-primary">{s.student_id}</td>
                       <td className="py-2 px-4 font-medium text-primary">{s.full_name}</td>
                       <td className="py-2 px-4">{s.department}</td>
-                      {kind !== "fees" && <td className="py-2 px-4">{s.semester}</td>}
-                      {kind !== "fees" && <td className="py-2 px-4">{s.year}</td>}
+                      {kind !== "library" && <td className="py-2 px-4">{s.semester}</td>}
+                      {kind !== "library" && <td className="py-2 px-4">{s.year}</td>}
                       {money && (
                         <td className="py-2 px-4 text-right font-mono text-xs">
                           {isEditing ? (
@@ -643,7 +647,7 @@ export function ClearanceAdminPage({ kind }: Props) {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5 + (kind !== "fees" ? 2 : 0) + (money ? 1 : 0)} className="py-10 text-center text-muted-foreground">
+                    <td colSpan={5 + (kind !== "library" ? 2 : 0) + (money ? 1 : 0)} className="py-10 text-center text-muted-foreground">
                       No students match filters.
                     </td>
                   </tr>
@@ -733,7 +737,7 @@ export function ClearanceAdminPage({ kind }: Props) {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Department</label>
-                  <select value={manualData.department} onChange={(e) => setManualData({...manualData, department: e.target.value})} className="w-full rounded-md border border-border bg-cream px-3 py-2 text-sm focus:ring-2 focus:ring-primary">
+                  <select value={manualData.department} onChange={(e) => setManualData({...manualData, department: e.target.value})} className="w-full rounded-md border border-border bg-cream px-3 py-2 text-base font-medium focus:ring-2 focus:ring-primary">
                     {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
@@ -799,7 +803,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-border bg-cream px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
+        className="w-full rounded-md border border-border bg-cream px-3 py-2 text-base font-medium outline-none focus:ring-2 focus:ring-primary"
         aria-label={label}
       >
         {options.map((o) => (
