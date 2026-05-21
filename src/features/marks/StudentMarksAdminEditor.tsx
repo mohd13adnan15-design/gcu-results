@@ -283,7 +283,7 @@ export function StudentMarksAdminEditor({
       );
       if (error) throw error;
       await runSync();
-      toast.success("Header saved; SGPA and student marksheet record updated from subject rows.");
+      toast.success("Header saved; CGPA and student marksheet record updated from subject rows.");
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");
@@ -469,13 +469,13 @@ export function StudentMarksAdminEditor({
                 {totalCredits.toFixed(1)}
               </p>
               <p>
-                SGPA: <strong>{header.semester_gpa}</strong> · Grade{" "}
+                CGPA: <strong>{header.semester_gpa}</strong> · Grade{" "}
                 <strong>{header.final_grade || "-"}</strong>
               </p>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-2">
             <PrettyField label="Name on card">
               <input
                 value={header.card_student_name}
@@ -483,14 +483,6 @@ export function StudentMarksAdminEditor({
                   setHeader((h) => (h ? { ...h, card_student_name: e.target.value } : h))
                 }
                 className={PRETTY_FIELD}
-              />
-            </PrettyField>
-            <PrettyField label="Roll no (portal ID)">
-              <input
-                readOnly
-                value={student.student_id}
-                title="Roll matches portal student id"
-                className={PRETTY_ROLL_READONLY}
               />
             </PrettyField>
             <PrettyField label="Registration">
@@ -512,7 +504,7 @@ export function StudentMarksAdminEditor({
               className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${headerBusy ? "animate-spin" : ""}`} />
-              {headerBusy ? "Saving…" : "Save header & sync"}
+              {headerBusy ? "Saving…" : "SAVE"}
             </button>
           </div>
         </div>
@@ -593,7 +585,7 @@ export function StudentMarksAdminEditor({
           <h4 className="text-sm font-semibold text-primary">Card header</h4>
           {!compact ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              Computed SGPA / final grade update from subject rows when you save.
+              Computed CGPA / final grade update from subject rows when you save.
             </p>
           ) : null}
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -692,7 +684,7 @@ export function StudentMarksAdminEditor({
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <span className="text-muted-foreground">
-              SGPA (after sync): <strong className="text-primary">{header.semester_gpa}</strong> ·
+              CGPA (after sync): <strong className="text-primary">{header.semester_gpa}</strong> ·
               Grade <strong className="text-primary">{header.final_grade || "-"}</strong>
             </span>
             <button
@@ -702,7 +694,7 @@ export function StudentMarksAdminEditor({
               className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${headerBusy ? "animate-spin" : ""}`} />
-              {headerBusy ? "Saving…" : compact ? "Save header & sync" : "Save header & sync SGPA"}
+              {headerBusy ? "Saving…" : "SAVE"}
             </button>
           </div>
         </div>

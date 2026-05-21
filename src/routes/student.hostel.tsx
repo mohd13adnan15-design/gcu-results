@@ -94,7 +94,6 @@ function HostelView() {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-5xl font-bold text-primary">{pct}%</span>
-            <span className="text-sm text-muted-foreground">paid</span>
           </div>
         </div>
 

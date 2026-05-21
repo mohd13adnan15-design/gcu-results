@@ -171,7 +171,7 @@ function Dashboard() {
           to="/student/hostel"
           icon={HomeIcon}
           label="Hostel"
-          status={!student.in_hostel ? "No Penalty" : hostelOk ? "Paid" : `${hostelPct}%`}
+          status={!student.in_hostel ? "Clear" : hostelOk ? "Paid" : `${hostelPct}%`}
           done={hostelOk}
           locked={!student.in_hostel}
         />
@@ -179,7 +179,7 @@ function Dashboard() {
           to="/student/library"
           icon={Library}
           label="Library"
-          status={!student.in_library ? "No Penalty" : libraryOk ? "All returned" : "Pending"}
+          status={!student.in_library ? "Clear" : libraryOk ? "All returned" : "Pending"}
           done={libraryOk}
           locked={!student.in_library}
         />
@@ -238,14 +238,6 @@ function Dashboard() {
                   <Lock className="h-4 w-4 text-muted-foreground" />
                 )}
                 Library clearance {!student.in_library && "(not required)"}
-              </li>
-              <li className="flex items-center gap-2">
-                {hasMarksheet ? (
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                ) : (
-                  <Lock className="h-4 w-4 text-muted-foreground" />
-                )}
-                Marksheet data
               </li>
               {student.in_library && hasLibraryPenalty && (
                 <li className="text-xs text-amber-800">

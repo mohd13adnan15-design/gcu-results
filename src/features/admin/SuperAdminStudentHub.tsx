@@ -173,11 +173,11 @@ export function SuperAdminStudentHub({ studentId }: Props) {
     
     // Notify admin that COE has approved the data
     await supabase.from("portal_notifications").insert({
-      recipient_portal: "admin_1",
+      recipient_portal: "admin_2",
       sender_portal: "head_of_coe",
       student_id: student.id,
       title: "COE Data Verified",
-      message: `Grade card data for ${student.student_id} has been verified by COE. Ready for final Admin verification.`,
+      message: `Grade card data for ${student.full_name} (${student.student_id}) has been verified by COE. Ready for final Admin verification.`,
     });
     
     toast.success("COE approved this grade card. Sent to Admin.");
@@ -338,11 +338,18 @@ export function SuperAdminStudentHub({ studentId }: Props) {
                     onChange={(e) => setSelectedDept(e.target.value)}
                     className="mt-1 w-full rounded-md border border-border bg-cream px-3 py-2 text-base font-medium"
                   >
-                    {Array.from(new Set(localDepts)).map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
+                    {(() => {
+                      const deptMap = new Map<string, string>();
+                      localDepts.forEach(d => {
+                        const key = d.trim().toUpperCase();
+                        if (!deptMap.has(key)) deptMap.set(key, d.trim());
+                      });
+                      return Array.from(deptMap.values()).map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ));
+                    })()}
                   </select>
                   <button
                     type="button"

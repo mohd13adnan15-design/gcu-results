@@ -12,7 +12,8 @@ const ASSET_PATHS = {
   logo: "/templates/assets/ChatGPT Image May 11, 2026, 06_01_10 PM.png",
   seal: "/templates/assets/gcu-seal.png",
   embossedSeal: "/templates/assets/ChatGPT Image May 10, 2026, 11_02_44 PM.png",
-  rightSignature: "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png",
+  rightSignatureOld: "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png",
+  rightSignatureNew: "/templates/assets/sibimamsign.png",
   backPage: "/templates/assets/file_00000000f02871f897434ec5582a144c.png",
 };
 
@@ -40,23 +41,36 @@ export function downloadBlob(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export function isMarksheetAfterJuly2024(marksheet: StudentMarksheet) {
+  if (!marksheet.exam_month_year) return true;
+  const match = marksheet.exam_month_year.match(/([a-zA-Z]+)\s*(?:-)?\s*(\d{4})/);
+  if (!match) return true;
+  const month = match[1];
+  const year = parseInt(match[2], 10);
+  const d = new Date(`${month} 1, ${year}`);
+  return d > new Date("July 31, 2024");
+}
+
 export async function generateMarksheetPdf(
   marksheet: StudentMarksheet,
   options: MarksheetDocumentOptions = {},
 ) {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const qr = await generateDynamicQrDataUrl(marksheet);
-  const [background, logo, seal, embossedSeal, rightSignature, backPage, photo] = await Promise.all([
+  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] = await Promise.all([
     loadDataUrl(ASSET_PATHS.background),
     loadDataUrl(ASSET_PATHS.logo),
     loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
     loadDataUrl(ASSET_PATHS.embossedSeal),
-    loadDataUrl(ASSET_PATHS.rightSignature, { dropLightBackground: true }),
+    loadDataUrl(ASSET_PATHS.rightSignatureOld, { dropLightBackground: true }),
+    loadDataUrl(ASSET_PATHS.rightSignatureNew, { dropLightBackground: true }),
     loadDataUrl(ASSET_PATHS.backPage),
     options.photoUrl
       ? loadDataUrl(options.photoUrl, { dropLightBackground: true, trimEdges: 18 })
       : Promise.resolve(null),
   ]);
+
+  const rightSignature = isMarksheetAfterJuly2024(marksheet) ? rightSignatureNew : rightSignatureOld;
 
   drawMarksheetPage(doc, marksheet, {
     background,
@@ -89,12 +103,13 @@ export async function generateAllSemestersPdf(
 ) {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
 
-  const [background, logo, seal, embossedSeal, rightSignature, backPage, photo] = await Promise.all([
+  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] = await Promise.all([
     loadDataUrl(ASSET_PATHS.background),
     loadDataUrl(ASSET_PATHS.logo),
     loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
     loadDataUrl(ASSET_PATHS.embossedSeal),
-    loadDataUrl(ASSET_PATHS.rightSignature, { dropLightBackground: true }),
+    loadDataUrl(ASSET_PATHS.rightSignatureOld, { dropLightBackground: true }),
+    loadDataUrl(ASSET_PATHS.rightSignatureNew, { dropLightBackground: true }),
     loadDataUrl(ASSET_PATHS.backPage),
     options.photoUrl
       ? loadDataUrl(options.photoUrl, { dropLightBackground: true, trimEdges: 18 })
@@ -106,6 +121,7 @@ export async function generateAllSemestersPdf(
     if (i > 0) doc.addPage();
 
     const qr = await generateDynamicQrDataUrl(marksheet);
+    const rightSignature = isMarksheetAfterJuly2024(marksheet) ? rightSignatureNew : rightSignatureOld;
     drawMarksheetPage(doc, marksheet, {
       background,
       logo,
@@ -326,7 +342,7 @@ function drawMarksTable(
     doc.rect(x, y, width, 15, "S");
     doc.setFont("times", "bold");
     doc.setFontSize(11);
-    const isPractical = group.section.trim().toUpperCase() === "PRACTICAL";
+    const isPractical = group.section.trim().toLowerCase().includes("practical");
     setText(doc, isPractical ? BLACK : RED);
     doc.text(group.section, isPractical ? x + 4 : x + width / 2, y + 10.5, {
       align: isPractical ? "left" : "center",

@@ -306,8 +306,7 @@ export function FacultyPage() {
                 <th className="px-2 py-2">Student</th>
                 <th className="px-2 py-2">Grade Card</th>
                 <th className="px-2 py-2">Courses</th>
-                <th className="px-2 py-2">SGPA</th>
-                <th className="px-2 py-2">COE</th>
+                <th className="px-2 py-2">Grade</th>
                 <th className="px-2 py-2">Admin</th>
                 <th className="px-2 py-2 text-right">Actions</th>
               </tr>
@@ -326,7 +325,7 @@ export function FacultyPage() {
                       {marksheet ? (
                         <div>
                           <p className="font-medium text-primary">
-                            {marksheet.programme_code} · Sem {marksheet.semester_label}
+                            {marksheet.programme_code}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {marksheet.programme_title}
@@ -344,7 +343,6 @@ export function FacultyPage() {
                       )}
                     </td>
                     <td className="px-2 py-3 text-primary">{courseCount}</td>
-                    <td className="px-2 py-3">{marksheet ? marksheet.sgpa.toFixed(2) : "-"}</td>
                     <td className="px-2 py-3">{marksheet?.final_grade ?? "-"}</td>
                     <td className="px-2 py-3">
                       <input
