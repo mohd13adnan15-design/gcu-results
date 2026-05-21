@@ -173,7 +173,21 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
 
               <div className="signature-container">
                 <div className="signature-block">
-                  <img src="/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png" alt="Signature" className="signature-img" />
+                  <img 
+                    src={(() => {
+                      if (!marksheet.exam_month_year) return "/templates/assets/sibimamsign.png";
+                      const match = marksheet.exam_month_year.match(/([a-zA-Z]+)\s*(?:-)?\s*(\d{4})/);
+                      if (!match) return "/templates/assets/sibimamsign.png";
+                      const month = match[1];
+                      const year = parseInt(match[2], 10);
+                      const d = new Date(`${month} 1, ${year}`);
+                      return d > new Date("July 31, 2024") 
+                        ? "/templates/assets/sibimamsign.png" 
+                        : "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png";
+                    })()} 
+                    alt="Signature" 
+                    className="signature-img" 
+                  />
                   <div className="signature-label">Controller of Examinations</div>
                 </div>
               </div>

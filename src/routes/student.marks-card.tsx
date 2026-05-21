@@ -36,7 +36,8 @@ function MarksCard() {
   const [otp, setOtp] = useState("");
   const [sentOtp, setSentOtp] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [downloadBusy, setDownloadBusy] = useState<"current" | "all" | null>(null);
+  const [downloadBusy, setDownloadBusy] = useState<string | null>(null);
+  const [showSemesterSelection, setShowSemesterSelection] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
@@ -199,8 +200,8 @@ function MarksCard() {
     }
   }
 
-  async function downloadMarksheet() {
-    if (!marksheet) {
+  async function downloadMarksheet(targetMarksheet: StudentMarksheet) {
+    if (!targetMarksheet) {
       toast.error("No marksheet data is saved for this student yet.");
       return;
     }
@@ -215,14 +216,14 @@ function MarksCard() {
       return;
     }
 
-    setDownloadBusy("current");
+    setDownloadBusy(targetMarksheet.id ?? "current");
     try {
       const [{ downloadMarksheetBlob, generateMarksheetPdf }, photoUrl] = await Promise.all([
         import("@/lib/marksheet-documents"),
-        resolveStudentPhotoUrl(supabase, marksheet),
+        resolveStudentPhotoUrl(supabase, targetMarksheet),
       ]);
-      const blob = await generateMarksheetPdf(marksheet, { photoUrl });
-      downloadMarksheetBlob(marksheet, "pdf", blob);
+      const blob = await generateMarksheetPdf(targetMarksheet, { photoUrl });
+      downloadMarksheetBlob(targetMarksheet, "pdf", blob);
       toast.success("PDF marksheet generated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not generate marksheet");
@@ -317,19 +318,17 @@ function MarksCard() {
             <ShieldCheck className="h-6 w-6" />
             <h2 className="text-2xl font-bold">Verify it's you</h2>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            We'll send a 6-digit code to <strong>{student.email}</strong>. Enter it below to unlock
-            your official grade card downloads.
-          </p>
 
           {stage === "idle" ? (
-            <button
-              onClick={sendOtp}
-              disabled={busy}
-              className="mt-6 inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-60"
-            >
-              <Mail className="h-4 w-4" /> {busy ? "Sending…" : "Send OTP"}
-            </button>
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={sendOtp}
+                disabled={busy}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-60"
+              >
+                <Mail className="h-4 w-4" /> {busy ? "Sending…" : "Send OTP"}
+              </button>
+            </div>
           ) : (
             <div className="mt-6 space-y-3">
               <input
@@ -355,12 +354,6 @@ function MarksCard() {
                   Resend
                 </button>
               </div>
-              {sentOtp && (
-                <p className="text-center text-xs text-muted-foreground">
-                  Demo mode - OTP is also shown above. In production this is sent only to your
-                  email.
-                </p>
-              )}
             </div>
           )}
         </div>
@@ -374,53 +367,62 @@ function MarksCard() {
               <div>
                 <h2 className="text-2xl font-bold text-primary">Download Your Grade Card</h2>
               </div>
-
-              <div className="rounded-2xl border border-border bg-white/70 p-4 text-sm text-foreground">
-                <p className="font-semibold text-primary">Saved grade card data</p>
-                {marksheet ? (
-                  <div className="mt-2 grid gap-1 sm:grid-cols-2">
-                    <p>
-                      Student: <strong>{marksheet.student_name}</strong>
-                    </p>
-                    <p>
-                      Registration: <strong>{marksheet.registration_no}</strong>
-                    </p>
-                    <p>
-                      Programme: <strong>{marksheet.programme_code}</strong>
-                    </p>
-                    <p>
-                      Courses: <strong>{marksheet.courses.length}</strong>
-                    </p>
-                  </div>
-                ) : (
-                  <p className="mt-2">
-                    No grade card data is saved yet for <strong>{student.student_id}</strong>.
-                    {marksheetError ? ` ${marksheetError}` : ""}
-                  </p>
-                )}
-              </div>
-
               <div className="flex flex-col gap-4 pt-2">
                 <h3 className="font-bold text-primary">Download Grade Cards</h3>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void downloadMarksheet()}
-                    disabled={!marksheet || Boolean(downloadBusy)}
-                    className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-60"
-                  >
-                    <FileText className="h-4 w-4" />
-                    {downloadBusy === "current" ? "Generating..." : "Download Current Semester"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void downloadAllSemesters()}
-                    disabled={allMarksheets.length === 0 || Boolean(downloadBusy)}
-                    className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-5 py-2.5 text-primary hover:bg-muted disabled:opacity-60"
-                  >
-                    <FileText className="h-4 w-4" />
-                    {downloadBusy === "all" ? "Generating..." : "Download All Semesters"}
-                  </button>
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowSemesterSelection(!showSemesterSelection)}
+                      className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-60"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Download Current Semester
+                    </button>
+                    {allMarksheets.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => void downloadAllSemesters()}
+                        disabled={Boolean(downloadBusy)}
+                        className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-5 py-2.5 text-primary hover:bg-muted disabled:opacity-60"
+                      >
+                        <FileText className="h-4 w-4" />
+                        {downloadBusy === "all" ? "Generating..." : "Download All Semesters"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        toast.info("Marks Card feature coming soon");
+                      }}
+                      className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-5 py-2.5 text-primary hover:bg-muted"
+                    >
+                      <FileText className="h-4 w-4" />
+                      MARKs CARD
+                    </button>
+                  </div>
+                  {showSemesterSelection && allMarksheets.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-3 p-4 rounded-lg border border-primary/20 bg-primary/5">
+                      <p className="w-full text-sm font-medium text-primary mb-1">Select Semester:</p>
+                      {allMarksheets.map((m) => {
+                        const semName = (m.semester_label || "").toLowerCase().startsWith("sem")
+                          ? m.semester_label
+                          : `Sem ${m.semester_label}`;
+                        return (
+                          <button
+                            key={m.id || m.semester_label}
+                            type="button"
+                            onClick={() => void downloadMarksheet(m)}
+                            disabled={Boolean(downloadBusy)}
+                            className="inline-flex items-center gap-2 rounded-md bg-white border border-primary/30 px-4 py-2 text-sm text-primary hover:bg-primary/10 disabled:opacity-60"
+                          >
+                            <FileText className="h-4 w-4" />
+                            {downloadBusy === (m.id ?? "current") ? "Generating..." : semName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

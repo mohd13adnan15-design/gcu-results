@@ -63,9 +63,6 @@ export function MarksheetSavedPreview({ marksheet, readOnlyNotice }: MarksheetSa
         <InfoLine label="Name on card" value={marksheet.student_name} />
         <InfoLine label="Roll no" value={marksheet.student_roll_no} />
         <InfoLine label="Registration" value={marksheet.registration_no} />
-        <InfoLine label="Semester" value={marksheet.semester_label} />
-        <InfoLine label="Exam" value={marksheet.exam_month_year} />
-        <InfoLine label="Grade card no" value={marksheet.grade_card_no} />
       </div>
 
       <div className="mt-5 overflow-x-auto">
@@ -76,7 +73,8 @@ export function MarksheetSavedPreview({ marksheet, readOnlyNotice }: MarksheetSa
               <th className="px-2 py-2">Code</th>
               <th className="px-2 py-2">Course</th>
               <th className="px-2 py-2">Section</th>
-              <th className="px-2 py-2">Credits</th>
+              <th className="px-2 py-2">Total credits</th>
+              <th className="px-2 py-2">Obtained credits</th>
               <th className="px-2 py-2">Grade</th>
               <th className="px-2 py-2">Points</th>
             </tr>
@@ -115,9 +113,8 @@ function CourseRow({ course }: { course: MarksheetCourse }) {
         ) : null}
       </td>
       <td className="px-2 py-2">{course.section}</td>
-      <td className="px-2 py-2">
-        {course.credits_earned} / {course.course_credits}
-      </td>
+      <td className="px-2 py-2">{course.course_credits}</td>
+      <td className="px-2 py-2">{course.credits_earned}</td>
       <td className="px-2 py-2">{course.grade_obtained}</td>
       <td className="px-2 py-2">{course.grade_points}</td>
     </tr>

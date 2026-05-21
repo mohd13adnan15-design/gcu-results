@@ -348,31 +348,6 @@ function CertificateFlow() {
         </section>
       )}
 
-      {/* Fee breakdown */}
-      <section className="rounded-2xl border border-border bg-white/90 p-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Fee clearance detail
-        </h3>
-        <ul className="mt-3 space-y-2 text-sm">
-          <FeeLine ok={Boolean(feeClearance?.feesOk)} label="Academic fees" />
-          <FeeLine
-            ok={Boolean(feeClearance?.hostelOk)}
-            label={!student.in_hostel ? "Hostel (No Penalty)" : "Hostel fees"}
-            muted={!student.in_hostel}
-          />
-          <FeeLine
-            ok={Boolean(feeClearance?.libraryOk)}
-            label={
-              !student.in_library
-                ? "Library (No Penalty)"
-                : hasLibraryPenalty
-                  ? "Library (dues + penalties)"
-                  : "Library clearance"
-            }
-            muted={!student.in_library}
-          />
-        </ul>
-      </section>
 
       {/* Flow diagram */}
       <section className="space-y-4">
@@ -478,15 +453,3 @@ function FlowNode({
   );
 }
 
-function FeeLine({ ok, label, muted }: { ok: boolean; label: string; muted?: boolean }) {
-  return (
-    <li className={`flex items-center gap-2 ${muted ? "text-muted-foreground" : ""}`}>
-      {ok ? (
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
-      ) : (
-        <CircleDot className="h-4 w-4 shrink-0 text-rose-600" aria-hidden />
-      )}
-      <span className={ok ? "text-emerald-900" : "text-rose-800"}>{label}</span>
-    </li>
-  );
-}

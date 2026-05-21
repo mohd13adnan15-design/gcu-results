@@ -741,18 +741,22 @@ export function ClearanceAdminPage({ kind }: Props) {
                     {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">Sem</label>
-                    <select value={manualData.semester} onChange={(e) => setManualData({...manualData, semester: Number(e.target.value)})} className="w-full rounded-md border border-border bg-cream px-3 py-2 text-sm focus:ring-2 focus:ring-primary">
-                      {SEMESTERS.map(s => <option key={s} value={s}>{["I", "II", "III", "IV", "V", "VI", "VII", "VIII"][s - 1]}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">Year</label>
-                    <input type="number" min="1" max="4" value={manualData.year} onChange={(e) => setManualData({...manualData, year: Number(e.target.value)})} className="w-full rounded-md border border-border bg-cream px-3 py-2 text-sm focus:ring-2 focus:ring-primary" />
-                  </div>
-                </div>
+                {kind !== "library" && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Semester</label>
+                      <select value={manualData.semester} onChange={(e) => setManualData({...manualData, semester: Number(e.target.value)})} className="w-full rounded-md border border-border bg-cream px-3 py-2 text-base font-medium focus:ring-2 focus:ring-primary">
+                        {SEMESTERS.map(s => <option key={s} value={s}>{toRoman(s)}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Year</label>
+                      <select value={manualData.year} onChange={(e) => setManualData({...manualData, year: Number(e.target.value)})} className="w-full rounded-md border border-border bg-cream px-3 py-2 text-base font-medium focus:ring-2 focus:ring-primary">
+                        {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
 
               {money ? (

@@ -129,12 +129,23 @@ function SuperAdminIssueReports() {
     }
 
     if (row.sender_portal) {
+      let studentText = "";
+      if (row.student_id) {
+        const { data: student } = await supabase
+          .from("students")
+          .select("full_name, student_id")
+          .eq("id", row.student_id)
+          .maybeSingle();
+        if (student) {
+          studentText = ` (Student: ${student.full_name} / ${student.student_id})`;
+        }
+      }
       await supabase.from("portal_notifications").insert({
         recipient_portal: row.sender_portal,
         sender_portal: "head_of_coe",
         student_id: row.student_id,
         title: "Issue Resolved by COE",
-        message: `The issue you reported has been resolved: ${row.title}`,
+        message: `The issue you reported has been resolved: ${row.title}${studentText}`,
       });
     }
 
@@ -421,7 +432,6 @@ function SuperAdminStudentsDashboard() {
                 <th className="px-2 py-2">Student</th>
                 <th className="px-2 py-2">Department</th>
                 <th className="px-2 py-2">Programme</th>
-                <th className="px-2 py-2">Semester</th>
                 <th className="px-2 py-2">Courses</th>
                 <th className="px-2 py-2">SGPA</th>
                 <th className="px-2 py-2">Grade</th>
@@ -444,9 +454,6 @@ function SuperAdminStudentsDashboard() {
                       <span className="ml-1 text-xs text-muted-foreground">
                         {h?.programme_code ?? ""}
                       </span>
-                    </td>
-                    <td className="px-2 py-2">
-                      {h?.semester_label ?? `Semester ${student.semester}`}
                     </td>
                     <td className="px-2 py-2">{n}</td>
                     <td className="px-2 py-2">

@@ -228,7 +228,7 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
       });
       const { error } = await supabase.from("students").update(payload).eq("id", student.id);
       if (error) throw error;
-      toast.success(next ? "Grade card issued for student" : "Grade card issue removed");
+      toast.success(next ? "Grade card issued for student" : "Grade card revoked");
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Admin verification update failed");
@@ -295,20 +295,16 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
           <MarksheetSavedPreview marksheet={marksheet} />
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 rounded-xl border border-border bg-cream p-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-primary">
-              {portal === "admin_1"
-                ? "Admin · Grade Card review"
-                : "Final COE approval"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {portal === "admin_1"
-                ? "Admin check and verify after checking saved grade card."
-                : "Approve after reviewing Admin verification."}
-            </p>
-          </div>
-          {portal === "admin_1" ? (
+        {portal === "admin_1" && (
+          <div className="mt-6 flex flex-col gap-3 rounded-xl border border-border bg-cream p-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-primary">
+                Admin · Grade Card review
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Admin check and verify after checking saved grade card.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => void toggleFacultyVerified(!student.faculty_verified)}
@@ -318,18 +314,8 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
               <ShieldCheck className="h-4 w-4" />
               {student.faculty_verified ? "Remove Verification" : "Verify Grade Card"}
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void toggleAdminVerified(!student.admin_verified)}
-              disabled={!adminCanVerify || verifyBusy}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              {student.admin_verified ? "Remove Issue" : "Issue grade card"}
-            </button>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="mt-6 space-y-3 rounded-xl border border-border bg-cream p-4">
           <label className="block text-sm font-medium text-primary">
@@ -399,7 +385,7 @@ function AdminClearanceReview({ student }: { student: Student }) {
       />
       <ClearanceBox
         label="Hostel Fee"
-        status={!student.in_hostel ? "No Penalty" : hostel.cleared ? "Clear" : "Pending"}
+        status={!student.in_hostel ? "Clear" : hostel.cleared ? "Clear" : "Pending"}
         lines={
           student.in_hostel
             ? [
@@ -413,7 +399,7 @@ function AdminClearanceReview({ student }: { student: Student }) {
       <ClearanceBox
         label="Library"
         status={
-          !student.in_library ? "No Penalty" : student.library_cleared ? "Clear" : "Pending"
+          !student.in_library ? "Clear" : student.library_cleared ? "Clear" : "Pending"
         }
         lines={
           student.in_library
@@ -422,7 +408,7 @@ function AdminClearanceReview({ student }: { student: Student }) {
                 ? `Remote profile ${student.library_remote_profile_id}`
                 : "No remote profile linked",
             ]
-            : ["No library clearance required"]
+            : ["No Penalty"]
         }
         ok={!student.in_library || student.library_cleared}
       />

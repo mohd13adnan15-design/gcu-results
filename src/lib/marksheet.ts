@@ -504,18 +504,13 @@ export async function resolveStudentPhotoUrl(
   supabase: SupabaseClient,
   marksheet: Pick<StudentMarksheet, "photo_bucket" | "photo_path" | "student_roll_no">,
 ) {
-  if (marksheet.student_roll_no?.toLowerCase() === "24btre152") {
-    return "/templates/assets/v_sai_tejashvi_profile.jpeg";
-  }
+  const roll = marksheet.student_roll_no?.toLowerCase();
+  if (roll === "24btre152") return "/templates/assets/v_sai_tejashvi_profile.jpeg";
+  if (roll === "23bsft101") return "/templates/assets/abigail_profile.jpeg";
 
   if (!marksheet.photo_bucket) return null;
 
   const configuredPath = normalizeStoragePath(marksheet.photo_path);
-  if (configuredPath) {
-    const configuredUrl = supabase.storage.from(marksheet.photo_bucket).getPublicUrl(configuredPath)
-      .data.publicUrl;
-    if (await canFetchImage(configuredUrl)) return configuredUrl;
-  }
 
   const candidates = await listStudentPhotoCandidates(
     supabase,
@@ -523,6 +518,7 @@ export async function resolveStudentPhotoUrl(
     marksheet.student_roll_no,
     configuredPath,
   );
+  
   const resolvedPath = pickStudentPhotoPath({
     configuredPath,
     rollNo: marksheet.student_roll_no,
@@ -899,16 +895,7 @@ async function listStudentPhotoCandidates(
   return [...candidates];
 }
 
-async function canFetchImage(url: string) {
-  try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) return false;
-    const contentType = response.headers.get("content-type") ?? "";
-    return contentType.startsWith("image/");
-  } catch {
-    return false;
-  }
-}
+
 
 function normalizeStoragePath(value: string | null | undefined) {
   const path = text(value).replace(/^\/+/, "").replace(/\\/g, "/");
