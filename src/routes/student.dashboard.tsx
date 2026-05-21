@@ -171,7 +171,7 @@ function Dashboard() {
           to="/student/hostel"
           icon={HomeIcon}
           label="Hostel"
-          status={!student.in_hostel ? "Not enrolled" : hostelOk ? "Paid" : `${hostelPct}%`}
+          status={!student.in_hostel ? "No Penalty" : hostelOk ? "Paid" : `${hostelPct}%`}
           done={hostelOk}
           locked={!student.in_hostel}
         />
@@ -179,7 +179,7 @@ function Dashboard() {
           to="/student/library"
           icon={Library}
           label="Library"
-          status={!student.in_library ? "Not enrolled" : libraryOk ? "All returned" : "Pending"}
+          status={!student.in_library ? "No Penalty" : libraryOk ? "All returned" : "Pending"}
           done={libraryOk}
           locked={!student.in_library}
         />
@@ -209,7 +209,7 @@ function Dashboard() {
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {eligible
-                ? "Your Grade Card passed all checks - open downloads from the certificate page."
+                ? "Your Grade Card passed all checks - Tap Download Certificate."
                 : certificateEntryUnlocked
                   ? "Fees are clear - open the certificate page to start the process (one tap) and track Admin / COE review."
                   : "Clear academic, hostel (if applicable), and library dues (including penalties) to continue."}
@@ -252,14 +252,6 @@ function Dashboard() {
                   Outstanding library penalty: ₹{libraryPenaltyTotal.toLocaleString()}
                 </li>
               )}
-              <li className="text-xs text-muted-foreground">Status: {cardStatus}</li>
-              <li className="text-xs text-muted-foreground">
-                {eligible
-                  ? "Unlocked for PDF generation"
-                  : certificateEntryUnlocked
-                    ? "Open certificate page to generate"
-                    : "Locked until fees are clear"}
-              </li>
             </ul>
           </div>
           <button

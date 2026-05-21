@@ -117,19 +117,9 @@ function LibraryView() {
           <AlertCircle className="h-6 w-6 shrink-0 text-primary mt-0.5" />
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-primary">Central library penalties</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Fines from the separate library-management system (overdue loans). Updates when that
-              system records overdue days and amounts.
-            </p>
           </div>
         </div>
 
-        {!remoteConfigured && (
-          <p className="mt-4 text-sm text-muted-foreground">
-            Library integration is not configured on this deployment (
-            <code className="text-xs">VITE_LIBRARY_SUPABASE_*</code>).
-          </p>
-        )}
         {remoteConfigured && !remoteProfileId && (
           <p className="mt-4 text-sm text-amber-900">
             Your account isn’t linked to the central library system yet - fees from that system

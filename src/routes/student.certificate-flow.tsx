@@ -357,14 +357,14 @@ function CertificateFlow() {
           <FeeLine ok={Boolean(feeClearance?.feesOk)} label="Academic fees" />
           <FeeLine
             ok={Boolean(feeClearance?.hostelOk)}
-            label={!student.in_hostel ? "Hostel (not enrolled)" : "Hostel fees"}
+            label={!student.in_hostel ? "Hostel (No Penalty)" : "Hostel fees"}
             muted={!student.in_hostel}
           />
           <FeeLine
             ok={Boolean(feeClearance?.libraryOk)}
             label={
               !student.in_library
-                ? "Library (not enrolled)"
+                ? "Library (No Penalty)"
                 : hasLibraryPenalty
                   ? "Library (dues + penalties)"
                   : "Library clearance"

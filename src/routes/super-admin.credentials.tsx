@@ -93,7 +93,6 @@ function CredentialCreator() {
             <option value="fees">{portalDisplayLabel("fees")}</option>
             <option value="admin_1">{portalDisplayLabel("admin_1")}</option>
             <option value="admin_2">{portalDisplayLabel("admin_2")}</option>
-            <option value="head_of_coe">{portalDisplayLabel("head_of_coe")}</option>
           </select>
         </div>
         <div>

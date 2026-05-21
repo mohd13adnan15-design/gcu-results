@@ -374,7 +374,7 @@ function AdminStudentRow({
       <td className="px-2 py-3">
         <StatusText
           ok={hostel.cleared}
-          label={!student.in_hostel ? "Not enrolled" : hostel.cleared ? "Clear" : "Pending"}
+          label={!student.in_hostel ? "No Penalty" : hostel.cleared ? "Clear" : "Pending"}
         />
         {student.in_hostel && (
           <p className="mt-1 text-xs text-muted-foreground">
@@ -386,7 +386,7 @@ function AdminStudentRow({
         <StatusText
           ok={!student.in_library || student.library_cleared}
           label={
-            !student.in_library ? "Not enrolled" : student.library_cleared ? "Clear" : "Pending"
+            !student.in_library ? "No Penalty" : student.library_cleared ? "Clear" : "Pending"
           }
         />
       </td>
