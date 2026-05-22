@@ -211,6 +211,18 @@ export function ClearanceAdminPage({ kind }: Props) {
     } else {
       if (!nextStatus) {
         await supabase.from("students").update({ library_cleared: false }).eq("id", booksModalStudent.id);
+      } else {
+        // Fetch all remaining books for the student and see if all of them are now returned!
+        const { data: allBooks } = await supabase
+          .from("library_books")
+          .select("returned")
+          .eq("student_id", booksModalStudent.id);
+        
+        const booksList = allBooks || [];
+        const allReturned = booksList.every((b) => b.returned);
+        if (allReturned) {
+          await supabase.from("students").update({ library_cleared: true }).eq("id", booksModalStudent.id);
+        }
       }
       toast.success(nextStatus ? "Book marked as returned." : "Book marked as pending.");
       void loadStudentBooks(booksModalStudent.id);
@@ -225,6 +237,17 @@ export function ClearanceAdminPage({ kind }: Props) {
     if (error) {
       toast.error(error.message);
     } else {
+      // Check if all remaining books are returned (or if no books remain) and update clearance
+      const { data: allBooks } = await supabase
+        .from("library_books")
+        .select("returned")
+        .eq("student_id", booksModalStudent.id);
+      
+      const booksList = allBooks || [];
+      const allReturned = booksList.length === 0 || booksList.every((b) => b.returned);
+      if (allReturned) {
+        await supabase.from("students").update({ library_cleared: true }).eq("id", booksModalStudent.id);
+      }
       toast.success("Book deleted.");
       void loadStudentBooks(booksModalStudent.id);
       void load();
@@ -1078,17 +1101,24 @@ export function ClearanceAdminPage({ kind }: Props) {
                           <td className="py-2.5 px-3 text-muted-foreground">{b.author || "—"}</td>
                           <td className="py-2.5 px-3 font-mono text-muted-foreground">{b.borrowed_at}</td>
                           <td className="py-2.5 px-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => void toggleBookReturned(b.id, b.returned)}
-                              className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition ${
-                                b.returned
-                                  ? "bg-primary/20 text-primary border border-primary/30 hover:bg-primary/35"
-                                  : "bg-accent/30 text-amber-900 border border-accent hover:bg-accent/50"
-                              }`}
-                            >
-                              {b.returned ? "Returned" : "Pending"}
-                            </button>
+                            {b.returned ? (
+                              <button
+                                type="button"
+                                onClick={() => void toggleBookReturned(b.id, b.returned)}
+                                className="inline-flex items-center gap-1 rounded-full bg-primary/20 border border-primary/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-primary/35 transition"
+                                title="Click to undo return"
+                              >
+                                ✓ Returned
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => void toggleBookReturned(b.id, b.returned)}
+                                className="inline-flex items-center gap-1 rounded-md bg-primary hover:opacity-90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm transition"
+                              >
+                                Mark as Returned
+                              </button>
+                            )}
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             <button

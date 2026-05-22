@@ -97,7 +97,7 @@ function LibraryView() {
   }
 
   const allReturned =
-    books.every((b) => b.returned) && (books.length > 0 || student.library_cleared);
+    books.length > 0 ? books.every((b) => b.returned) : Boolean(student.library_cleared);
 
   const remoteConfigured = isLibraryRemoteConfigured();
   const remoteProfileId = resolveLibraryRemoteProfileId(student);
@@ -138,9 +138,18 @@ function LibraryView() {
             {remoteLoading ? (
               <p className="mt-4 text-muted-foreground">Loading penalties…</p>
             ) : penalties.length === 0 ? (
-              <p className="mt-4 text-muted-foreground">
-                No overdue penalties on your library account.
-              </p>
+              !allReturned ? (
+                <div className="mt-4 p-4 rounded-lg bg-accent/20 border border-accent/60 flex items-center gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-950 shrink-0 animate-pulse" />
+                  <div className="text-sm text-amber-950 font-medium">
+                    Pending Clearance: You have unreturned borrowed books in your possession.
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 text-muted-foreground">
+                  No overdue penalties on your library account.
+                </p>
+              )
             ) : (
               <div className="mt-4 overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-sm">
@@ -193,7 +202,7 @@ function LibraryView() {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={allReturned || student.library_cleared}
+              checked={allReturned}
               readOnly
               className="h-4 w-4 accent-[var(--color-primary)]"
             />
@@ -206,7 +215,7 @@ function LibraryView() {
             <li className="py-4 text-muted-foreground">No books on record in this portal.</li>
           )}
           {books.map((b) => {
-            const isBookReturned = b.returned || student.library_cleared;
+            const isBookReturned = b.returned;
             return (
               <li key={b.id} className="flex items-center justify-between py-3">
                 <div className="flex items-center gap-3">
