@@ -59,9 +59,8 @@ export function MarksheetSavedPreview({ marksheet, readOnlyNotice }: MarksheetSa
         </div>
       </div>
 
-      <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         <InfoLine label="Name on card" value={marksheet.student_name} />
-        <InfoLine label="Roll no" value={marksheet.student_roll_no} />
         <InfoLine label="Registration" value={marksheet.registration_no} />
       </div>
 

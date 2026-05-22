@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Student } from "@/lib/types";
 import { DEPARTMENTS, SEMESTERS, YEARS } from "@/lib/types";
+import { fetchDepartments, insertDepartment } from "@/lib/departments-db";
 import { cn } from "@/lib/utils";
 import { StudentMarksAdminEditor } from "@/features/marks/StudentMarksAdminEditor";
 import { toast } from "sonner";
@@ -43,11 +44,19 @@ export function SuperAdminStudentHub({ studentId }: Props) {
   const [tab, setTab] = useState<TabId>("overview");
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState<Student | null>(null);
-  const [localDepts, setLocalDepts] = useState<string[]>([...DEPARTMENTS]);
+  const [localDepts, setLocalDepts] = useState<string[]>([]);
   const [selectedDept, setSelectedDept] = useState("");
   const [inFees, setInFees] = useState(false);
   const [inHostel, setInHostel] = useState(false);
   const [inLibrary, setInLibrary] = useState(false);
+
+  useEffect(() => {
+    async function loadDepts() {
+      const list = await fetchDepartments();
+      setLocalDepts(list);
+    }
+    void loadDepts();
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,7 +109,7 @@ export function SuperAdminStudentHub({ studentId }: Props) {
       in_hostel: inHostel,
       in_library: inLibrary,
     };
-    const { error } = await supabase.from("students").update(patch).eq("id", student.id);
+    const { error } = await supabase.from("students").update(patch as any).eq("id", student.id);
     if (error) {
       toast.error(error.message);
       return;
@@ -170,7 +179,7 @@ export function SuperAdminStudentHub({ studentId }: Props) {
       toast.error(error.message);
       return;
     }
-    
+
     // Notify admin that COE has approved the data
     await supabase.from("portal_notifications").insert({
       recipient_portal: "admin_2",
@@ -179,7 +188,7 @@ export function SuperAdminStudentHub({ studentId }: Props) {
       title: "COE Data Verified",
       message: `Grade card data for ${student.full_name} (${student.student_id}) has been verified by COE. Ready for final Admin verification.`,
     });
-    
+
     toast.success("COE approved this grade card. Sent to Admin.");
     void load();
   };
@@ -353,15 +362,18 @@ export function SuperAdminStudentHub({ studentId }: Props) {
                   </select>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       const newDept = window.prompt("Enter new department name:");
                       if (newDept && newDept.trim()) {
                         const trimmed = newDept.trim();
-                        if (!localDepts.includes(trimmed)) setLocalDepts([...localDepts, trimmed]);
+                        await insertDepartment(trimmed);
+                        const list = await fetchDepartments();
+                        setLocalDepts(list);
                         setSelectedDept(trimmed);
+                        toast.success(`Department "${trimmed}" added.`);
                       }
                     }}
-                    className="mt-1 rounded-md bg-secondary/50 px-3 py-2 text-primary hover:bg-secondary"
+                    className="mt-1 rounded-md bg-secondary/50 px-3 py-2 text-primary hover:bg-secondary border border-border"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
@@ -415,7 +427,7 @@ export function SuperAdminStudentHub({ studentId }: Props) {
       )}
 
       {tab === "fees" && (
-          <form
+        <form
           onSubmit={(e) => void saveFeesHostelLibrary(e)}
           className="card-elevated space-y-6 rounded-2xl p-6"
         >

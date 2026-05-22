@@ -25,6 +25,7 @@ const BORDER: [number, number, number] = [55, 55, 55] as const;
 
 export type MarksheetDocumentOptions = {
   photoUrl?: string | null;
+  allMarksheets?: StudentMarksheet[];
 };
 
 type LoadedDataUrl = {
@@ -80,7 +81,7 @@ export async function generateMarksheetPdf(
     embossedSeal,
     rightSignature,
     photo,
-  });
+  }, options);
 
   if (backPage) {
     doc.addPage();
@@ -130,7 +131,7 @@ export async function generateAllSemestersPdf(
       embossedSeal,
       rightSignature,
       photo,
-    });
+    }, { ...options, allMarksheets: marksheets });
   }
 
   if (backPage && marksheets.length > 0) {
@@ -154,7 +155,7 @@ export function downloadMarksheetBlob(marksheet: StudentMarksheet, extension: "p
 
 function drawMarksheetPage(
   doc: jsPDF,
-  marksheet: StudentMarksheet,
+  inputMarksheet: StudentMarksheet,
   images: {
     background: LoadedDataUrl | null;
     logo: LoadedDataUrl | null;
@@ -164,7 +165,50 @@ function drawMarksheetPage(
     rightSignature: LoadedDataUrl | null;
     photo: LoadedDataUrl | null;
   },
+  options: MarksheetDocumentOptions = {},
 ) {
+  let marksheet = inputMarksheet;
+  if (options.allMarksheets && options.allMarksheets.length > 0) {
+    const SEMESTER_ORDER: Record<string, number> = {
+      I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
+      "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10,
+      "SEM 1": 1, "SEM 2": 2, "SEM 3": 3, "SEM 4": 4, "SEM 5": 5, "SEM 6": 6, "SEM 7": 7, "SEM 8": 8
+    };
+
+    const getSemesterOrderValue = (label: string): number => {
+      const norm = label.trim().toUpperCase().replace(/^SEM\s+/, "");
+      return SEMESTER_ORDER[norm] || 99;
+    };
+
+    const currentVal = getSemesterOrderValue(marksheet.semester_label);
+    const previousCourseCodes = new Set<string>();
+    for (const otherMs of options.allMarksheets) {
+      if (getSemesterOrderValue(otherMs.semester_label) < currentVal) {
+        const otherCourses = otherMs.courses || [];
+        for (const c of otherCourses) {
+          if (c.course_code) {
+            previousCourseCodes.add(c.course_code.trim().toUpperCase());
+          }
+        }
+      }
+    }
+
+    if (previousCourseCodes.size > 0) {
+      const filteredCourses = marksheet.courses.filter(c => {
+        const code = c.course_code ? c.course_code.trim().toUpperCase() : "";
+        return !previousCourseCodes.has(code);
+      });
+      const resequencedCourses = filteredCourses.map((c, idx) => ({
+        ...c,
+        sl_no: idx + 1,
+      }));
+      marksheet = {
+        ...marksheet,
+        courses: resequencedCourses,
+      };
+    }
+  }
+
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const x = 32;

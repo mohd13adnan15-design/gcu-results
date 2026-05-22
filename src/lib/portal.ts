@@ -3,12 +3,15 @@ import type { PortalType } from "./types";
 /** Default landing path after sign-in for each portal role. */
 export function portalHomePath(portal: PortalType): string {
   switch (portal) {
+    case "super_admin":
+      return "/super-admin";
+    case "admin":
+    case "faculty":
+    case "admin_2":
+      return "/admin";
     case "head_of_coe":
     case "admin_1":
       return "/coe";
-    case "admin_2":
-    case "faculty":
-      return "/admin";
     case "library":
       return "/library";
     case "hostel":
@@ -47,12 +50,15 @@ export function notificationPortalLabel(raw: string): string {
 
 export function portalDisplayLabel(portal: PortalType): string {
   switch (portal) {
-    case "head_of_coe":
-    case "admin_1":
-      return "COE";
+    case "super_admin":
+      return "Super Admin";
+    case "admin":
     case "admin_2":
     case "faculty":
       return "Admin";
+    case "head_of_coe":
+    case "admin_1":
+      return "COE";
     case "library":
       return "Library";
     case "hostel":

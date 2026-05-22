@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { StudentMarksheet } from "@/lib/marksheet";
-import { fetchStudentMarksheet } from "@/lib/marksheet";
+import { fetchStudentMarksheet, fetchAllStudentMarksheets } from "@/lib/marksheet";
 import { MarksheetSavedPreview } from "@/features/marks/MarksheetDisplay";
 import {
   buildAdminVerificationUpdate,
@@ -27,6 +27,8 @@ type Props = {
 export function StudentMarksReviewPanel({ studentId, portal }: Props) {
   const [student, setStudent] = useState<Student | null>(null);
   const [marksheet, setMarksheet] = useState<StudentMarksheet | null>(null);
+  const [allMarksheets, setAllMarksheets] = useState<StudentMarksheet[]>([]);
+  const [selectedSemLabel, setSelectedSemLabel] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
@@ -43,6 +45,8 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
       toast.error(studentError.message);
       setStudent(null);
       setMarksheet(null);
+      setAllMarksheets([]);
+      setSelectedSemLabel(null);
       setPageLoading(false);
       return;
     }
@@ -51,15 +55,29 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
     setStudent(nextStudent);
     if (!nextStudent) {
       setMarksheet(null);
+      setAllMarksheets([]);
+      setSelectedSemLabel(null);
       setPageLoading(false);
       return;
     }
 
     try {
-      setMarksheet(await fetchStudentMarksheet(supabase, nextStudent.id));
+      const sheets = await fetchAllStudentMarksheets(supabase, nextStudent.id);
+      setAllMarksheets(sheets);
+      if (sheets.length > 0) {
+        // Default to showing the latest saved marksheet
+        const latest = sheets[sheets.length - 1];
+        setMarksheet(latest);
+        setSelectedSemLabel(latest.semester_label);
+      } else {
+        setMarksheet(null);
+        setSelectedSemLabel(null);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not load marksheet");
       setMarksheet(null);
+      setAllMarksheets([]);
+      setSelectedSemLabel(null);
     } finally {
       setPageLoading(false);
     }
@@ -289,9 +307,38 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
         {portal === "admin_2" && <AdminClearanceReview student={student} />}
 
         <div className="mt-6">
-          <p className="mb-3 text-sm font-semibold text-primary">
-            Grade card Details
-          </p>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3 border-b border-border/40 pb-2">
+            <p className="text-sm font-semibold text-primary">
+              Grade card Details
+            </p>
+            {allMarksheets.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {allMarksheets.map((m) => {
+                  const semName = (m.semester_label || "").toLowerCase().startsWith("sem")
+                    ? m.semester_label
+                    : `Sem ${m.semester_label}`;
+                  const isSelected = selectedSemLabel === m.semester_label;
+                  return (
+                    <button
+                      key={m.id || m.semester_label}
+                      type="button"
+                      onClick={() => {
+                        setMarksheet(m);
+                        setSelectedSemLabel(m.semester_label);
+                      }}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold border transition ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-white text-primary border-primary/30 hover:bg-primary/10"
+                      }`}
+                    >
+                      {semName}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <MarksheetSavedPreview marksheet={marksheet} />
         </div>
 
@@ -385,7 +432,7 @@ function AdminClearanceReview({ student }: { student: Student }) {
       />
       <ClearanceBox
         label="Hostel Fee"
-        status={!student.in_hostel ? "Clear" : hostel.cleared ? "Clear" : "Pending"}
+        status={!student.in_hostel ? "Not enrolled" : hostel.cleared ? "Clear" : "Pending"}
         lines={
           student.in_hostel
             ? [

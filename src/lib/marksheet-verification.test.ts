@@ -32,6 +32,7 @@ const clearStudent: Student = {
   hostel_total: 50000,
   hostel_paid: 50000,
   library_remote_profile_id: null,
+  marksheet_verification_requested_at: "2026-05-01T00:00:00.000Z",
 };
 
 describe("marksheet verification helpers", () => {
@@ -166,7 +167,7 @@ describe("marksheet verification helpers", () => {
   });
 
   it("detects student verification request timestamp", () => {
-    expect(studentRequestedMarksheetVerification(clearStudent)).toBe(false);
+    expect(studentRequestedMarksheetVerification({ ...clearStudent, marksheet_verification_requested_at: null })).toBe(false);
     expect(
       studentRequestedMarksheetVerification({
         ...clearStudent,

@@ -57,19 +57,23 @@ function Dashboard() {
   const [hasLibraryPenalty, setHasLibraryPenalty] = useState(false);
   const [libraryPenaltyTotal, setLibraryPenaltyTotal] = useState(0);
   const [hasMarksheet, setHasMarksheet] = useState(false);
+  const [allBooksReturned, setAllBooksReturned] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     const s = getStudentSession();
     if (!s) return;
     const load = async () => {
-      const [{ data }, { data: marksheetData }] = await Promise.all([
+      const [{ data }, { data: marksheetData }, { data: booksData }] = await Promise.all([
         supabase.from("students").select("*").eq("id", s.id).maybeSingle(),
         supabase.from("student_marksheets").select("id").eq("student_id", s.id).limit(1).maybeSingle(),
+        supabase.from("library_books").select("returned").eq("student_id", s.id),
       ]);
       const st = data as Student | null;
       setStudent(st);
       setHasMarksheet(Boolean(marksheetData));
+      const booksList = (booksData ?? []) as { returned: boolean }[];
+      setAllBooksReturned(booksList.length > 0 ? booksList.every((b) => b.returned) : true);
 
       if (!st?.in_library || !isLibraryRemoteConfigured()) {
         setHasLibraryPenalty(false);
@@ -163,7 +167,16 @@ function Dashboard() {
           to="/student/fees"
           icon={IndianRupee}
           label="Academic Fees"
-          status={feesOk ? "Paid" : "Pending"}
+          status={
+            feesOk ? (
+              <span>Paid</span>
+            ) : (
+              <div className="flex justify-between w-full">
+                <span>Pending</span>
+                <span>{Math.max(0, 100 - feesPct)}%</span>
+              </div>
+            )
+          }
           done={feesOk}
           locked={false}
         />
@@ -171,7 +184,18 @@ function Dashboard() {
           to="/student/hostel"
           icon={HomeIcon}
           label="Hostel"
-          status={!student.in_hostel ? "Clear" : hostelOk ? "Paid" : `${hostelPct}%`}
+          status={
+            !student.in_hostel ? (
+              <span>Not enrolled</span>
+            ) : hostelOk ? (
+              <span>Paid</span>
+            ) : (
+              <div className="flex justify-between w-full">
+                <span>Pending</span>
+                <span>{Math.max(0, 100 - hostelPct)}%</span>
+              </div>
+            )
+          }
           done={hostelOk}
           locked={!student.in_hostel}
         />
@@ -179,7 +203,20 @@ function Dashboard() {
           to="/student/library"
           icon={Library}
           label="Library"
-          status={!student.in_library ? "Clear" : libraryOk ? "All returned" : "Pending"}
+          status={
+            !student.in_library ? (
+              <span>No Activities</span>
+            ) : hasLibraryPenalty ? (
+              <div className="flex justify-between w-full">
+                <span>Penalty</span>
+                <span>₹{libraryPenaltyTotal.toLocaleString()}</span>
+              </div>
+            ) : allBooksReturned || student.library_cleared ? (
+              <span>No penalties</span>
+            ) : (
+              <span>Pending</span>
+            )
+          }
           done={libraryOk}
           locked={!student.in_library}
         />
@@ -270,32 +307,41 @@ function DashCard({
   status,
   done,
   locked,
+  footer,
 }: {
   to: string;
   icon: typeof IndianRupee;
   label: string;
-  status: string;
+  status: React.ReactNode;
   done: boolean;
   locked: boolean;
+  footer?: React.ReactNode;
 }) {
   const inner = (
     <div
-      className={`card-elevated rounded-2xl p-6 h-full transition hover:-translate-y-0.5 ${locked ? "opacity-60" : ""}`}
+      className={`card-elevated rounded-2xl p-6 h-full transition flex flex-col justify-between hover:-translate-y-0.5 ${locked ? "opacity-60" : ""}`}
     >
-      <div className="flex items-start justify-between">
-        <div
-          className={`flex h-12 w-12 items-center justify-center rounded-xl bg-accent ${locked ? "locked-blur" : ""}`}
-        >
-          <Icon className="h-6 w-6 text-primary" strokeWidth={1.75} />
+      <div>
+        <div className="flex items-start justify-between">
+          <div
+            className={`flex h-12 w-12 items-center justify-center rounded-xl bg-accent ${locked ? "locked-blur" : ""}`}
+          >
+            <Icon className="h-6 w-6 text-primary" strokeWidth={1.75} />
+          </div>
+          {locked ? (
+            <Lock className="h-5 w-5 text-muted-foreground" />
+          ) : done ? (
+            <CheckCircle2 className="h-5 w-5 text-primary" />
+          ) : null}
         </div>
-        {locked ? (
-          <Lock className="h-5 w-5 text-muted-foreground" />
-        ) : done ? (
-          <CheckCircle2 className="h-5 w-5 text-primary" />
-        ) : null}
+        <p className="mt-6 text-2xl font-bold text-primary">{label}</p>
+        <div className="mt-1 text-sm text-muted-foreground">{status}</div>
       </div>
-      <p className="mt-6 text-2xl font-bold text-primary">{label}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{status}</p>
+      {footer && (
+        <div className="mt-4 text-xs text-muted-foreground border-t border-border/40 pt-2 text-left">
+          {footer}
+        </div>
+      )}
     </div>
   );
   if (locked) return <div className="cursor-not-allowed">{inner}</div>;

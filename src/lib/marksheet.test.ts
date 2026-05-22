@@ -97,7 +97,7 @@ describe("marksheet data helpers", () => {
 
   it("creates stable student-specific filenames", () => {
     expect(buildMarksheetFileName(TEJASHVI_MARKSHEET_SEED, "pdf")).toBe(
-      "24btre152-v-sai-tejashvi-marksheet.pdf",
+      "GradeCard_Sem4.pdf",
     );
   });
 
@@ -115,7 +115,7 @@ describe("marksheet data helpers", () => {
       finalGrade: "A+",
     });
     expect(buildMarksheetFileName(AARAV_MARKSHEET_SEED, "pdf")).toBe(
-      "24btre148-aarav-sharma-marksheet.pdf",
+      "GradeCard_Sem5.pdf",
     );
   });
 

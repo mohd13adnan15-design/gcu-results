@@ -67,6 +67,8 @@ export function StudentMarksAdminEditor({
   const [student, setStudent] = useState<Student | null>(null);
   const [header, setHeader] = useState<HeaderFormState | null>(null);
   const [marks, setMarks] = useState<DraftMark[]>([]);
+  const [allSheets, setAllSheets] = useState<any[]>([]);
+  const [selectedSemFilter, setSelectedSemFilter] = useState<string>("ALL");
   const [draft, setDraft] = useState<DraftMark>({
     subject: "",
     subject_code: "",
@@ -115,13 +117,13 @@ export function StudentMarksAdminEditor({
       .delete()
       .eq("student_id", s.id);
     if (deleteError) throw deleteError;
-    const { error: insertError } = await supabase.from("main_grade_card").insert(rows);
+    const { error: insertError } = await supabase.from("main_grade_card").insert(rows as any);
     if (insertError) throw insertError;
   }
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: studentData }, { data: headerData }, { data: marksData }, { data: msheet }] =
+    const [{ data: studentData }, { data: headerData }, { data: marksData }, { data: msheet }, { data: allSheetsData }] =
       await Promise.all([
         supabase.from("students").select("*").eq("id", studentId).maybeSingle(),
         supabase
@@ -144,6 +146,11 @@ export function StudentMarksAdminEditor({
           .select("university,school_name,grade_card_no,qr_data")
           .eq("student_id", studentId)
           .maybeSingle(),
+        supabase
+          .from("student_marksheets")
+          .select("semester_label, courses")
+          .eq("student_id", studentId)
+          .order("semester_label", { ascending: true }),
       ]);
 
     const currentStudent = (studentData as Student | null) ?? null;
@@ -176,6 +183,7 @@ export function StudentMarksAdminEditor({
           : ""),
     };
     setHeader(nextHeader);
+    setAllSheets(allSheetsData ?? []);
 
     let nextMarks = ((marksData as DraftMark[]) ?? []).filter(Boolean);
 
@@ -300,7 +308,9 @@ export function StudentMarksAdminEditor({
   async function saveRow(row: DraftMark) {
     if (!row.id) return;
     const marksObtained = Number(row.marks_obtained ?? 0);
-    const maxMarks = Number(row.max_marks ?? 100);
+    const category = String(row.course_category ?? "").trim().toUpperCase();
+    const isPractical = category.includes("PRACTICAL");
+    const maxMarks = isPractical ? 50 : Number(row.max_marks ?? 100);
     const grade = String(row.grade ?? "")
       .trim()
       .toUpperCase();
@@ -366,6 +376,9 @@ export function StudentMarksAdminEditor({
       const creditsEarned = Number(draft.credits_earned ?? 0) || (grade === "RA" ? 0 : credits);
       const g = grade || "RA";
       const gradePoints = Number(draft.grade_points ?? 0) || gradePointsFromGradeLetter(g);
+      const category = String(draft.course_category ?? "CORE COURSE").trim().toUpperCase();
+      const isPractical = category.includes("PRACTICAL");
+      const maxMarks = isPractical ? 50 : Number(draft.max_marks ?? 100);
       const payload = {
         student_id: student.id,
         subject: draft.subject,
@@ -374,7 +387,7 @@ export function StudentMarksAdminEditor({
         credits,
         credits_earned: creditsEarned,
         marks_obtained: Number(draft.marks_obtained ?? 0),
-        max_marks: Number(draft.max_marks ?? 100),
+        max_marks: maxMarks,
         grade: g,
         grade_points: gradePoints,
       };
@@ -410,14 +423,31 @@ export function StudentMarksAdminEditor({
     setMarks((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)));
   };
 
+  const filteredMarks = useMemo(() => {
+    if (selectedSemFilter === "ALL") return marks;
+    const targetSheet = allSheets.find(s => s.semester_label === selectedSemFilter);
+    if (!targetSheet) return [];
+    
+    let allowedCourses: any[] = [];
+    try {
+      allowedCourses = typeof targetSheet.courses === 'string' ? JSON.parse(targetSheet.courses) : targetSheet.courses;
+    } catch {
+      allowedCourses = targetSheet.courses || [];
+    }
+    if (!Array.isArray(allowedCourses)) allowedCourses = [];
+    
+    const allowedCodes = new Set(allowedCourses.map((c: any) => String(c.course_code || c.subject_code || "").toUpperCase().trim()).filter(Boolean));
+    return marks.filter(m => allowedCodes.has(String(m.subject_code || "").toUpperCase().trim()));
+  }, [marks, allSheets, selectedSemFilter]);
+
   const totalCredits = useMemo(
-    () => marks.reduce((sum, row) => sum + Number(row.credits ?? 0), 0),
-    [marks],
+    () => filteredMarks.reduce((sum, row) => sum + Number(row.credits ?? 0), 0),
+    [filteredMarks],
   );
 
   const totalCreditsEarned = useMemo(
-    () => marks.reduce((sum, row) => sum + Number(row.credits_earned ?? 0), 0),
-    [marks],
+    () => filteredMarks.reduce((sum, row) => sum + Number(row.credits_earned ?? 0), 0),
+    [filteredMarks],
   );
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading marks…</p>;
@@ -533,6 +563,45 @@ export function StudentMarksAdminEditor({
           <div className="rounded-lg border border-border bg-secondary/20 px-3 py-2 text-sm">
             Total credits: <strong>{totalCredits.toFixed(1)}</strong>
           </div>
+        </div>
+      )}
+
+      {allSheets.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-b border-border/30 bg-cream/40 p-3 rounded-xl border border-border/60">
+          <span className="text-xs font-bold text-primary uppercase tracking-wider mr-2">
+            Semester wise view:
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedSemFilter("ALL")}
+            className={`rounded-md px-3 py-1.5 text-xs font-bold border transition ${
+              selectedSemFilter === "ALL"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-white text-primary border-primary/30 hover:bg-primary/10"
+            }`}
+          >
+            ALL
+          </button>
+          {allSheets.map((s) => {
+            const semName = (s.semester_label || "").toLowerCase().startsWith("sem")
+              ? s.semester_label
+              : `Sem ${s.semester_label}`;
+            const isSelected = selectedSemFilter === s.semester_label;
+            return (
+              <button
+                key={s.semester_label}
+                type="button"
+                onClick={() => setSelectedSemFilter(s.semester_label)}
+                className={`rounded-md px-3 py-1.5 text-xs font-bold border transition ${
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-white text-primary border-primary/30 hover:bg-primary/10"
+                }`}
+              >
+                {semName}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -712,7 +781,8 @@ export function StudentMarksAdminEditor({
                   <th className="px-2 py-2">Code</th>
                   <th className="px-2 py-2">Course</th>
                   <th className="px-2 py-2">Section</th>
-                  <th className="px-2 py-2">Credits</th>
+                  <th className="px-2 py-2">Total Credits</th>
+                  <th className="px-2 py-2">Obtained Credits</th>
                   <th className="px-2 py-2">Grade</th>
                   <th className="px-2 py-2">Points</th>
                   <th className="px-2 py-2">Obt</th>
@@ -725,8 +795,8 @@ export function StudentMarksAdminEditor({
                   <th className="px-2 py-2">Code</th>
                   <th className="px-2 py-2">{compact ? "Course" : "Subject"}</th>
                   <th className="px-2 py-2">{compact ? "Section" : "Category"}</th>
-                  <th className="px-2 py-2">Cr</th>
-                  <th className="px-2 py-2">{compact ? "Earned" : "Cr earned"}</th>
+                  <th className="px-2 py-2">Total Credits</th>
+                  <th className="px-2 py-2">Obtained Credits</th>
                   <th className="px-2 py-2">Obt</th>
                   <th className="px-2 py-2">Max</th>
                   <th className="px-2 py-2">Grade</th>
@@ -737,7 +807,7 @@ export function StudentMarksAdminEditor({
             </tr>
           </thead>
           <tbody>
-            {marks.map((row, index) => {
+            {filteredMarks.map((row, index) => {
               return (
                 <tr key={row.id} className="border-b border-border/60">
                   <td className="px-2 py-2 text-muted-foreground">{index + 1}</td>
@@ -775,25 +845,26 @@ export function StudentMarksAdminEditor({
                     />
                   </td>
                   {prettyCard ? (
-                    <td className="px-2 py-2">
-                      <div className="flex items-center justify-start gap-1 whitespace-nowrap">
-                        <input
-                          type="number"
-                          title="Credits earned"
-                          value={String(row.credits_earned ?? 0)}
-                          onChange={(e) => updateMark(row.id!, { credits_earned: Number(e.target.value) })}
-                          className={`${PRETTY_TABLE_INPUT} w-11`}
-                        />
-                        <span className="text-muted-foreground">/</span>
+                    <>
+                      <td className="px-2 py-2">
                         <input
                           type="number"
                           title="Course credits"
                           value={String(row.credits ?? 0)}
                           onChange={(e) => updateMark(row.id!, { credits: Number(e.target.value) })}
-                          className={`${PRETTY_TABLE_INPUT} w-11`}
+                          className={`${PRETTY_TABLE_INPUT} w-16`}
                         />
-                      </div>
-                    </td>
+                      </td>
+                      <td className="px-2 py-2">
+                        <input
+                          type="number"
+                          title="Credits earned"
+                          value={String(row.credits_earned ?? 0)}
+                          onChange={(e) => updateMark(row.id!, { credits_earned: Number(e.target.value) })}
+                          className={`${PRETTY_TABLE_INPUT} w-16`}
+                        />
+                      </td>
+                    </>
                   ) : (
                     <>
                       <td className="px-2 py-2">

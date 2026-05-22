@@ -1,5 +1,5 @@
 import React from "react";
-import type { StudentMarksheet } from "@/lib/marksheet";
+import { groupCoursesBySection, type StudentMarksheet } from "@/lib/marksheet";
 
 interface HighFidelityGradeCardProps {
   marksheet: StudentMarksheet;
@@ -113,28 +113,49 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
               </tr>
             </thead>
             <tbody>
-              {/* Note: In a full implementation, we would group by category (CORE, PRACTICAL, etc.) */}
-              <tr className="section-header">
-                <td colSpan={7}>CORE COURSE</td>
-              </tr>
-              {marksheet.courses.map((course, idx) => (
-                <tr key={idx}>
-                  <td className="center">{course.sl_no}</td>
-                  <td className="center">{course.course_code}</td>
-                  <td className="left">
-                    {course.course_title}
-                    {course.total_marks_practical && course.total_marks_practical > 0 ? (
-                      <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>
-                        (Theory: {course.total_marks_theory || 0}, Practical: {course.total_marks_practical})
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="center">{course.course_credits?.toFixed(1)}</td>
-                  <td className="center">{course.credits_earned?.toFixed(1)}</td>
-                  <td className="center">{course.grade_obtained}</td>
-                  <td className="center">{course.grade_points?.toFixed(2)}</td>
-                </tr>
-              ))}
+              {groupCoursesBySection(marksheet.courses).map((group, groupIdx) => {
+                const isPractical = group.section.trim().toLowerCase().includes("practical");
+                return (
+                  <React.Fragment key={groupIdx}>
+                    <tr className="section-header">
+                      <td
+                        colSpan={7}
+                        className={isPractical ? "left charcoal" : "center maroon"}
+                        style={{
+                          textAlign: isPractical ? "left" : "center",
+                          color: isPractical ? "#2e2e2e" : "#6b1f1f",
+                          paddingLeft: isPractical ? "12px" : "8px",
+                          fontWeight: "bold",
+                          fontSize: "14px",
+                          backgroundColor: "#fcf8f8",
+                          height: "30px",
+                          borderBottom: "1px solid #ddd"
+                        }}
+                      >
+                        {group.section}
+                      </td>
+                    </tr>
+                    {group.courses.map((course, idx) => (
+                      <tr key={idx}>
+                        <td className="center">{course.sl_no}</td>
+                        <td className="center">{course.course_code}</td>
+                        <td className="left">
+                          {course.course_title}
+                          {course.total_marks_practical && course.total_marks_practical > 0 ? (
+                            <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>
+                              (Theory: {course.total_marks_theory || 0}, Practical: {course.total_marks_practical})
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="center">{course.course_credits?.toFixed(1)}</td>
+                        <td className="center">{course.credits_earned?.toFixed(1)}</td>
+                        <td className="center">{course.grade_obtained}</td>
+                        <td className="center">{course.grade_points?.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
               <tr className="total-row">
                 <td colSpan={2}></td>
                 <td className="right bold maroon">TOTAL</td>

@@ -1,5 +1,32 @@
 import { TEJASHVI_MARKSHEET_SEED } from "@/lib/marksheet";
 
+export function toRoman(num: number | string): string {
+  const n = typeof num === 'number' ? num : parseInt(String(num), 10);
+  if (!Number.isFinite(n) || Number.isNaN(n)) return String(num).toUpperCase();
+  const map: Record<number, string> = {
+    1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII",
+    9: "IX", 10: "X"
+  };
+  return map[n] || String(n);
+}
+
+export function romanToNum(roman: string | number | null | undefined): number {
+  if (roman === null || roman === undefined || roman === "") return 0;
+  if (typeof roman === "number") return roman;
+  const clean = String(roman).trim().toUpperCase();
+  if (!clean) return 0;
+
+  const n = parseInt(clean, 10);
+  if (Number.isFinite(n) && !Number.isNaN(n)) return n;
+
+  const map: Record<string, number> = {
+    I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8,
+    IX: 9, X: 10
+  };
+  return map[clean] || 0;
+}
+
+
 /** Full template - one row per course; repeat student/header columns on every row (same as typical Excel marks uploads). */
 export const MARKS_TEMPLATE_HEADERS_FULL = [
   "Sl No",
@@ -120,6 +147,7 @@ export type ParsedMarksCourseRow = {
   max_marks: number;
   grade: string;
   grade_points: number;
+  image_path?: string;
 };
 
 export function gradePointsFromGradeLetter(grade: string): number {
@@ -161,6 +189,7 @@ export function parseMarksTemplateRow(nc: Record<string, unknown>): ParsedMarksC
   const full_name = cell(nc, "Student Name", "student name");
   const subject_code = cell(nc, "Course Code", "course code");
   const subject = cell(nc, "Course Title", "course title");
+  const image_path = cell(nc, "Image Path", "image path", "image_path");
 
   if (!student_id || !full_name || !subject_code || !subject) {
     return null;
@@ -182,8 +211,11 @@ export function parseMarksTemplateRow(nc: Record<string, unknown>): ParsedMarksC
   const grade_card_no = cell(nc, "Grade Card No", "grade card no");
 
   const semesterRaw = cell(nc, "Semester", "semester");
-  const semesterParsed = parseInt(semester_label.replace(/\D/g, ""), 10);
-  const semester = Number(semesterRaw) || (Number.isFinite(semesterParsed) ? semesterParsed : 1);
+  let semester = romanToNum(semesterRaw);
+  if (!semester) {
+    const semesterParsed = parseInt(semester_label.replace(/\D/g, ""), 10);
+    semester = Number.isFinite(semesterParsed) ? semesterParsed : 1;
+  }
   const yearRaw = cell(nc, "Year", "year");
   const year = Number(yearRaw) || Math.ceil(semester / 2) || 1;
 
@@ -191,28 +223,32 @@ export function parseMarksTemplateRow(nc: Record<string, unknown>): ParsedMarksC
   const course_priority = cellNum(nc, "Course Priority", "course priority", "priority") || 1;
   const credits = Number(cell(nc, "Course Credits", "course credits", "credits")) || 0;
 
-  const cia_max_marks_theory = cellNum(nc, "cia max marks theory", "ciamaxmarkstheory") || 0;
-  const cia_max_marks_practical = cellNum(nc, "cia max marks practical", "ciamaxmarkspractical") || 0;
-  const cia_marks_obtained_theory = cellNum(nc, "cia marks obtained theory", "ciamarksobtainedtheory") || 0;
-  const cia_marks_obtained_practical = cellNum(nc, "cia marks obtained practical", "ciamarksobtainedpractical") || 0;
-  const ese_max_marks_theory = cellNum(nc, "ese max marks theory", "esemaxmarkstheory") || 0;
-  const ese_max_marks_practical = cellNum(nc, "ese max marks practical", "esemaxmarkspractical") || 0;
-  const ese_marks_obtained_theory = cellNum(nc, "ese marks obtained theory", "esemarksobtainedtheory") || 0;
-  const ese_marks_obtained_practical = cellNum(nc, "ese marks obtained practical", "esemarksobtainedpractical") || 0;
-  const total_marks_theory = cellNum(nc, "total marks theory", "totalmarkstheory") || 0;
-  const total_marks_practical = cellNum(nc, "total marks practical", "totalmarkspractical") || 0;
+  const courseType = cell(nc, "Course Type", "coursetype") || "";
+  const isPractical = courseType.toUpperCase().includes("PRACTICAL") || String(course_category).toUpperCase().includes("PRACTICAL");
 
-  const marksStr = cell(nc, "Marks Obtained", "marks obtained");
+  const cia_max_raw = cellNum(nc, "cia max marks theory", "ciamaxmarkstheory") || cellNum(nc, "cia max marks practical", "ciamaxmarkspractical") || cellNum(nc, "CIA Max Marks", "ciamaxmarks") || 0;
+  const cia_obt_raw = cellNum(nc, "cia marks obtained theory", "ciamarksobtainedtheory") || cellNum(nc, "cia marks obtained practical", "ciamarksobtainedpractical") || cellNum(nc, "CIA Marks Obtained", "ciamarksobtained") || 0;
+  const ese_max_raw = cellNum(nc, "ese max marks theory", "esemaxmarkstheory") || cellNum(nc, "ese max marks practical", "esemaxmarkspractical") || cellNum(nc, "ESE Max Marks", "esemaxmarks") || 0;
+  const ese_obt_raw = cellNum(nc, "ese marks obtained theory", "esemarksobtainedtheory") || cellNum(nc, "ese marks obtained practical", "esemarksobtainedpractical") || cellNum(nc, "ESE Marks Obtained", "esemarksobtained") || 0;
+
+  const cia_max_marks_theory = isPractical ? 0 : cia_max_raw;
+  const cia_max_marks_practical = isPractical ? cia_max_raw : 0;
+  const cia_marks_obtained_theory = isPractical ? 0 : cia_obt_raw;
+  const cia_marks_obtained_practical = isPractical ? cia_obt_raw : 0;
+  const ese_max_marks_theory = isPractical ? 0 : ese_max_raw;
+  const ese_max_marks_practical = isPractical ? ese_max_raw : 0;
+  const ese_marks_obtained_theory = isPractical ? 0 : ese_obt_raw;
+  const ese_marks_obtained_practical = isPractical ? ese_obt_raw : 0;
+
+  const total_marks_theory_raw = cellNum(nc, "total marks theory", "totalmarkstheory") || 0;
+  const total_marks_practical_raw = cellNum(nc, "total marks practical", "totalmarkspractical") || 0;
+  const total_marks_theory = isPractical ? 0 : (total_marks_theory_raw || (cia_max_marks_theory + ese_max_marks_theory));
+  const total_marks_practical = isPractical ? (total_marks_practical_raw || (cia_max_marks_practical + ese_max_marks_practical)) : 0;
+
   const max_marksRaw = Number(cell(nc, "Max Marks", "max marks", "total max marks", "totalmaxmarks"));
-  const max_marks = max_marksRaw || (cia_max_marks_theory + cia_max_marks_practical + ese_max_marks_theory + ese_max_marks_practical) || 100;
+  const max_marks = isPractical ? 50 : (max_marksRaw || (cia_max_raw + ese_max_raw) || 100);
 
-  let marks_obtained = marksStr === "" ? NaN : Number(marksStr);
-  if (Number.isNaN(marks_obtained) && (cia_marks_obtained_theory > 0 || cia_marks_obtained_practical > 0 || ese_marks_obtained_theory > 0 || ese_marks_obtained_practical > 0 || total_marks_theory > 0 || total_marks_practical > 0)) {
-    marks_obtained = total_marks_theory + total_marks_practical;
-    if (marks_obtained === 0) {
-      marks_obtained = cia_marks_obtained_theory + cia_marks_obtained_practical + ese_marks_obtained_theory + ese_marks_obtained_practical;
-    }
-  }
+  const marks_obtained = cia_obt_raw + ese_obt_raw;
 
   const gradeRaw = cell(nc, "Grade Obtained", "grade obtained", "Grade").toUpperCase();
   const grade =
@@ -263,6 +299,7 @@ export function parseMarksTemplateRow(nc: Record<string, unknown>): ParsedMarksC
     max_marks,
     grade,
     grade_points,
+    image_path: image_path || undefined,
   };
 }
 
@@ -318,7 +355,7 @@ export function buildTejashviTemplateExampleRows(): (string | number)[][] {
       "student123",
       m.student_name,
       "SET",
-      parseInt(semLabel.replace(/\D/g, "") || "1", 10),
+      toRoman(parseInt(semLabel.replace(/\D/g, "") || "1", 10)),
       1,
       m.university,
       m.school_name,

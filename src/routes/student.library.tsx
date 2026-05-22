@@ -205,30 +205,33 @@ function LibraryView() {
           {books.length === 0 && (
             <li className="py-4 text-muted-foreground">No books on record in this portal.</li>
           )}
-          {books.map((b) => (
-            <li key={b.id} className="flex items-center justify-between py-3">
-              <div className="flex items-center gap-3">
-                {b.returned ? (
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                ) : (
-                  <Circle className="h-5 w-5 text-muted-foreground" />
-                )}
-                <div>
-                  <p className="font-medium text-primary">{b.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {b.author ?? "Unknown"} · borrowed {b.borrowed_at}
-                  </p>
+          {books.map((b) => {
+            const isBookReturned = b.returned || student.library_cleared;
+            return (
+              <li key={b.id} className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3">
+                  {isBookReturned ? (
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-muted-foreground" />
+                  )}
+                  <div>
+                    <p className="font-medium text-primary">{b.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {b.author ?? "Unknown"} · borrowed {b.borrowed_at}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <span
-                className={`text-xs uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                  b.returned ? "bg-primary text-primary-foreground" : "bg-accent text-primary"
-                }`}
-              >
-                {b.returned ? "Returned" : "Pending"}
-              </span>
-            </li>
-          ))}
+                <span
+                  className={`text-xs uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    isBookReturned ? "bg-primary text-primary-foreground" : "bg-accent text-primary"
+                  }`}
+                >
+                  {isBookReturned ? "Returned" : "Pending"}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
