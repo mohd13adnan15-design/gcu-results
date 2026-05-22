@@ -130,6 +130,102 @@ export function ClearanceAdminPage({ kind }: Props) {
   const [depts, setDepts] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Library Portal Books Management
+  const [booksModalStudent, setBooksModalStudent] = useState<Student | null>(null);
+  const [modalBooks, setModalBooks] = useState<any[]>([]);
+  const [booksLoading, setBooksLoading] = useState(false);
+  const [newBookTitle, setNewBookTitle] = useState("");
+  const [newBookAuthor, setNewBookAuthor] = useState("");
+  const [newBookBorrowedAt, setNewBookBorrowedAt] = useState(new Date().toISOString().split("T")[0]);
+  const [addingBook, setAddingBook] = useState(false);
+
+  const loadStudentBooks = useCallback(async (studentId: string) => {
+    setBooksLoading(true);
+    const { data, error } = await supabase
+      .from("library_books")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("borrowed_at", { ascending: false });
+    if (error) toast.error(error.message);
+    setModalBooks(data || []);
+    setBooksLoading(false);
+  }, []);
+
+  function openBooksModal(student: Student) {
+    setBooksModalStudent(student);
+    setNewBookTitle("");
+    setNewBookAuthor("");
+    setNewBookBorrowedAt(new Date().toISOString().split("T")[0]);
+    void loadStudentBooks(student.id);
+  }
+
+  async function handleAddBook(e: React.FormEvent) {
+    e.preventDefault();
+    if (!booksModalStudent) return;
+    if (!newBookTitle.trim()) {
+      toast.error("Book title is required.");
+      return;
+    }
+    setAddingBook(true);
+    try {
+      const payload = {
+        student_id: booksModalStudent.id,
+        title: newBookTitle.trim(),
+        author: newBookAuthor.trim() || null,
+        borrowed_at: newBookBorrowedAt || new Date().toISOString().split("T")[0],
+        returned: false,
+        returned_at: null,
+      };
+      const { error } = await supabase.from("library_books").insert(payload);
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success("Book added successfully.");
+        setNewBookTitle("");
+        setNewBookAuthor("");
+        void loadStudentBooks(booksModalStudent.id);
+        void load();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add book");
+    } finally {
+      setAddingBook(false);
+    }
+  }
+
+  async function toggleBookReturned(bookId: string, currentStatus: boolean) {
+    if (!booksModalStudent) return;
+    const nextStatus = !currentStatus;
+    const { error } = await supabase
+      .from("library_books")
+      .update({
+        returned: nextStatus,
+        returned_at: nextStatus ? new Date().toISOString().split("T")[0] : null,
+      })
+      .eq("id", bookId);
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(nextStatus ? "Book marked as returned." : "Book marked as pending.");
+      void loadStudentBooks(booksModalStudent.id);
+      void load();
+    }
+  }
+
+  async function deleteBook(bookId: string) {
+    if (!booksModalStudent) return;
+    if (!confirm("Are you sure you want to delete this book?")) return;
+    const { error } = await supabase.from("library_books").delete().eq("id", bookId);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Book deleted.");
+      void loadStudentBooks(booksModalStudent.id);
+      void load();
+    }
+  }
+
   useEffect(() => {
     async function loadDepts() {
       const list = await fetchDepartments();
@@ -672,6 +768,14 @@ export function ClearanceAdminPage({ kind }: Props) {
                                 <Pencil className="h-3.5 w-3.5" /> Edit
                               </button>
                             ))}
+                          {kind === "library" && (
+                            <button
+                              onClick={() => openBooksModal(s)}
+                              className="inline-flex items-center gap-1 rounded-md border border-border bg-cream px-2 py-1 text-xs text-primary hover:bg-secondary"
+                            >
+                              <Plus className="h-3.5 w-3.5" /> Books
+                            </button>
+                          )}
                           <button
                             onClick={() => removeStudent(s.id)}
                             className="inline-flex items-center gap-1 rounded-md border border-border bg-cream px-2 py-1 text-xs text-primary hover:bg-secondary"
@@ -846,6 +950,143 @@ export function ClearanceAdminPage({ kind }: Props) {
                 <button type="submit" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">Save Details</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Library Books Modal */}
+      {booksModalStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="card-elevated w-full max-w-2xl rounded-2xl p-6 flex flex-col max-h-[90vh] bg-cream shadow-2xl border border-border/80">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/60">
+              <div>
+                <h3 className="text-lg font-bold text-primary">Borrowed Books Management</h3>
+                <p className="text-xs text-muted-foreground">
+                  {booksModalStudent.full_name} ({booksModalStudent.student_id})
+                </p>
+              </div>
+              <button
+                onClick={() => setBooksModalStudent(null)}
+                className="text-muted-foreground hover:text-primary transition-colors p-1 hover:bg-secondary/40 rounded-full"
+                aria-label="Close books modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Add Book Form */}
+            <form onSubmit={handleAddBook} className="bg-secondary/25 border border-border/80 rounded-xl p-4 mb-4 grid gap-3 sm:grid-cols-3 items-end">
+              <div className="sm:col-span-1">
+                <label className="block text-xs font-semibold text-primary mb-1">Book Title *</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Clean Code"
+                  value={newBookTitle}
+                  onChange={(e) => setNewBookTitle(e.target.value)}
+                  className="w-full rounded-md border border-border bg-white px-3 py-1.5 text-xs text-primary shadow-sm outline-none focus:ring-1 focus:ring-primary/25"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-primary mb-1">Author Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Robert C. Martin"
+                  value={newBookAuthor}
+                  onChange={(e) => setNewBookAuthor(e.target.value)}
+                  className="w-full rounded-md border border-border bg-white px-3 py-1.5 text-xs text-primary shadow-sm outline-none focus:ring-1 focus:ring-primary/25"
+                />
+              </div>
+              <div className="flex gap-2 items-center">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-primary mb-1">Borrowed Date</label>
+                  <input
+                    type="date"
+                    value={newBookBorrowedAt}
+                    onChange={(e) => setNewBookBorrowedAt(e.target.value)}
+                    className="w-full rounded-md border border-border bg-white px-2 py-1 text-xs text-primary shadow-sm outline-none focus:ring-1 focus:ring-primary/25"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={addingBook}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1 shrink-0 mt-5 h-[32px] justify-center"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </button>
+              </div>
+            </form>
+
+            {/* Books List */}
+            <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                Currently Borrowed Books ({modalBooks.length})
+              </h4>
+              
+              {booksLoading ? (
+                <p className="text-center py-6 text-sm text-muted-foreground">Loading books...</p>
+              ) : modalBooks.length === 0 ? (
+                <p className="text-center py-8 text-sm text-muted-foreground bg-secondary/10 rounded-lg border border-dashed border-border/80">
+                  No books currently borrowed by this student.
+                </p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-border/80">
+                  <table className="w-full text-xs">
+                    <thead className="bg-secondary text-primary">
+                      <tr className="text-left">
+                        <th className="py-2 px-3 font-semibold">Title</th>
+                        <th className="py-2 px-3 font-semibold">Author</th>
+                        <th className="py-2 px-3 font-semibold">Borrowed Date</th>
+                        <th className="py-2 px-3 font-semibold text-center">Status</th>
+                        <th className="py-2 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {modalBooks.map((b) => (
+                        <tr key={b.id} className="hover:bg-secondary/20">
+                          <td className="py-2.5 px-3 font-medium text-primary">{b.title}</td>
+                          <td className="py-2.5 px-3 text-muted-foreground">{b.author || "—"}</td>
+                          <td className="py-2.5 px-3 font-mono text-muted-foreground">{b.borrowed_at}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => void toggleBookReturned(b.id, b.returned)}
+                              className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition ${
+                                b.returned
+                                  ? "bg-primary/20 text-primary border border-primary/30 hover:bg-primary/35"
+                                  : "bg-accent/30 text-amber-900 border border-accent hover:bg-accent/50"
+                              }`}
+                            >
+                              {b.returned ? "Returned" : "Pending"}
+                            </button>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => void deleteBook(b.id)}
+                              className="text-muted-foreground hover:text-primary transition-colors p-1 hover:bg-secondary/40 rounded"
+                              title="Delete book"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-4 mt-3 border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => setBooksModalStudent(null)}
+                className="rounded-md border border-border bg-cream px-4 py-2 text-xs font-semibold text-primary hover:bg-secondary"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
