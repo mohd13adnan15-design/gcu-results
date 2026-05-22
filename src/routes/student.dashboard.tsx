@@ -248,7 +248,7 @@ function Dashboard() {
               {eligible
                 ? "Your Grade Card passed all checks - Tap Download Certificate."
                 : certificateEntryUnlocked
-                  ? "Fees are clear - open the certificate page to start the process (one tap) and track Admin / COE review."
+                  ? "All required clearances are completed. You can now track its status."
                   : "Clear academic, hostel (if applicable), and library dues (including penalties) to continue."}
             </p>
             <ul className="mt-3 space-y-1 text-sm">
