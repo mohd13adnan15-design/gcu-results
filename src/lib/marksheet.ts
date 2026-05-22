@@ -671,6 +671,7 @@ export function legacyMarkRowsToMarksheetCourses(marks: LegacyMarkRow[]): Marksh
 export function marksheetCoursesToStudentMarkInserts(
   studentId: string,
   courses: MarksheetCourse[],
+  semesterLabel?: string,
 ): any[] {
   return courses.map((c) => {
     const isPractical = String(c.section).toUpperCase().includes("PRACTICAL");
@@ -697,6 +698,7 @@ export function marksheetCoursesToStudentMarkInserts(
       max_marks,
       grade: c.grade_obtained || "RA",
       grade_points: c.grade_points,
+      semester_label: semesterLabel || null,
     };
   });
 }
@@ -772,7 +774,7 @@ export async function fetchStudentMarksheet(supabase: SupabaseClient, studentId:
     supabase
       .from("student_marks")
       .select(
-        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points",
+        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
       )
       .eq("student_id", studentId)
       .order("course_priority", { ascending: true })
@@ -786,10 +788,19 @@ export async function fetchStudentMarksheet(supabase: SupabaseClient, studentId:
   const student = studentData as Student | null;
   if (!student) return null;
 
+  const header = (headerData as Record<string, unknown> | null) ?? null;
+  const targetSemLabel = header?.semester_label || `Semester ${student.semester || 1}`;
+
+  let marks = ((marksData as any[]) ?? []).filter(Boolean);
+  const hasSemMarks = marks.some((m) => m.semester_label === targetSemLabel);
+  if (hasSemMarks) {
+    marks = marks.filter((m) => m.semester_label === targetSemLabel);
+  }
+
   return studentMarksToMarksheet(
     student,
-    (headerData as Record<string, unknown> | null) ?? null,
-    ((marksData as LegacyMarkRow[]) ?? []).filter(Boolean),
+    header,
+    marks,
   );
 }
 
@@ -807,9 +818,64 @@ export async function fetchAllStudentMarksheets(supabase: SupabaseClient, studen
     return data.map(normalizeMarksheet);
   }
 
-  // Fallback: If no saved marksheets exist, fetch the current one using fallback logic
-  const currentMarksheet = await fetchStudentMarksheet(supabase, studentId);
-  return currentMarksheet ? [currentMarksheet] : [];
+  // Fallback: If no saved marksheets exist, construct semester-specific marksheets from student_marks table
+  const [
+    { data: studentData, error: studentError },
+    { data: headerData, error: headerError },
+    { data: marksData, error: marksError },
+  ] = await Promise.all([
+    supabase.from("students").select("*").eq("id", studentId).maybeSingle(),
+    supabase.from("grade_card_details").select("*").eq("student_id", studentId).maybeSingle(),
+    supabase
+      .from("student_marks")
+      .select(
+        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
+      )
+      .eq("student_id", studentId)
+      .order("course_priority", { ascending: true })
+      .order("subject_code", { ascending: true }),
+  ]);
+
+  if (studentError || marksError) return [];
+  const student = studentData as Student | null;
+  if (!student) return [];
+
+  const marks = ((marksData as any[]) ?? []).filter(Boolean);
+  if (marks.length === 0) return [];
+
+  // Group marks by semester_label
+  const semGroups = new Map<string, any[]>();
+  marks.forEach((m) => {
+    const label = m.semester_label || `Semester ${student.semester || 1}`;
+    if (!semGroups.has(label)) {
+      semGroups.set(label, []);
+    }
+    semGroups.get(label)!.push(m);
+  });
+
+  const marksheets: StudentMarksheet[] = [];
+  
+  // Sort the semester labels naturally if possible
+  const sortedLabels = Array.from(semGroups.keys()).sort((a, b) => {
+    const aMatch = a.match(/\d+/);
+    const bMatch = b.match(/\d+/);
+    if (aMatch && bMatch) {
+      return Number(aMatch[0]) - Number(bMatch[0]);
+    }
+    return a.localeCompare(b);
+  });
+
+  for (const label of sortedLabels) {
+    const groupMarks = semGroups.get(label)!;
+    // Create header override with semester label
+    const headerCopy = headerData ? { ...(headerData as any), semester_label: label } : { semester_label: label };
+    const sheet = studentMarksToMarksheet(student, headerCopy, groupMarks);
+    if (sheet) {
+      marksheets.push(sheet);
+    }
+  }
+
+  return marksheets;
 }
 
 export async function fetchMarksheetByRegistrationNo(

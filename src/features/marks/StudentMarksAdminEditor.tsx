@@ -18,7 +18,11 @@ const PRETTY_ROLL_READONLY =
 const PRETTY_TABLE_INPUT =
   "min-w-0 rounded-md border border-border bg-white px-1.5 py-1.5 text-xs text-primary shadow-sm outline-none transition hover:border-primary/40 focus:border-primary focus:ring-1 focus:ring-primary/25";
 
-type DraftMark = StudentMarkRow & { id?: string };
+type DraftMark = StudentMarkRow & {
+  id?: string;
+  semester?: number | null;
+  semester_label?: string | null;
+};
 
 type HeaderFormState = {
   programme_title: string;
@@ -136,7 +140,7 @@ export function StudentMarksAdminEditor({
         supabase
           .from("student_marks")
           .select(
-            "id,subject,subject_code,course_category,credits,credits_earned,marks_obtained,max_marks,grade,grade_points,course_priority,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical",
+            "id,subject,subject_code,course_category,credits,credits_earned,marks_obtained,max_marks,grade,grade_points,course_priority,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,semester,semester_label",
           )
           .eq("student_id", studentId)
           .order("course_priority", { ascending: true, nullsFirst: false })
@@ -191,7 +195,7 @@ export function StudentMarksAdminEditor({
       try {
         const sheet = await fetchStudentMarksheet(supabase, studentId);
         if (sheet?.courses?.length) {
-          const inserts = marksheetCoursesToStudentMarkInserts(studentId, sheet.courses);
+          const inserts = marksheetCoursesToStudentMarkInserts(studentId, sheet.courses, sheet.semester_label);
           const { data: inserted, error: insErr } = await supabase
             .from("student_marks")
             .insert(inserts)
@@ -390,6 +394,8 @@ export function StudentMarksAdminEditor({
         max_marks: maxMarks,
         grade: g,
         grade_points: gradePoints,
+        semester: student.semester || 1,
+        semester_label: selectedSemFilter !== "ALL" ? selectedSemFilter : header?.semester_label || `Semester ${student.semester || 1}`,
       };
       const { data, error } = await supabase
         .from("student_marks")
@@ -425,20 +431,8 @@ export function StudentMarksAdminEditor({
 
   const filteredMarks = useMemo(() => {
     if (selectedSemFilter === "ALL") return marks;
-    const targetSheet = allSheets.find(s => s.semester_label === selectedSemFilter);
-    if (!targetSheet) return [];
-    
-    let allowedCourses: any[] = [];
-    try {
-      allowedCourses = typeof targetSheet.courses === 'string' ? JSON.parse(targetSheet.courses) : targetSheet.courses;
-    } catch {
-      allowedCourses = targetSheet.courses || [];
-    }
-    if (!Array.isArray(allowedCourses)) allowedCourses = [];
-    
-    const allowedCodes = new Set(allowedCourses.map((c: any) => String(c.course_code || c.subject_code || "").toUpperCase().trim()).filter(Boolean));
-    return marks.filter(m => allowedCodes.has(String(m.subject_code || "").toUpperCase().trim()));
-  }, [marks, allSheets, selectedSemFilter]);
+    return marks.filter((m) => m.semester_label === selectedSemFilter);
+  }, [marks, selectedSemFilter]);
 
   const totalCredits = useMemo(
     () => filteredMarks.reduce((sum, row) => sum + Number(row.credits ?? 0), 0),
