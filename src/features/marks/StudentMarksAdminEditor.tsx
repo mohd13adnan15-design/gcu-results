@@ -187,14 +187,7 @@ export function StudentMarksAdminEditor({
           : ""),
     };
     setHeader(nextHeader);
-    const sheetsList = allSheetsData ?? [];
-    setAllSheets(sheetsList);
-    if (sheetsList.length > 0) {
-      const latestSem = sheetsList[sheetsList.length - 1].semester_label;
-      if (latestSem) {
-        setSelectedSemFilter(latestSem);
-      }
-    }
+    setAllSheets(allSheetsData ?? []);
 
     let nextMarks = ((marksData as DraftMark[]) ?? []).filter(Boolean);
 
@@ -589,9 +582,40 @@ export function StudentMarksAdminEditor({
 
       {allSheets.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-2 border-b border-border/30 bg-cream/40 p-3 rounded-xl border border-border/60">
-          <span className="text-xs font-bold text-primary uppercase tracking-wider">
-            Viewing Semester: <span className="font-extrabold text-amber-900">{selectedSemFilter}</span>
+          <span className="text-xs font-bold text-primary uppercase tracking-wider mr-2">
+            Semester wise view:
           </span>
+          <button
+            type="button"
+            onClick={() => setSelectedSemFilter("ALL")}
+            className={`rounded-md px-3 py-1.5 text-xs font-bold border transition ${
+              selectedSemFilter === "ALL"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-white text-primary border-primary/30 hover:bg-primary/10"
+            }`}
+          >
+            ALL
+          </button>
+          {allSheets.map((s) => {
+            const semName = (s.semester_label || "").toLowerCase().startsWith("sem")
+              ? s.semester_label
+              : `Sem ${s.semester_label}`;
+            const isSelected = selectedSemFilter === s.semester_label;
+            return (
+              <button
+                key={s.semester_label}
+                type="button"
+                onClick={() => setSelectedSemFilter(s.semester_label)}
+                className={`rounded-md px-3 py-1.5 text-xs font-bold border transition ${
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-white text-primary border-primary/30 hover:bg-primary/10"
+                }`}
+              >
+                {semName}
+              </button>
+            );
+          })}
         </div>
       )}
 
