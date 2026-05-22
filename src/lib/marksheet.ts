@@ -471,15 +471,32 @@ export function calculateMarksheetTotals(courses: MarksheetCourse[]): MarksheetT
   };
 }
 
+export function isPracticalCourse(course: { course_title: string; section?: string; course_code?: string }): boolean {
+  const title = (course.course_title || "").toUpperCase().trim();
+  const section = (course.section || "").toUpperCase().trim();
+  if (section.includes("PRACTICAL")) return true;
+  if (
+    title.endsWith("(P)") ||
+    title.includes("(P)") ||
+    title.includes("PRACTICAL") ||
+    title.endsWith(" LAB") ||
+    title.includes(" LAB ")
+  ) return true;
+  return false;
+}
+
 export function groupCoursesBySection(courses: MarksheetCourse[]): MarksheetCourseGroup[] {
   return [...courses]
     .sort((a, b) => a.sl_no - b.sl_no)
     .reduce<MarksheetCourseGroup[]>((groups, course) => {
+      const isPractical = isPracticalCourse(course);
+      const effectiveSection = isPractical ? "PRACTICAL" : course.section;
       const previous = groups.at(-1);
-      if (previous?.section === course.section) {
+      
+      if (previous?.section === effectiveSection) {
         previous.courses.push(course);
       } else {
-        groups.push({ section: course.section, courses: [course] });
+        groups.push({ section: effectiveSection, courses: [course] });
       }
       return groups;
     }, []);
