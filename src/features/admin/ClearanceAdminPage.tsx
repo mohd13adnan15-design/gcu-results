@@ -314,8 +314,8 @@ export function ClearanceAdminPage({ kind }: Props) {
 
   const filtered = students.filter((s) => {
     if (dept !== "ALL" && s.department !== dept) return false;
-    if (kind !== "library" && kind !== "hostel" && sem !== "ALL" && s.semester !== Number(sem)) return false;
-    if (kind !== "library" && kind !== "hostel" && year !== "ALL" && s.year !== Number(year)) return false;
+    if (kind !== "library" && kind !== "hostel" && kind !== "fees" && sem !== "ALL" && s.semester !== Number(sem)) return false;
+    if (kind !== "library" && kind !== "hostel" && kind !== "fees" && year !== "ALL" && s.year !== Number(year)) return false;
     if (search) {
       const q = search.toLowerCase();
       if (
@@ -402,7 +402,7 @@ export function ClearanceAdminPage({ kind }: Props) {
 
   function downloadTemplate() {
     const wb = XLSX.utils.book_new();
-    const headers = kind === "hostel"
+    const headers = kind === "hostel" || kind === "fees"
       ? ["Student ID", "Name", "Department", "Paid", "Total"]
       : money
         ? ["Student ID", "Name", "Department", "Sem", "Year", "Paid", "Total"]
@@ -410,8 +410,8 @@ export function ClearanceAdminPage({ kind }: Props) {
     const sample =
       kind === "fees"
         ? [
-            ["24btre148", "Aarav Sharma", "Robotics", "IV", 2, 75000, 100000],
-            ["24btre149", "Priya Patel", "Robotics", "IV", 2, 100000, 100000],
+            ["24btre148", "Aarav Sharma", "Robotics", 75000, 100000],
+            ["24btre149", "Priya Patel", "Robotics", 100000, 100000],
           ]
         : kind === "hostel"
           ? [
@@ -552,8 +552,8 @@ export function ClearanceAdminPage({ kind }: Props) {
               email: `${sid}@gcu.edu.in`,
               full_name: data.name || sid,
               department: data.dept || "UNKNOWN",
-              semester: kind === "hostel" ? 1 : (Number.isFinite(data.sem) ? data.sem : 1),
-              year: kind === "hostel" ? 1 : (Number.isFinite(data.yearNum) ? data.yearNum : 1),
+              semester: (kind === "hostel" || kind === "fees") ? 1 : (Number.isFinite(data.sem) ? data.sem : 1),
+              year: (kind === "hostel" || kind === "fees") ? 1 : (Number.isFinite(data.yearNum) ? data.yearNum : 1),
               fees_total: 100000,
               fees_paid: 0,
               hostel_total: 50000,
@@ -571,8 +571,8 @@ export function ClearanceAdminPage({ kind }: Props) {
 
           if (data.name) payload.full_name = data.name;
           if (data.dept) payload.department = data.dept;
-          if (kind !== "hostel" && Number.isFinite(data.sem)) payload.semester = data.sem;
-          if (kind !== "hostel" && Number.isFinite(data.yearNum)) payload.year = data.yearNum;
+          if (kind !== "hostel" && kind !== "fees" && Number.isFinite(data.sem)) payload.semester = data.sem;
+          if (kind !== "hostel" && kind !== "fees" && Number.isFinite(data.yearNum)) payload.year = data.yearNum;
 
           const { error: updErr } = await supabase
             .from("students")
@@ -699,7 +699,7 @@ export function ClearanceAdminPage({ kind }: Props) {
               <Plus className="h-5 w-5" />
             </button>
           </div>
-          {kind !== "library" && kind !== "hostel" && (
+          {kind !== "library" && kind !== "hostel" && kind !== "fees" && (
             <>
               <FilterSelect
                 value={sem}
@@ -735,8 +735,8 @@ export function ClearanceAdminPage({ kind }: Props) {
                   <th className="py-3 px-4 font-medium">Student ID</th>
                   <th className="py-3 px-4 font-medium">Name</th>
                   <th className="py-3 px-4 font-medium">Department</th>
-                  {kind !== "library" && kind !== "hostel" && <th className="py-3 px-4 font-medium">Sem</th>}
-                  {kind !== "library" && kind !== "hostel" && <th className="py-3 px-4 font-medium">Year</th>}
+                  {kind !== "library" && kind !== "hostel" && kind !== "fees" && <th className="py-3 px-4 font-medium">Sem</th>}
+                  {kind !== "library" && kind !== "hostel" && kind !== "fees" && <th className="py-3 px-4 font-medium">Year</th>}
                   {money && <th className="py-3 px-4 font-medium text-right">Paid / Total</th>}
                   <th className="py-3 px-4 font-medium text-center">{cfg.label}</th>
           <th className="py-3 px-4 font-medium"></th>
@@ -753,8 +753,8 @@ export function ClearanceAdminPage({ kind }: Props) {
                       <td className="py-2 px-4 font-mono text-xs text-primary">{s.student_id}</td>
                       <td className="py-2 px-4 font-medium text-primary">{s.full_name}</td>
                       <td className="py-2 px-4">{s.department}</td>
-                      {kind !== "library" && kind !== "hostel" && <td className="py-2 px-4">{s.semester}</td>}
-                      {kind !== "library" && kind !== "hostel" && <td className="py-2 px-4">{s.year}</td>}
+                      {kind !== "library" && kind !== "hostel" && kind !== "fees" && <td className="py-2 px-4">{s.semester}</td>}
+                      {kind !== "library" && kind !== "hostel" && kind !== "fees" && <td className="py-2 px-4">{s.year}</td>}
                       {money && (
                         <td className="py-2 px-4 text-right font-mono text-xs">
                           {isEditing ? (
@@ -842,7 +842,7 @@ export function ClearanceAdminPage({ kind }: Props) {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5 + (kind !== "library" && kind !== "hostel" ? 2 : 0) + (money ? 1 : 0)} className="py-10 text-center text-muted-foreground">
+                    <td colSpan={5 + (kind !== "library" && kind !== "hostel" && kind !== "fees" ? 2 : 0) + (money ? 1 : 0)} className="py-10 text-center text-muted-foreground">
                       No students match filters.
                     </td>
                   </tr>
@@ -960,7 +960,7 @@ export function ClearanceAdminPage({ kind }: Props) {
                     </button>
                   </div>
                 </div>
-                {kind !== "library" && kind !== "hostel" && (
+                {kind !== "library" && kind !== "hostel" && kind !== "fees" && (
                   <>
                     <div>
                       <label className="block text-xs font-medium text-muted-foreground mb-1">Semester</label>
