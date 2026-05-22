@@ -431,8 +431,28 @@ export function StudentMarksAdminEditor({
 
   const filteredMarks = useMemo(() => {
     if (selectedSemFilter === "ALL") return marks;
-    return marks.filter((m) => m.semester_label === selectedSemFilter);
-  }, [marks, selectedSemFilter]);
+    
+    // 1. Try to filter by database column semester_label first
+    const dbFiltered = marks.filter((m) => m.semester_label === selectedSemFilter);
+    if (dbFiltered.length > 0) return dbFiltered;
+
+    // 2. Fallback: use target sheet courses to filter by code (for legacy/existing data)
+    const targetSheet = allSheets.find(s => s.semester_label === selectedSemFilter);
+    if (!targetSheet) return [];
+    
+    let allowedCourses: any[] = [];
+    try {
+      allowedCourses = typeof targetSheet.courses === 'string' ? JSON.parse(targetSheet.courses) : targetSheet.courses;
+    } catch {
+      allowedCourses = targetSheet.courses || [];
+    }
+    if (!Array.isArray(allowedCourses)) allowedCourses = [];
+    
+    const allowedCodes = new Set(
+      allowedCourses.map((c: any) => String(c.course_code || c.subject_code || "").toUpperCase().trim()).filter(Boolean)
+    );
+    return marks.filter(m => allowedCodes.has(String(m.subject_code || "").toUpperCase().trim()));
+  }, [marks, allSheets, selectedSemFilter]);
 
   const totalCredits = useMemo(
     () => filteredMarks.reduce((sum, row) => sum + Number(row.credits ?? 0), 0),
