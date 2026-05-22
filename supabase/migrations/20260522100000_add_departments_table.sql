@@ -26,3 +26,6 @@ BEGIN
   END IF;
 END
 $$;
+
+-- Grant permissions to Data API roles
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.departments TO anon, authenticated, service_role;
