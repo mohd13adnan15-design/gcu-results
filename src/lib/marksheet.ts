@@ -777,7 +777,7 @@ export async function fetchStudentMarksheet(supabase: SupabaseClient, studentId:
     supabase
       .from("student_marks")
       .select(
-        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
+        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points",
       )
       .eq("student_id", studentId)
       .order("course_priority", { ascending: true })
@@ -832,7 +832,7 @@ export async function fetchAllStudentMarksheets(supabase: SupabaseClient, studen
     supabase
       .from("student_marks")
       .select(
-        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
+        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points",
       )
       .eq("student_id", studentId)
       .order("course_priority", { ascending: true })
