@@ -329,7 +329,7 @@ function CertificateFlow() {
         {pdfOk && (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-medium text-emerald-900">
-              All steps complete - open the secure download page (email OTP).
+              ✨ Verification complete! Your secure grade card is ready for download.
             </p>
             <button
               type="button"

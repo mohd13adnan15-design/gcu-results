@@ -374,7 +374,7 @@ function AdminStudentRow({
       <td className="px-2 py-3">
         <StatusText
           ok={hostel.cleared}
-          label={!student.in_hostel ? "Clear" : hostel.cleared ? "Clear" : "Pending"}
+          label={!student.in_hostel ? "Not enrolled" : hostel.cleared ? "Clear" : "Pending"}
         />
         {student.in_hostel && (
           <p className="mt-1 text-xs text-muted-foreground">

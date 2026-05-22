@@ -507,26 +507,51 @@ export async function resolveStudentPhotoUrl(
   const roll = marksheet.student_roll_no?.toLowerCase();
   if (roll === "24btre152") return "/templates/assets/v_sai_tejashvi_profile.jpeg";
   if (roll === "23bsft101") return "/templates/assets/abigail_profile.jpeg";
+  if (roll === "23msda105" || roll === "23msda105@gcu.edu.in") {
+    return "/templates/assets/princy akka.jpeg";
+  }
 
-  if (!marksheet.photo_bucket) return null;
+  // 1. Check students table first
+  if (marksheet.student_roll_no) {
+    try {
+      const { data: student } = await supabase
+        .from("students")
+        .select("image_path")
+        .eq("student_id", marksheet.student_roll_no)
+        .maybeSingle();
 
-  const configuredPath = normalizeStoragePath(marksheet.photo_path);
+      if (student?.image_path) {
+        return supabase.storage.from("student-photos").getPublicUrl(student.image_path).data.publicUrl;
+      }
+    } catch (e) {
+      console.error("Failed to query student photo:", e);
+    }
+  }
 
-  const candidates = await listStudentPhotoCandidates(
-    supabase,
-    marksheet.photo_bucket,
-    marksheet.student_roll_no,
-    configuredPath,
-  );
-  
-  const resolvedPath = pickStudentPhotoPath({
-    configuredPath,
-    rollNo: marksheet.student_roll_no,
-    candidates,
-  });
+  // 2. Fallback to configured photo bucket and path list
+  if (marksheet.photo_bucket) {
+    const configuredPath = normalizeStoragePath(marksheet.photo_path);
 
-  if (!resolvedPath) return null;
-  return supabase.storage.from(marksheet.photo_bucket).getPublicUrl(resolvedPath).data.publicUrl;
+    const candidates = await listStudentPhotoCandidates(
+      supabase,
+      marksheet.photo_bucket,
+      marksheet.student_roll_no,
+      configuredPath,
+    );
+
+    const resolvedPath = pickStudentPhotoPath({
+      configuredPath,
+      rollNo: marksheet.student_roll_no,
+      candidates,
+    });
+
+    if (resolvedPath) {
+      return supabase.storage.from(marksheet.photo_bucket).getPublicUrl(resolvedPath).data.publicUrl;
+    }
+  }
+
+  // 3. Absolute fallback to default-avatar
+  return "/templates/assets/default-avatar.png";
 }
 
 export function pickStudentPhotoPath({
@@ -596,29 +621,33 @@ export type LegacyMarkRow = {
 
 /** Same mapping used for PDF JSON (`courses` on `student_marksheets`) and sync. */
 export function legacyMarkRowsToMarksheetCourses(marks: LegacyMarkRow[]): MarksheetCourse[] {
-  return marks.map((m, index) => ({
-    sl_no: index + 1,
-    section: String(m.course_category ?? "CORE COURSE").trim() || "CORE COURSE",
-    course_code: String(m.subject_code ?? "").trim(),
-    course_title: String(m.subject ?? "").trim(),
-    course_priority: Number(m.course_priority ?? 1) || 1,
-    course_credits: Number(m.credits ?? 0) || 0,
-    credits_earned: Number(m.credits_earned ?? 0) || 0,
-    cia_max_marks_theory: Number(m.cia_max_marks_theory ?? 0) || 0,
-    cia_max_marks_practical: Number(m.cia_max_marks_practical ?? 0) || 0,
-    cia_marks_obtained_theory: Number(m.cia_marks_obtained_theory ?? 0) || 0,
-    cia_marks_obtained_practical: Number(m.cia_marks_obtained_practical ?? 0) || 0,
-    ese_max_marks_theory: Number(m.ese_max_marks_theory ?? 0) || 0,
-    ese_max_marks_practical: Number(m.ese_max_marks_practical ?? 0) || 0,
-    ese_marks_obtained_theory: Number(m.ese_marks_obtained_theory ?? 0) || 0,
-    ese_marks_obtained_practical: Number(m.ese_marks_obtained_practical ?? 0) || 0,
-    total_marks_theory: Number(m.total_marks_theory ?? 0) || 0,
-    total_marks_practical: Number(m.total_marks_practical ?? 0) || 0,
-    marks_obtained: Number(m.marks_obtained ?? 0) || 0,
-    max_marks: Number(m.max_marks ?? 0) || 0,
-    grade_obtained: String(m.grade ?? "").trim(),
-    grade_points: Number(m.grade_points ?? 0) || 0,
-  }));
+  return marks.map((m, index) => {
+    const section = String(m.course_category ?? "CORE COURSE").trim() || "CORE COURSE";
+    const max_marks = section.toUpperCase().includes("PRACTICAL") ? 50 : (Number(m.max_marks) || 100);
+    return {
+      sl_no: index + 1,
+      section,
+      course_code: String(m.subject_code ?? "").trim(),
+      course_title: String(m.subject ?? "").trim(),
+      course_priority: Number(m.course_priority ?? 1) || 1,
+      course_credits: Number(m.credits ?? 0) || 0,
+      credits_earned: Number(m.credits_earned ?? 0) || 0,
+      cia_max_marks_theory: Number(m.cia_max_marks_theory ?? 0) || 0,
+      cia_max_marks_practical: Number(m.cia_max_marks_practical ?? 0) || 0,
+      cia_marks_obtained_theory: Number(m.cia_marks_obtained_theory ?? 0) || 0,
+      cia_marks_obtained_practical: Number(m.cia_marks_obtained_practical ?? 0) || 0,
+      ese_max_marks_theory: Number(m.ese_max_marks_theory ?? 0) || 0,
+      ese_max_marks_practical: Number(m.ese_max_marks_practical ?? 0) || 0,
+      ese_marks_obtained_theory: Number(m.ese_marks_obtained_theory ?? 0) || 0,
+      ese_marks_obtained_practical: Number(m.ese_marks_obtained_practical ?? 0) || 0,
+      total_marks_theory: Number(m.total_marks_theory ?? 0) || 0,
+      total_marks_practical: Number(m.total_marks_practical ?? 0) || 0,
+      marks_obtained: Number(m.marks_obtained ?? 0) || 0,
+      max_marks,
+      grade_obtained: String(m.grade ?? "").trim(),
+      grade_points: Number(m.grade_points ?? 0) || 0,
+    };
+  });
 }
 
 /** Insert payloads for `student_marks` from saved marksheet JSON (inverse of legacy rows → courses). */
@@ -626,29 +655,33 @@ export function marksheetCoursesToStudentMarkInserts(
   studentId: string,
   courses: MarksheetCourse[],
 ): any[] {
-  return courses.map((c) => ({
-    student_id: studentId,
-    course_category: c.section,
-    subject: c.course_title,
-    subject_code: c.course_code,
-    course_priority: c.course_priority ?? 1,
-    credits: c.course_credits,
-    credits_earned: c.credits_earned,
-    cia_max_marks_theory: c.cia_max_marks_theory ?? 0,
-    cia_max_marks_practical: c.cia_max_marks_practical ?? 0,
-    cia_marks_obtained_theory: c.cia_marks_obtained_theory ?? 0,
-    cia_marks_obtained_practical: c.cia_marks_obtained_practical ?? 0,
-    ese_max_marks_theory: c.ese_max_marks_theory ?? 0,
-    ese_max_marks_practical: c.ese_max_marks_practical ?? 0,
-    ese_marks_obtained_theory: c.ese_marks_obtained_theory ?? 0,
-    ese_marks_obtained_practical: c.ese_marks_obtained_practical ?? 0,
-    total_marks_theory: c.total_marks_theory ?? 0,
-    total_marks_practical: c.total_marks_practical ?? 0,
-    marks_obtained: c.marks_obtained ?? 0,
-    max_marks: c.max_marks ?? 100,
-    grade: c.grade_obtained || "RA",
-    grade_points: c.grade_points,
-  }));
+  return courses.map((c) => {
+    const isPractical = String(c.section).toUpperCase().includes("PRACTICAL");
+    const max_marks = isPractical ? 50 : (c.max_marks ?? 100);
+    return {
+      student_id: studentId,
+      course_category: c.section,
+      subject: c.course_title,
+      subject_code: c.course_code,
+      course_priority: c.course_priority ?? 1,
+      credits: c.course_credits,
+      credits_earned: c.credits_earned,
+      cia_max_marks_theory: c.cia_max_marks_theory ?? 0,
+      cia_max_marks_practical: c.cia_max_marks_practical ?? 0,
+      cia_marks_obtained_theory: c.cia_marks_obtained_theory ?? 0,
+      cia_marks_obtained_practical: c.cia_marks_obtained_practical ?? 0,
+      ese_max_marks_theory: c.ese_max_marks_theory ?? 0,
+      ese_max_marks_practical: c.ese_max_marks_practical ?? 0,
+      ese_marks_obtained_theory: c.ese_marks_obtained_theory ?? 0,
+      ese_marks_obtained_practical: c.ese_marks_obtained_practical ?? 0,
+      total_marks_theory: c.total_marks_theory ?? 0,
+      total_marks_practical: c.total_marks_practical ?? 0,
+      marks_obtained: c.marks_obtained ?? 0,
+      max_marks,
+      grade: c.grade_obtained || "RA",
+      grade_points: c.grade_points,
+    };
+  });
 }
 
 /** Build a marksheet view from `grade_card_details` + `student_marks` when `student_marksheets` is empty. */
@@ -814,9 +847,12 @@ export function normalizeMarksheet(row: Record<string, unknown>): StudentMarkshe
 }
 
 function normalizeCourse(course: Record<string, unknown>): MarksheetCourse {
+  const section = text(course.section);
+  const max_marksRaw = numberOr(course.max_marks, 0);
+  const max_marks = section.toUpperCase().includes("PRACTICAL") ? 50 : (max_marksRaw || 100);
   return {
     sl_no: numberOr(course.sl_no, 0),
-    section: text(course.section),
+    section,
     course_code: text(course.course_code),
     course_title: text(course.course_title),
     course_priority: numberOr(course.course_priority, 1),
@@ -833,7 +869,7 @@ function normalizeCourse(course: Record<string, unknown>): MarksheetCourse {
     total_marks_theory: numberOr(course.total_marks_theory, 0),
     total_marks_practical: numberOr(course.total_marks_practical, 0),
     marks_obtained: numberOr(course.marks_obtained, 0),
-    max_marks: numberOr(course.max_marks, 0),
+    max_marks,
     grade_obtained: text(course.grade_obtained),
     grade_points: numberOr(course.grade_points, 0),
   };

@@ -17,7 +17,7 @@ import type { Student } from "@/lib/types";
 export function FacultyPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [marksheets, setMarksheets] = useState<StudentMarksheet[]>([]);
-  const [legacyMarkCount, setLegacyMarkCount] = useState<Map<string, number>>(new Map());
+  const [studentMarks, setStudentMarks] = useState<{ student_id: string; subject_code: string | null; subject: string | null }[]>([]);
   const [busyStudentId, setBusyStudentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,7 +40,7 @@ export function FacultyPage() {
     ] = await Promise.all([
       supabase.from("students").select("*").order("student_id", { ascending: true }),
       supabase.from("student_marksheets").select("*").order("updated_at", { ascending: false }),
-      supabase.from("student_marks").select("student_id"),
+      supabase.from("student_marks").select("student_id,subject_code,subject"),
       supabase
         .from("portal_notifications")
         .select("student_id")
@@ -59,11 +59,7 @@ export function FacultyPage() {
         normalizeMarksheet(row),
       ),
     );
-    const countMap = new Map<string, number>();
-    for (const row of (markRows ?? []) as { student_id: string }[]) {
-      countMap.set(row.student_id, (countMap.get(row.student_id) ?? 0) + 1);
-    }
-    setLegacyMarkCount(countMap);
+    setStudentMarks((markRows as any[]) ?? []);
     
     setUnresolvedReports(
       new Set(
@@ -100,17 +96,64 @@ export function FacultyPage() {
     [marksheets],
   );
 
-  const rows = useMemo(
-    () =>
-      students
-        .filter((student) => Boolean(student.marksheet_verification_requested_at))
-        .map((student) => ({
-          student,
-          marksheet: marksheetByStudentId.get(student.id) ?? null,
-          legacyCourseCount: legacyMarkCount.get(student.id) ?? 0,
-        })),
-    [students, marksheetByStudentId, legacyMarkCount],
-  );
+  const courseCountByStudentId = useMemo(() => {
+    const studentCodes = new Map<string, Set<string>>();
+
+    const getSet = (sid: string) => {
+      let s = studentCodes.get(sid);
+      if (!s) {
+        s = new Set<string>();
+        studentCodes.set(sid, s);
+      }
+      return s;
+    };
+
+    for (const ms of marksheets) {
+      const s = getSet(ms.student_id);
+      const coursesArr = Array.isArray(ms.courses) ? ms.courses : [];
+      for (const c of coursesArr) {
+        const code = c.course_code || c.course_title;
+        if (code) s.add(code);
+      }
+    }
+
+    for (const row of studentMarks) {
+      const s = getSet(row.student_id);
+      const code = row.subject_code || row.subject;
+      if (code) s.add(code);
+    }
+
+    const countMap = new Map<string, number>();
+    for (const [sid, set] of studentCodes.entries()) {
+      countMap.set(sid, set.size);
+    }
+    return countMap;
+  }, [marksheets, studentMarks]);
+
+  const rows = useMemo(() => {
+    const uniqueMarksMap = new Map<string, number>();
+    const studentCodes = new Map<string, Set<string>>();
+    for (const row of studentMarks) {
+      let s = studentCodes.get(row.student_id);
+      if (!s) {
+        s = new Set<string>();
+        studentCodes.set(row.student_id, s);
+      }
+      const code = row.subject_code || row.subject;
+      if (code) s.add(code);
+    }
+    for (const [sid, s] of studentCodes.entries()) {
+      uniqueMarksMap.set(sid, s.size);
+    }
+
+    return students
+      .filter((student) => Boolean(student.marksheet_verification_requested_at))
+      .map((student) => ({
+        student,
+        marksheet: marksheetByStudentId.get(student.id) ?? null,
+        legacyCourseCount: uniqueMarksMap.get(student.id) ?? 0,
+      }));
+  }, [students, marksheetByStudentId, studentMarks]);
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -305,15 +348,15 @@ export function FacultyPage() {
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="px-2 py-2">Student</th>
                 <th className="px-2 py-2">Grade Card</th>
-                <th className="px-2 py-2">Courses</th>
-                <th className="px-2 py-2">Grade</th>
-                <th className="px-2 py-2">Admin</th>
+                <th className="px-2 py-2 text-center">Courses</th>
+                <th className="px-2 py-2 text-center">Grade</th>
+                <th className="px-2 py-2 text-center">Admin</th>
                 <th className="px-2 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.map(({ student, marksheet, legacyCourseCount }) => {
-                const courseCount = marksheet?.courses.length ?? legacyCourseCount;
+                const courseCount = courseCountByStudentId.get(student.id) || 0;
                 const hasMarks = Boolean(marksheet) || legacyCourseCount > 0;
                 return (
                   <tr key={student.id} className="border-b border-border/60">
@@ -342,9 +385,9 @@ export function FacultyPage() {
                         <span className="font-medium text-amber-700">Missing</span>
                       )}
                     </td>
-                    <td className="px-2 py-3 text-primary">{courseCount}</td>
-                    <td className="px-2 py-3">{marksheet?.final_grade ?? "-"}</td>
-                    <td className="px-2 py-3">
+                    <td className="px-2 py-3 text-center text-primary">{courseCount}</td>
+                    <td className="px-2 py-3 text-center">{marksheet?.final_grade ?? "-"}</td>
+                    <td className="px-2 py-3 text-center">
                       <input
                         type="checkbox"
                         checked={Boolean(student.faculty_verified)}

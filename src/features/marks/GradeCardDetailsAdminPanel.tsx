@@ -167,7 +167,7 @@ export function GradeCardApplicationForm({
 
       const { error } = await supabase
         .from("grade_card_details")
-        .upsert(payload, { onConflict: "student_id,row_number" });
+        .upsert(payload as any, { onConflict: "student_id,row_number" });
       if (error) throw error;
 
       const [studentRes, marksRes] = await Promise.all([
@@ -185,7 +185,7 @@ export function GradeCardApplicationForm({
             registration_no: registrationNo.trim(),
             semester_label: semesterLabel.trim(),
             exam_month_year: examMonthYear.trim(),
-            issue_date: issueDate.trim() || null,
+            issue_date: issueDate.trim() || undefined,
             semester_gpa: gpaNum ?? 0,
             final_grade: finalGrade.trim() || "",
           },
@@ -194,7 +194,7 @@ export function GradeCardApplicationForm({
         await supabase.from("main_grade_card").delete().eq("student_id", sid);
         const { error: mainGradeError } = await supabase
           .from("main_grade_card")
-          .insert(mainGradeRows);
+          .insert(mainGradeRows as any);
         if (mainGradeError) throw mainGradeError;
       }
 
@@ -228,7 +228,7 @@ export function GradeCardApplicationForm({
         "Bachelor of Computer Applications",
         "BCAR",
         "22BCAR241",
-        "Semester 1",
+        "Semester I",
         "March - 2023",
         "2023-06-13",
         8.45,
@@ -289,7 +289,7 @@ export function GradeCardApplicationForm({
 
       const { error } = await supabase
         .from("grade_card_details")
-        .upsert(parsed, { onConflict: "student_id,row_number" });
+        .upsert(parsed as any, { onConflict: "student_id,row_number" });
       if (error) throw error;
       toast.success(`Uploaded ${parsed.length} grade card rows.`);
       onSaved();
@@ -579,7 +579,7 @@ export function GradeCardDetailsAdminPanel() {
                 <th className="px-2 py-2 font-sans">Registration</th>
                 <th className="px-2 py-2 font-sans">Semester</th>
                 <th className="px-2 py-2 font-sans">Exam</th>
-                <th className="px-2 py-2 font-sans">SGPA</th>
+                <th className="px-2 py-2 font-sans">CGPA</th>
                 <th className="px-2 py-2 font-sans">Final</th>
                 <th className="px-2 py-2 font-sans">Last updated</th>
               </tr>

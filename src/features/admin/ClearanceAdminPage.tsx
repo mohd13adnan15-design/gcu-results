@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Student } from "@/lib/types";
 import { DEPARTMENTS, SEMESTERS, YEARS } from "@/lib/types";
+import { toRoman, romanToNum } from "@/lib/marks-excel-template";
 import { toast } from "sonner";
 import { Trash2, Search, CheckCircle2, Upload, Download, Pencil, Save, X, Plus } from "lucide-react";
+import { fetchDepartments, insertDepartment } from "@/lib/departments-db";
 import * as XLSX from "xlsx";
 
 type Kind = "library" | "hostel" | "fees";
@@ -118,14 +120,24 @@ export function ClearanceAdminPage({ kind }: Props) {
   const [manualData, setManualData] = useState({
     student_id: "",
     full_name: "",
-    department: DEPARTMENTS[0],
+    department: DEPARTMENTS[0] as string,
     semester: 1,
     year: 1,
     paid: "",
     total: "",
     cleared: false,
   });
+  const [depts, setDepts] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function loadDepts() {
+      const list = await fetchDepartments();
+      setDepts(list);
+      setManualData((prev) => ({ ...prev, department: list[0] || "CSE" }));
+    }
+    void loadDepts();
+  }, []);
 
   const load = useCallback(async () => {
     const membership = FIELD[kind].membership;
@@ -157,8 +169,8 @@ export function ClearanceAdminPage({ kind }: Props) {
 
   const filtered = students.filter((s) => {
     if (dept !== "ALL" && s.department !== dept) return false;
-    if (sem !== "ALL" && s.semester !== Number(sem)) return false;
-    if (year !== "ALL" && s.year !== Number(year)) return false;
+    if (kind !== "library" && kind !== "hostel" && sem !== "ALL" && s.semester !== Number(sem)) return false;
+    if (kind !== "library" && kind !== "hostel" && year !== "ALL" && s.year !== Number(year)) return false;
     if (search) {
       const q = search.toLowerCase();
       if (
@@ -241,17 +253,21 @@ export function ClearanceAdminPage({ kind }: Props) {
 
   function downloadTemplate() {
     const wb = XLSX.utils.book_new();
-    const headers = money ? ["Student ID", "Name", "Department", "Sem", "Year", "Paid", "Total"] : ["Student ID", "Name", "Department", cfg.label];
+    const headers = kind === "hostel"
+      ? ["Student ID", "Name", "Department", "Paid", "Total"]
+      : money
+        ? ["Student ID", "Name", "Department", "Sem", "Year", "Paid", "Total"]
+        : ["Student ID", "Name", "Department", cfg.label];
     const sample =
       kind === "fees"
         ? [
-            ["24btre148", "Aarav Sharma", "Robotics", 4, 2, 75000, 100000],
-            ["24btre149", "Priya Patel", "Robotics", 4, 2, 100000, 100000],
+            ["24btre148", "Aarav Sharma", "Robotics", "IV", 2, 75000, 100000],
+            ["24btre149", "Priya Patel", "Robotics", "IV", 2, 100000, 100000],
           ]
         : kind === "hostel"
           ? [
-              ["24btre148", "Aarav Sharma", "Robotics", 4, 2, 30000, 50000],
-              ["24btre149", "Priya Patel", "Robotics", 4, 2, 50000, 50000],
+              ["24btre148", "Aarav Sharma", "Robotics", 30000, 50000],
+              ["24btre149", "Priya Patel", "Robotics", 50000, 50000],
             ]
           : [
               ["24btre148", "Aarav Sharma", "Robotics", "Returned"],
@@ -312,7 +328,7 @@ export function ClearanceAdminPage({ kind }: Props) {
         
         const name = nameKey ? String(row[nameKey] ?? "").trim() : "";
         const dept = deptKey ? String(row[deptKey] ?? "").trim() : "";
-        const sem = semKey ? parseInt(String(row[semKey]), 10) : NaN;
+        const sem = semKey ? romanToNum(String(row[semKey] ?? "")) : NaN;
         const yearNum = yearKey ? parseInt(String(row[yearKey]), 10) : NaN;
 
         if (money) {
@@ -387,8 +403,8 @@ export function ClearanceAdminPage({ kind }: Props) {
               email: `${sid}@gcu.edu.in`,
               full_name: data.name || sid,
               department: data.dept || "UNKNOWN",
-              semester: Number.isFinite(data.sem) ? data.sem : 1,
-              year: Number.isFinite(data.yearNum) ? data.yearNum : 1,
+              semester: kind === "hostel" ? 1 : (Number.isFinite(data.sem) ? data.sem : 1),
+              year: kind === "hostel" ? 1 : (Number.isFinite(data.yearNum) ? data.yearNum : 1),
               fees_total: 100000,
               fees_paid: 0,
               hostel_total: 50000,
@@ -406,8 +422,8 @@ export function ClearanceAdminPage({ kind }: Props) {
 
           if (data.name) payload.full_name = data.name;
           if (data.dept) payload.department = data.dept;
-          if (Number.isFinite(data.sem)) payload.semester = data.sem;
-          if (Number.isFinite(data.yearNum)) payload.year = data.yearNum;
+          if (kind !== "hostel" && Number.isFinite(data.sem)) payload.semester = data.sem;
+          if (kind !== "hostel" && Number.isFinite(data.yearNum)) payload.year = data.yearNum;
 
           const { error: updErr } = await supabase
             .from("students")
@@ -506,13 +522,35 @@ export function ClearanceAdminPage({ kind }: Props) {
               />
             </div>
           </div>
-          <FilterSelect
-            value={dept}
-            onChange={setDept}
-            options={["ALL", ...DEPARTMENTS]}
-            label="Department"
-          />
-          {kind !== "library" && (
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <FilterSelect
+                value={dept}
+                onChange={setDept}
+                options={["ALL", ...depts]}
+                label="Department"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                const name = window.prompt("Enter new department name:");
+                if (name && name.trim()) {
+                  const clean = name.trim();
+                  await insertDepartment(clean);
+                  const updated = await fetchDepartments();
+                  setDepts(updated);
+                  setDept(clean);
+                  toast.success(`Department "${clean}" added.`);
+                }
+              }}
+              className="rounded-md bg-secondary/50 p-2 text-primary hover:bg-secondary border border-border"
+              title="Add new department"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          </div>
+          {kind !== "library" && kind !== "hostel" && (
             <>
               <FilterSelect
                 value={sem}
@@ -548,8 +586,8 @@ export function ClearanceAdminPage({ kind }: Props) {
                   <th className="py-3 px-4 font-medium">Student ID</th>
                   <th className="py-3 px-4 font-medium">Name</th>
                   <th className="py-3 px-4 font-medium">Department</th>
-                  {kind !== "library" && <th className="py-3 px-4 font-medium">Sem</th>}
-                  {kind !== "library" && <th className="py-3 px-4 font-medium">Year</th>}
+                  {kind !== "library" && kind !== "hostel" && <th className="py-3 px-4 font-medium">Sem</th>}
+                  {kind !== "library" && kind !== "hostel" && <th className="py-3 px-4 font-medium">Year</th>}
                   {money && <th className="py-3 px-4 font-medium text-right">Paid / Total</th>}
                   <th className="py-3 px-4 font-medium text-center">{cfg.label}</th>
                   <th className="py-3 px-4 font-medium"></th>
@@ -566,8 +604,8 @@ export function ClearanceAdminPage({ kind }: Props) {
                       <td className="py-2 px-4 font-mono text-xs text-primary">{s.student_id}</td>
                       <td className="py-2 px-4 font-medium text-primary">{s.full_name}</td>
                       <td className="py-2 px-4">{s.department}</td>
-                      {kind !== "library" && <td className="py-2 px-4">{s.semester}</td>}
-                      {kind !== "library" && <td className="py-2 px-4">{s.year}</td>}
+                      {kind !== "library" && kind !== "hostel" && <td className="py-2 px-4">{s.semester}</td>}
+                      {kind !== "library" && kind !== "hostel" && <td className="py-2 px-4">{s.year}</td>}
                       {money && (
                         <td className="py-2 px-4 text-right font-mono text-xs">
                           {isEditing ? (
@@ -647,7 +685,7 @@ export function ClearanceAdminPage({ kind }: Props) {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5 + (kind !== "library" ? 2 : 0) + (money ? 1 : 0)} className="py-10 text-center text-muted-foreground">
+                    <td colSpan={5 + (kind !== "library" && kind !== "hostel" ? 2 : 0) + (money ? 1 : 0)} className="py-10 text-center text-muted-foreground">
                       No students match filters.
                     </td>
                   </tr>
@@ -704,6 +742,10 @@ export function ClearanceAdminPage({ kind }: Props) {
                   const newPayload = {
                     student_id: sid,
                     email: `${sid}@gcu.edu.in`,
+                    full_name: manualData.full_name || sid,
+                    department: manualData.department as any,
+                    semester: manualData.semester,
+                    year: manualData.year,
                     fees_total: 100000,
                     fees_paid: 0,
                     hostel_total: 50000,
@@ -716,12 +758,12 @@ export function ClearanceAdminPage({ kind }: Props) {
                     fees_cleared: false,
                     ...payload
                   };
-                  const { error } = await supabase.from("students").insert(newPayload);
+                  const { error } = await supabase.from("students").insert(newPayload as any);
                   if (error) return toast.error(error.message);
                 }
                 toast.success("Student details saved.");
                 setManualEntryOpen(false);
-                setManualData({ student_id: "", full_name: "", department: DEPARTMENTS[0], semester: 1, year: 1, paid: "", total: "", cleared: false });
+                setManualData({ student_id: "", full_name: "", department: depts[0] || "CSE", semester: 1, year: 1, paid: "", total: "", cleared: false });
                 load();
               }}
               className="space-y-4"
@@ -737,11 +779,31 @@ export function ClearanceAdminPage({ kind }: Props) {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Department</label>
-                  <select value={manualData.department} onChange={(e) => setManualData({...manualData, department: e.target.value})} className="w-full rounded-md border border-border bg-cream px-3 py-2 text-base font-medium focus:ring-2 focus:ring-primary">
-                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
+                  <div className="flex gap-2">
+                    <select value={manualData.department} onChange={(e) => setManualData({...manualData, department: e.target.value})} className="w-full rounded-md border border-border bg-cream px-3 py-2 text-base font-medium focus:ring-2 focus:ring-primary">
+                      {depts.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const name = window.prompt("Enter new department name:");
+                        if (name && name.trim()) {
+                          const clean = name.trim();
+                          await insertDepartment(clean);
+                          const updated = await fetchDepartments();
+                          setDepts(updated);
+                          setManualData((prev) => ({ ...prev, department: clean }));
+                          toast.success(`Department "${clean}" added.`);
+                        }
+                      }}
+                      className="rounded-md bg-secondary/50 px-3 py-2 text-primary hover:bg-secondary border border-border"
+                      title="Add new department"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-                {kind !== "library" && (
+                {kind !== "library" && kind !== "hostel" && (
                   <>
                     <div>
                       <label className="block text-xs font-medium text-muted-foreground mb-1">Semester</label>

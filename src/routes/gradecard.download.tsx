@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   fetchMarksheetByRegistrationNo,
   resolveStudentPhotoUrl,
+  normalizeMarksheet,
   type StudentMarksheet,
 } from "@/lib/marksheet";
 
@@ -14,6 +15,7 @@ export function GradecardQrDownloadPage() {
   const [params] = useSearchParams();
   const registrationNo = useMemo(() => params.get("reg")?.trim() ?? "", [params]);
   const [marksheet, setMarksheet] = useState<StudentMarksheet | null>(null);
+  const [allMarksheets, setAllMarksheets] = useState<StudentMarksheet[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
@@ -26,7 +28,18 @@ export function GradecardQrDownloadPage() {
       }
       try {
         const row = await fetchMarksheetByRegistrationNo(supabase, registrationNo);
-        if (active) setMarksheet(row);
+        if (active && row) {
+          setMarksheet(row);
+          // Fetch all marksheets for this student to allow proper semester course filtering
+          const { data: allRows } = await supabase
+            .from("student_marksheets")
+            .select("*")
+            .eq("student_id", row.student_id)
+            .order("semester_label", { ascending: true });
+          if (active && allRows) {
+            setAllMarksheets(allRows.map(normalizeMarksheet));
+          }
+        }
       } catch (error) {
         if (active) toast.error(error instanceof Error ? error.message : "Could not load grade card");
       } finally {
@@ -46,7 +59,7 @@ export function GradecardQrDownloadPage() {
         import("@/lib/marksheet-documents"),
         resolveStudentPhotoUrl(supabase, marksheet),
       ]);
-      const blob = await generateMarksheetPdf(marksheet, { photoUrl });
+      const blob = await generateMarksheetPdf(marksheet, { photoUrl, allMarksheets });
       downloadMarksheetBlob(marksheet, "pdf", blob);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not generate grade card PDF");

@@ -222,7 +222,7 @@ function MarksCard() {
         import("@/lib/marksheet-documents"),
         resolveStudentPhotoUrl(supabase, targetMarksheet),
       ]);
-      const blob = await generateMarksheetPdf(targetMarksheet, { photoUrl });
+      const blob = await generateMarksheetPdf(targetMarksheet, { photoUrl, allMarksheets });
       downloadMarksheetBlob(targetMarksheet, "pdf", blob);
       toast.success("PDF marksheet generated");
     } catch (error) {
@@ -377,7 +377,7 @@ function MarksCard() {
                       className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-60"
                     >
                       <FileText className="h-4 w-4" />
-                      Download Current Semester
+                      Download semester wise
                     </button>
                     {allMarksheets.length > 0 && (
                       <button

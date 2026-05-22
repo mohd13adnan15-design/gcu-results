@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import JSZip from "jszip";
 
 import {
   MARKS_TEMPLATE_HEADERS_FULL,
@@ -27,6 +28,7 @@ import {
 import {
   calculateMarksheetTotals,
   legacyMarkRowsToMarksheetCourses,
+  normalizeMarksheet,
 } from "@/lib/marksheet";
 import { notificationPortalLabel } from "@/lib/portal";
 
@@ -307,16 +309,21 @@ function SuperAdminStudentsDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: studentRows, error: sErr }, { data: detailRows }, { data: markRows }] =
-      await Promise.all([
-        supabase.from("students").select("*").order("student_id", { ascending: true }),
-        supabase
-          .from("grade_card_details")
-          .select(
-            "student_id,programme_title,programme_code,semester_label,semester_gpa,final_grade,updated_at",
-          ),
-        supabase.from("student_marks").select("student_id"),
-      ]);
+    const [
+      { data: studentRows, error: sErr },
+      { data: detailRows },
+      { data: markRows },
+      { data: marksheetRows },
+    ] = await Promise.all([
+      supabase.from("students").select("*").order("student_id", { ascending: true }),
+      supabase
+        .from("grade_card_details")
+        .select(
+          "student_id,programme_title,programme_code,semester_label,semester_gpa,final_grade,updated_at",
+        ),
+      supabase.from("student_marks").select("student_id,subject_code,subject"),
+      supabase.from("student_marksheets").select("student_id,courses"),
+    ]);
     if (sErr) toast.error(sErr.message);
     setStudents((studentRows as Student[]) ?? []);
 
@@ -331,9 +338,39 @@ function SuperAdminStudentsDashboard() {
     }
     setHeadersByStudent(headerMap);
 
+    const marksheets = ((marksheetRows as Record<string, unknown>[] | null) ?? []).map((row) =>
+      normalizeMarksheet(row),
+    );
+
+    const studentCodes = new Map<string, Set<string>>();
+    const getSet = (sid: string) => {
+      let s = studentCodes.get(sid);
+      if (!s) {
+        s = new Set<string>();
+        studentCodes.set(sid, s);
+      }
+      return s;
+    };
+
+    for (const ms of marksheets) {
+      const s = getSet(ms.student_id);
+      const coursesArr = Array.isArray(ms.courses) ? ms.courses : [];
+      for (const c of coursesArr) {
+        const code = c.course_code || c.course_title;
+        if (code) s.add(code);
+      }
+    }
+
+    const legacyMarkRows = (markRows ?? []) as { student_id: string; subject_code: string | null; subject: string | null }[];
+    for (const row of legacyMarkRows) {
+      const s = getSet(row.student_id);
+      const code = row.subject_code || row.subject;
+      if (code) s.add(code);
+    }
+
     const counts = new Map<string, number>();
-    for (const r of (markRows ?? []) as { student_id: string }[]) {
-      counts.set(r.student_id, (counts.get(r.student_id) ?? 0) + 1);
+    for (const [sid, set] of studentCodes.entries()) {
+      counts.set(sid, set.size);
     }
     setCourseCountByStudent(counts);
     setLoading(false);
@@ -356,6 +393,11 @@ function SuperAdminStudentsDashboard() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "student_marks" },
+        () => void load(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "student_marksheets" },
         () => void load(),
       )
       .subscribe();
@@ -432,9 +474,9 @@ function SuperAdminStudentsDashboard() {
                 <th className="px-2 py-2">Student</th>
                 <th className="px-2 py-2">Department</th>
                 <th className="px-2 py-2">Programme</th>
-                <th className="px-2 py-2">Courses</th>
-                <th className="px-2 py-2">SGPA</th>
-                <th className="px-2 py-2">Grade</th>
+                <th className="px-2 py-2 text-center">Courses</th>
+                <th className="px-2 py-2 text-center">CGPA</th>
+                <th className="px-2 py-2 text-center">Grade</th>
                 <th className="px-2 py-2"></th>
               </tr>
             </thead>
@@ -455,11 +497,11 @@ function SuperAdminStudentsDashboard() {
                         {h?.programme_code ?? ""}
                       </span>
                     </td>
-                    <td className="px-2 py-2">{n}</td>
-                    <td className="px-2 py-2">
+                    <td className="px-2 py-2 text-center">{n}</td>
+                    <td className="px-2 py-2 text-center">
                       {h?.semester_gpa != null ? Number(h.semester_gpa).toFixed(2) : "-"}
                     </td>
-                    <td className="px-2 py-2">{h?.final_grade ?? "-"}</td>
+                    <td className="px-2 py-2 text-center">{h?.final_grade ?? "-"}</td>
                     <td className="px-2 py-2 text-right">
                       <Link
                         to={`/coe/students/${student.id}`}
@@ -485,7 +527,8 @@ function SuperAdminStudentsDashboard() {
 }
 
 function MarksUploader() {
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [zipFile, setZipFile] = useState<File | null>(null);
   const [replace, setReplace] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -493,16 +536,47 @@ function MarksUploader() {
     window.location.href = "/marks_template_final.xlsx";
   }
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function handleUploadAll() {
+    if (!excelFile) {
+      toast.error("Please select an Excel marks sheet file.");
+      return;
+    }
     setBusy(true);
 
     console.group("COE Marks Upload Debug");
-    console.log("File received:", file.name, file.size, "bytes");
+    console.log("Excel received:", excelFile.name, excelFile.size, "bytes");
+    if (zipFile) {
+      console.log("ZIP received:", zipFile.name, zipFile.size, "bytes");
+    }
 
     try {
-      const buf = await file.arrayBuffer();
+      // 1. Process ZIP File if provided
+      const uploadedImages = new Map<string, Blob>();
+      if (zipFile) {
+        try {
+          const zip = await JSZip.loadAsync(zipFile);
+          for (const [filename, fileObj] of Object.entries(zip.files)) {
+            if (fileObj.dir) continue;
+            
+            const lowerName = filename.toLowerCase();
+            if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg") || lowerName.endsWith(".png")) {
+              const content = await fileObj.async("blob");
+              const baseName = filename.split('/').pop() || filename;
+              uploadedImages.set(baseName.toLowerCase().trim(), content);
+            }
+          }
+          console.log("Successfully extracted images from ZIP:", uploadedImages.size);
+        } catch (err) {
+          toast.error("Failed to extract ZIP file. Ensure it is a valid ZIP archive.");
+          console.error("ZIP extraction error:", err);
+          setBusy(false);
+          console.groupEnd();
+          return;
+        }
+      }
+
+      // 2. Read Excel file
+      const buf = await excelFile.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellFormula: false, cellHTML: false, cellText: false, cellDates: true });
       const sheetName = wb.SheetNames[0]; // Always read the first sheet safely
       const sheet = wb.Sheets[sheetName];
@@ -512,6 +586,7 @@ function MarksUploader() {
       if (aoa.length === 0) {
         toast.error("The sheet is empty.");
         console.groupEnd();
+        setBusy(false);
         return;
       }
 
@@ -536,7 +611,7 @@ function MarksUploader() {
             "Course Priority", "Course Code", "Course Title", "Course Credits", "Credits Earned", 
             "CIA Max Marks Theory", "CIA Max Marks Practical", "CIA Marks Obtained Theory", "CIA Marks Obtained Practical", 
             "ESE Max Marks Theory", "ESE Max Marks Practical", "ESE Marks Obtained Theory", "ESE Marks Obtained Practical", 
-            "Total Marks Theory", "Total Marks Practical", "Grade Obtained", "Grade Points"
+            "Total Marks Theory", "Total Marks Practical", "Grade Obtained", "Grade Points", "Image Path"
           ];
         } else {
           let lastMainHeader = "";
@@ -578,6 +653,7 @@ function MarksUploader() {
       if (rows.length === 0) {
         toast.error("The sheet is empty.");
         console.groupEnd();
+        setBusy(false);
         return;
       }
 
@@ -609,11 +685,11 @@ function MarksUploader() {
       if (parsed.length === 0) {
         toast.error(`No valid rows found. ${rejected.length} rows were rejected due to missing critical fields.`);
         console.groupEnd();
+        setBusy(false);
         return;
       }
 
       // 3. Group and Process Students
-      // We use upsert for students to ensure they exist and have latest metadata (name, dept)
       const studentsMap = new Map<string, any>();
       parsed.forEach(row => {
         const sid = row.student_id.toLowerCase().trim();
@@ -625,14 +701,81 @@ function MarksUploader() {
             department: row.department || "General",
             semester: Number(row.semester) || 1,
             year: Number(row.year) || 1,
-            in_fees: true, // Auto-add to portals if they are in marksheet
+            in_fees: true,
             in_hostel: false,
             in_library: false,
+            image_path: row.image_path || null,
           });
         }
       });
 
       console.log("Unique students to sync:", studentsMap.size);
+
+      // Fetch existing students to preserve photo and clearance statuses
+      const studentIds = Array.from(studentsMap.keys());
+      const { data: existingStudents } = await supabase
+        .from("students")
+        .select("student_id, image_path, in_hostel, in_library, in_fees")
+        .in("student_id", studentIds);
+
+      const existingMap = new Map<string, any>();
+      existingStudents?.forEach(s => {
+        existingMap.set(s.student_id.toLowerCase().trim(), s);
+      });
+
+      // Update studentsMap with existing values if needed
+      studentsMap.forEach((s, sid) => {
+        const existing = existingMap.get(sid);
+        if (existing) {
+          s.in_hostel = existing.in_hostel;
+          s.in_library = existing.in_library;
+          s.in_fees = existing.in_fees;
+          if (!s.image_path && existing.image_path) {
+            s.image_path = existing.image_path;
+          }
+        }
+      });
+
+      // 4. Match and Upload ZIP photos
+      const uniqueStudentsList = Array.from(studentsMap.values());
+      for (const s of uniqueStudentsList) {
+        const regLower = (s.registration_no || s.student_id).toLowerCase().trim();
+        const possibleKeys = [
+          s.image_path?.toLowerCase(),
+          `${regLower}.jpg`,
+          `${regLower}.jpeg`,
+          `${regLower}.png`
+        ].filter((k): k is string => !!k);
+
+        let imageBlob: Blob | undefined;
+        let detectedExt = "jpg";
+        for (const key of possibleKeys) {
+          if (uploadedImages.has(key)) {
+            imageBlob = uploadedImages.get(key);
+            detectedExt = key.split('.').pop() || "jpg";
+            break;
+          }
+        }
+
+        if (imageBlob) {
+          const storageFileName = `${s.student_id}.${detectedExt}`;
+          try {
+            const { error: uploadErr } = await supabase.storage
+              .from("student-photos")
+              .upload(storageFileName, imageBlob, {
+                upsert: true,
+                contentType: imageBlob.type || `image/${detectedExt === 'png' ? 'png' : 'jpeg'}`
+              });
+            if (uploadErr) {
+              console.error(`Error uploading photo for ${s.student_id}:`, uploadErr);
+            } else {
+              s.image_path = storageFileName;
+            }
+          } catch (err) {
+            console.error(`Exception uploading photo for ${s.student_id}:`, err);
+          }
+        }
+      }
 
       // Upsert students (onConflict: student_id)
       const { data: studentSyncData, error: studentSyncErr } = await supabase
@@ -648,7 +791,7 @@ function MarksUploader() {
       const idLookup = new Map<string, string>();
       studentSyncData.forEach(s => idLookup.set(s.student_id.toLowerCase(), s.id));
 
-      // 4. Prepare Marks and Grade Card Rows
+      // 5. Prepare Marks and Grade Card Rows
       const marksToInsert: any[] = [];
       const gradeCardRows: any[] = [];
       const studentExtras = new Map<string, any>();
@@ -736,7 +879,7 @@ function MarksUploader() {
 
       console.log("Total marks records:", marksToInsert.length);
 
-      // 5. Delete old marks if replace is checked
+      // Delete old marks if replace is checked
       const studentUuids = Array.from(idLookup.values());
       if (replace && studentUuids.length > 0) {
         console.log("Replacing existing marks for students:", studentUuids.length);
@@ -752,22 +895,22 @@ function MarksUploader() {
           .in("student_id", studentUuids);
       }
 
-      // 6. Insert Marks
+      // Insert Marks
       const { error: markErr } = await supabase.from("student_marks").insert(marksToInsert);
       if (markErr) {
         console.error("Marks insert error:", markErr);
         throw new Error(`Failed to insert marks: ${markErr.message}`);
       }
 
-      // 7. Upsert Main Grade Card Rows
+      // Upsert Main Grade Card Rows
       if (gradeCardRows.length > 0) {
         const { error: gcErr } = await supabase
           .from("main_grade_card")
-          .upsert(gradeCardRows, { onConflict: "student_id,row_number" });
+          .upsert(gradeCardRows as any, { onConflict: "student_id,row_number" });
         if (gcErr) console.error("Grade card upsert error:", gcErr);
       }
 
-      // 8. Reset Verification Status and set marks_uploaded_at
+      // Reset Verification Status and set marks_uploaded_at
       await supabase
         .from("students")
         .update({
@@ -779,7 +922,7 @@ function MarksUploader() {
         })
         .in("id", studentUuids);
 
-      // 9. End-to-end Sync (SGPA, JSON Marksheet, Grade Card Details)
+      // End-to-end Sync (SGPA, JSON Marksheet, Grade Card Details)
       const marksheetsToUpsert = [];
       const uniqueGradeCardDetails = new Map<string, any>();
       const nowIso2 = new Date().toISOString();
@@ -803,6 +946,8 @@ function MarksUploader() {
         const totals = calculateMarksheetTotals(courses);
 
         const firstRow = rows[0];
+        const studentInfo = studentsMap.get(firstRow.student_id.toLowerCase().trim());
+        const dbImagePath = studentInfo?.image_path || `${firstRow.registration_no || firstRow.student_id}/profile.jpeg`;
 
         marksheetsToUpsert.push({
           student_id: uuid,
@@ -819,7 +964,7 @@ function MarksUploader() {
           grade_card_no: firstRow.grade_card_no,
           qr_data: `GCU|${firstRow.student_id}|${firstRow.registration_no || firstRow.student_id}|${firstRow.full_name}|${firstRow.programme_code}|${semLabel}`,
           photo_bucket: "student-photos",
-          photo_path: `${firstRow.registration_no || firstRow.student_id}/profile.jpeg`,
+          photo_path: dbImagePath,
           total_credits: totals.totalCredits,
           total_credits_earned: totals.totalCreditsEarned,
           total_credit_points: totals.totalCreditPoints,
@@ -883,6 +1028,8 @@ function MarksUploader() {
           `Successfully processed ${successCount} rows for ${studentCount} students. ` +
           `All grade cards generated and synced.`
         );
+        setExcelFile(null);
+        setZipFile(null);
       }
 
     } catch (error) {
@@ -891,7 +1038,6 @@ function MarksUploader() {
     } finally {
       console.groupEnd();
       setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
@@ -902,36 +1048,87 @@ function MarksUploader() {
           <h2 className="flex items-center gap-2 text-lg font-bold text-primary">
             <FileSpreadsheet className="h-5 w-5" /> Upload student marks
           </h2>
-
+          <p className="mt-1 text-xs text-muted-foreground">
+            Upload the Excel spreadsheet containing marks and student records, and optionally select a ZIP archive containing student photo files matched by registration number.
+          </p>
         </div>
         <button
           type="button"
           onClick={downloadTemplate}
-          className="inline-flex shrink-0 items-center gap-2 rounded-md border border-border bg-cream px-3 py-1.5 text-sm text-primary hover:bg-secondary"
+          className="inline-flex shrink-0 items-center gap-2 rounded-md border border-border bg-cream px-3 py-1.5 text-sm text-primary hover:bg-secondary transition-colors"
         >
           <Download className="h-4 w-4" /> Download template
         </button>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-4">
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={busy}
-          className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
-        >
-          <Upload className="h-4 w-4" /> {busy ? "Uploading…" : "Upload Excel"}
-        </button>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={handleFile} />
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <input
-            type="checkbox"
-            checked={replace}
-            onChange={(e) => setReplace(e.target.checked)}
-            className="h-4 w-4 accent-[var(--color-primary)]"
-          />
-          Replace existing marks for matched students
-        </label>
+      <div className="mt-6 flex flex-col gap-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Excel Input */}
+          <div className="flex flex-col gap-2 rounded-xl border border-border bg-cream/20 p-4">
+            <label className="text-sm font-semibold text-primary">Excel Marks Sheet (Required)</label>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              disabled={busy}
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setExcelFile(file);
+              }}
+              className="w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-primary-foreground hover:file:opacity-90 transition-all cursor-pointer"
+            />
+            {excelFile && (
+              <span className="text-xs text-primary font-medium">Selected: {excelFile.name} ({(excelFile.size / 1024).toFixed(1)} KB)</span>
+            )}
+          </div>
+
+          {/* ZIP Input */}
+          <div className="flex flex-col gap-2 rounded-xl border border-border bg-cream/20 p-4">
+            <label className="text-sm font-semibold text-primary">Student Photos ZIP (Optional)</label>
+            <input
+              type="file"
+              accept=".zip"
+              disabled={busy}
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setZipFile(file);
+              }}
+              className="w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-primary-foreground hover:file:opacity-90 transition-all cursor-pointer"
+            />
+            {zipFile && (
+              <span className="text-xs text-primary font-medium">Selected: {zipFile.name} ({(zipFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/60 pt-4">
+          <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={replace}
+              onChange={(e) => setReplace(e.target.checked)}
+              disabled={busy}
+              className="h-4 w-4 accent-[var(--color-primary)]"
+            />
+            Replace existing marks for matched students
+          </label>
+
+          <button
+            type="button"
+            onClick={handleUploadAll}
+            disabled={busy || !excelFile}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60 transition-colors shadow-sm"
+          >
+            {busy ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Processing…
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" /> Upload Marks & Photos
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

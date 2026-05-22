@@ -87,6 +87,7 @@ export function getMarksheetEligibility({
   if (!feesOk) missing.push("academic_fee");
   if (!hostelOk) missing.push("hostel_fee");
   if (!libraryOk) missing.push("library");
+  if (!facultyOk) missing.push("faculty_review");
   if (!adminOk) missing.push("admin_review");
 
   return {

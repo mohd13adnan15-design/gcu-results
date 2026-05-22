@@ -8,6 +8,21 @@ export type Database = {
   };
   public: {
     Tables: {
+      departments: {
+        Row: {
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       email_otps: {
         Row: {
           created_at: string;
@@ -158,6 +173,7 @@ export type Database = {
       student_marks: {
         Row: {
           course_category: string;
+          course_priority: number;
           created_at: string;
           credits_earned: number;
           credits: number;
@@ -169,9 +185,22 @@ export type Database = {
           student_id: string;
           subject: string;
           subject_code: string;
+          cia_max_marks_theory: number | null;
+          cia_max_marks_practical: number | null;
+          cia_marks_obtained_theory: number | null;
+          cia_marks_obtained_practical: number | null;
+          ese_max_marks_theory: number | null;
+          ese_max_marks_practical: number | null;
+          ese_marks_obtained_theory: number | null;
+          ese_marks_obtained_practical: number | null;
+          total_marks_theory: number | null;
+          total_marks_practical: number | null;
+          semester: number | null;
+          semester_label: string | null;
         };
         Insert: {
           course_category?: string;
+          course_priority?: number;
           created_at?: string;
           credits_earned?: number;
           credits?: number;
@@ -183,9 +212,22 @@ export type Database = {
           student_id: string;
           subject: string;
           subject_code: string;
+          cia_max_marks_theory?: number | null;
+          cia_max_marks_practical?: number | null;
+          cia_marks_obtained_theory?: number | null;
+          cia_marks_obtained_practical?: number | null;
+          ese_max_marks_theory?: number | null;
+          ese_max_marks_practical?: number | null;
+          ese_marks_obtained_theory?: number | null;
+          ese_marks_obtained_practical?: number | null;
+          total_marks_theory?: number | null;
+          total_marks_practical?: number | null;
+          semester?: number | null;
+          semester_label?: string | null;
         };
         Update: {
           course_category?: string;
+          course_priority?: number;
           created_at?: string;
           credits_earned?: number;
           credits?: number;
@@ -197,6 +239,18 @@ export type Database = {
           student_id?: string;
           subject?: string;
           subject_code?: string;
+          cia_max_marks_theory?: number | null;
+          cia_max_marks_practical?: number | null;
+          cia_marks_obtained_theory?: number | null;
+          cia_marks_obtained_practical?: number | null;
+          ese_max_marks_theory?: number | null;
+          ese_max_marks_practical?: number | null;
+          ese_marks_obtained_theory?: number | null;
+          ese_marks_obtained_practical?: number | null;
+          total_marks_theory?: number | null;
+          total_marks_practical?: number | null;
+          semester?: number | null;
+          semester_label?: string | null;
         };
         Relationships: [
           {
@@ -415,6 +469,128 @@ export type Database = {
           },
         ];
       };
+      main_grade_card: {
+        Row: {
+          id: string;
+          student_id: string;
+          programme_title: string | null;
+          programme_code: string | null;
+          student_name: string | null;
+          registration_no: string | null;
+          semester_label: string | null;
+          exam_month_year: string | null;
+          row_number: number;
+          course_code: string | null;
+          course_title: string | null;
+          course_credits: number | null;
+          credits_earned: number | null;
+          grade: string | null;
+          grade_points: number | null;
+          course_category: string | null;
+          total_credit_points: number | null;
+          total_credits: number | null;
+          semester_gpa: number | null;
+          final_grade: string | null;
+          issue_date: string | null;
+          qr_data: string | null;
+          photo_url: string | null;
+          subject: string | null;
+          subject_code: string | null;
+          credits: number | null;
+          practical_1: string | null;
+          ability_enhancement_compulsory_course: string | null;
+          skill_enhancement_course: string | null;
+          practical_2: string | null;
+          objective_enhancement_course: string | null;
+          marks_obtained: number | null;
+          max_marks: number | null;
+          updated_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          programme_title?: string | null;
+          programme_code?: string | null;
+          student_name?: string | null;
+          registration_no?: string | null;
+          semester_label?: string | null;
+          exam_month_year?: string | null;
+          row_number: number;
+          course_code?: string | null;
+          course_title?: string | null;
+          course_credits?: number | null;
+          credits_earned?: number | null;
+          grade?: string | null;
+          grade_points?: number | null;
+          course_category?: string | null;
+          total_credit_points?: number | null;
+          total_credits?: number | null;
+          semester_gpa?: number | null;
+          final_grade?: string | null;
+          issue_date?: string | null;
+          qr_data?: string | null;
+          photo_url?: string | null;
+          subject?: string | null;
+          subject_code?: string | null;
+          credits?: number | null;
+          practical_1?: string | null;
+          ability_enhancement_compulsory_course?: string | null;
+          skill_enhancement_course?: string | null;
+          practical_2?: string | null;
+          objective_enhancement_course?: string | null;
+          marks_obtained?: number | null;
+          max_marks?: number | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          programme_title?: string | null;
+          programme_code?: string | null;
+          student_name?: string | null;
+          registration_no?: string | null;
+          semester_label?: string | null;
+          exam_month_year?: string | null;
+          row_number?: number;
+          course_code?: string | null;
+          course_title?: string | null;
+          course_credits?: number | null;
+          credits_earned?: number | null;
+          grade?: string | null;
+          grade_points?: number | null;
+          course_category?: string | null;
+          total_credit_points?: number | null;
+          total_credits?: number | null;
+          semester_gpa?: number | null;
+          final_grade?: string | null;
+          issue_date?: string | null;
+          qr_data?: string | null;
+          photo_url?: string | null;
+          subject?: string | null;
+          subject_code?: string | null;
+          credits?: number | null;
+          practical_1?: string | null;
+          ability_enhancement_compulsory_course?: string | null;
+          skill_enhancement_course?: string | null;
+          practical_2?: string | null;
+          objective_enhancement_course?: string | null;
+          marks_obtained?: number | null;
+          max_marks?: number | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "main_grade_card_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "students";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       students: {
         Row: {
           admin_verified: boolean;
@@ -423,6 +599,8 @@ export type Database = {
           faculty_verified: boolean;
           fully_verified: boolean;
           marksheet_verification_requested_at: string | null;
+          marks_uploaded_at: string | null;
+          grade_card_issue_date: string | null;
           department: string;
           email: string;
           fees_cleared: boolean;
@@ -441,6 +619,7 @@ export type Database = {
           semester: number;
           student_id: string;
           year: number;
+          image_path: string | null;
         };
         Insert: {
           admin_verified?: boolean;
@@ -449,6 +628,8 @@ export type Database = {
           faculty_verified?: boolean;
           fully_verified?: boolean;
           marksheet_verification_requested_at?: string | null;
+          marks_uploaded_at?: string | null;
+          grade_card_issue_date?: string | null;
           department: string;
           email: string;
           fees_cleared?: boolean;
@@ -467,6 +648,7 @@ export type Database = {
           semester: number;
           student_id: string;
           year: number;
+          image_path?: string | null;
         };
         Update: {
           admin_verified?: boolean;
@@ -475,6 +657,8 @@ export type Database = {
           faculty_verified?: boolean;
           fully_verified?: boolean;
           marksheet_verification_requested_at?: string | null;
+          marks_uploaded_at?: string | null;
+          grade_card_issue_date?: string | null;
           department?: string;
           email?: string;
           fees_cleared?: boolean;
@@ -493,6 +677,7 @@ export type Database = {
           semester?: number;
           student_id?: string;
           year?: number;
+          image_path?: string | null;
         };
         Relationships: [];
       };
@@ -512,15 +697,15 @@ export type Database = {
     };
     Enums: {
       portal_type:
-        | "super_admin"
-        | "faculty"
-        | "admin"
-        | "admin_1"
-        | "admin_2"
-        | "head_of_coe"
-        | "library"
-        | "hostel"
-        | "fees";
+      | "super_admin"
+      | "faculty"
+      | "admin"
+      | "admin_1"
+      | "admin_2"
+      | "head_of_coe"
+      | "library"
+      | "hostel"
+      | "fees";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -534,114 +719,114 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R;
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R;
-      }
-      ? R
-      : never
-    : never;
+  ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+    Row: infer R;
+  }
+  ? R
+  : never
+  : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I;
-    }
-    ? I
-    : never
+    Insert: infer I;
+  }
+  ? I
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I;
-      }
-      ? I
-      : never
-    : never;
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I;
+  }
+  ? I
+  : never
+  : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U;
-    }
-    ? U
-    : never
+    Update: infer U;
+  }
+  ? U
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U;
-      }
-      ? U
-      : never
-    : never;
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Update: infer U;
+  }
+  ? U
+  : never
+  : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Enums"]
+  | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never;
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never;
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never;
 
 export const Constants = {
   public: {

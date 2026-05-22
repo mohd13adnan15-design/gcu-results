@@ -1,4 +1,4 @@
-export type PortalType = "head_of_coe" | "admin_1" | "admin_2" | "library" | "hostel" | "fees";
+export type PortalType = "super_admin" | "faculty" | "admin" | "head_of_coe" | "admin_1" | "admin_2" | "library" | "hostel" | "fees";
 
 export interface Student {
   id: string;

@@ -36,18 +36,20 @@ export type MainGradeCardRow = {
   objective_enhancement_course?: string | null;
 };
 
-export type MainGradeCardHeader = Pick<
-  StudentGradeProfile,
-  | "programme_title"
-  | "programme_code"
-  | "registration_no"
-  | "exam_month_year"
-  | "issue_date"
-  | "semester_label"
-  | "total_credits"
-  | "total_credit_points"
-  | "semester_gpa"
-  | "final_grade"
+export type MainGradeCardHeader = Partial<
+  Pick<
+    StudentGradeProfile,
+    | "programme_title"
+    | "programme_code"
+    | "registration_no"
+    | "exam_month_year"
+    | "issue_date"
+    | "semester_label"
+    | "total_credits"
+    | "total_credit_points"
+    | "semester_gpa"
+    | "final_grade"
+  >
 > & {
   student_name?: string | null;
   qr_data?: string | null;
