@@ -38,36 +38,40 @@ export async function syncStudentGradeAndMarksheet(
 
   const targetSemesterLabel = overrides?.semester_label || base?.semester_label;
 
-  let query = supabase
+  const { data: marksRows } = await supabase
     .from("student_marks")
     .select(
-      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
+      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points",
     )
-    .eq("student_id", studentId);
-
-  if (targetSemesterLabel) {
-    query = query.eq("semester_label", targetSemesterLabel);
-  }
-
-  let { data: marksRows } = await query
+    .eq("student_id", studentId)
     .order("course_priority", { ascending: true })
     .order("subject_code", { ascending: true });
 
-  // Fallback for legacy data where semester_label is null
-  if (targetSemesterLabel && (!marksRows || marksRows.length === 0)) {
-    const { data: fallbackRows } = await supabase
-      .from("student_marks")
-      .select(
-        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
-      )
-      .eq("student_id", studentId)
-      .order("course_priority", { ascending: true })
-      .order("subject_code", { ascending: true });
-    
-    marksRows = fallbackRows;
-  }
+  let marks = ((marksRows as LegacyMarkRow[] | null) ?? []).filter(Boolean);
 
-  const marks = ((marksRows as LegacyMarkRow[] | null) ?? []).filter(Boolean);
+  if (targetSemesterLabel && marks.length > 0) {
+    const { data: targetSheet } = await supabase
+      .from("student_marksheets")
+      .select("courses")
+      .eq("student_id", studentId)
+      .eq("semester_label", targetSemesterLabel)
+      .maybeSingle();
+
+    if (targetSheet) {
+      let allowedCourses: any[] = [];
+      try {
+        allowedCourses = typeof targetSheet.courses === 'string' ? JSON.parse(targetSheet.courses) : targetSheet.courses;
+      } catch {
+        allowedCourses = targetSheet.courses || [];
+      }
+      if (Array.isArray(allowedCourses) && allowedCourses.length > 0) {
+        const allowedCodes = new Set(
+          allowedCourses.map((c: any) => String(c.course_code || c.subject_code || "").toUpperCase().trim()).filter(Boolean)
+        );
+        marks = marks.filter(m => allowedCodes.has(String(m.subject_code || "").toUpperCase().trim()));
+      }
+    }
+  }
 
   let merged: StudentMarksheet = { ...base, ...overrides };
 

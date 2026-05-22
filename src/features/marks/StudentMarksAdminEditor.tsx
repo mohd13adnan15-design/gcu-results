@@ -140,7 +140,7 @@ export function StudentMarksAdminEditor({
         supabase
           .from("student_marks")
           .select(
-            "id,subject,subject_code,course_category,credits,credits_earned,marks_obtained,max_marks,grade,grade_points,course_priority,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,semester,semester_label",
+            "id,subject,subject_code,course_category,credits,credits_earned,marks_obtained,max_marks,grade,grade_points,course_priority,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical",
           )
           .eq("student_id", studentId)
           .order("course_priority", { ascending: true, nullsFirst: false })
