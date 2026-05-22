@@ -524,6 +524,9 @@ export async function resolveStudentPhotoUrl(
   const roll = marksheet.student_roll_no?.toLowerCase();
   if (roll === "24btre152") return "/templates/assets/v_sai_tejashvi_profile.jpeg";
   if (roll === "23bsft101") return "/templates/assets/abigail_profile.jpeg";
+  if (roll === "23msda110" || roll === "23msda110@gcu.edu.in") {
+    return "/templates/assets/sibi_profile.jpeg";
+  }
   if (roll === "23msda105" || roll === "23msda105@gcu.edu.in") {
     return "/templates/assets/princy akka.jpeg";
   }
