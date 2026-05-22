@@ -47,8 +47,6 @@ export function SuperAdminStudentHub({ studentId }: Props) {
   const [localDepts, setLocalDepts] = useState<string[]>([]);
   const [selectedDept, setSelectedDept] = useState("");
   const [inFees, setInFees] = useState(false);
-  const [inHostel, setInHostel] = useState(false);
-  const [inLibrary, setInLibrary] = useState(false);
 
   useEffect(() => {
     async function loadDepts() {
@@ -77,8 +75,6 @@ export function SuperAdminStudentHub({ studentId }: Props) {
         }
         setSelectedDept(s.department);
         setInFees(s.in_fees);
-        setInHostel(s.in_hostel);
-        setInLibrary(s.in_library);
       }
     }
     setLoading(false);
@@ -106,8 +102,6 @@ export function SuperAdminStudentHub({ studentId }: Props) {
       email,
       department,
       in_fees: inFees,
-      in_hostel: inHostel,
-      in_library: inLibrary,
     };
     const { error } = await supabase.from("students").update(patch as any).eq("id", student.id);
     if (error) {
@@ -381,36 +375,80 @@ export function SuperAdminStudentHub({ studentId }: Props) {
               </div>
             </div>
 
-            <div className="rounded-lg border border-border/80 bg-secondary/20 p-4">
-              <p className="text-sm font-medium text-primary">Include in portal lists</p>
-              <div className="mt-3 flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 text-sm">
+            <div className="rounded-xl border border-border/80 bg-secondary/10 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-primary">Portal Enrollment Status</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Student enrollment is managed automatically. When a student is added to the Hostel or Library portal lists, the corresponding checkmark is done automatically and the card is unlocked in the student portal.
+              </p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:gap-6">
+                <label className="flex items-center gap-3 rounded-lg border border-border/50 bg-cream/40 px-4 py-3 text-sm cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={inFees}
                     onChange={(e) => setInFees(e.target.checked)}
-                    className="h-4 w-4 accent-[var(--color-primary)]"
+                    className="h-4.5 w-4.5 accent-[var(--color-primary)] cursor-pointer"
                   />
-                  Academic fees
+                  <div>
+                    <span className="font-semibold text-primary block">Academic Fees</span>
+                    <span className="text-xs text-muted-foreground block">Managed by COE</span>
+                  </div>
                 </label>
-                <label className="flex items-center gap-2 text-sm">
+
+                <div className={cn(
+                  "flex items-center gap-3 rounded-lg border px-4 py-3 text-sm select-none",
+                  student?.in_hostel 
+                    ? "border-primary/20 bg-primary/5 text-primary" 
+                    : "border-border/40 bg-secondary/10 text-muted-foreground/70"
+                )}>
                   <input
                     type="checkbox"
-                    checked={inHostel}
-                    onChange={(e) => setInHostel(e.target.checked)}
-                    className="h-4 w-4 accent-[var(--color-primary)]"
+                    checked={student?.in_hostel ?? false}
+                    disabled
+                    className="h-4.5 w-4.5 accent-[var(--color-primary)] cursor-not-allowed opacity-80"
                   />
-                  Hostel
-                </label>
-                <label className="flex items-center gap-2 text-sm">
+                  <div>
+                    <span className="font-semibold block">Hostel Portal</span>
+                    <span className="text-xs block mt-0.5">
+                      {student?.in_hostel ? (
+                        <span className="inline-flex items-center rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                          Enrolled (Unlocked)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-orange-800 dark:bg-orange-950/30 dark:text-orange-400">
+                          Locked (Not Enrolled)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={cn(
+                  "flex items-center gap-3 rounded-lg border px-4 py-3 text-sm select-none",
+                  student?.in_library 
+                    ? "border-primary/20 bg-primary/5 text-primary" 
+                    : "border-border/40 bg-secondary/10 text-muted-foreground/70"
+                )}>
                   <input
                     type="checkbox"
-                    checked={inLibrary}
-                    onChange={(e) => setInLibrary(e.target.checked)}
-                    className="h-4 w-4 accent-[var(--color-primary)]"
+                    checked={student?.in_library ?? false}
+                    disabled
+                    className="h-4.5 w-4.5 accent-[var(--color-primary)] cursor-not-allowed opacity-80"
                   />
-                  Library
-                </label>
+                  <div>
+                    <span className="font-semibold block">Library Portal</span>
+                    <span className="text-xs block mt-0.5">
+                      {student?.in_library ? (
+                        <span className="inline-flex items-center rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                          Active (Unlocked)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-orange-800 dark:bg-orange-950/30 dark:text-orange-400">
+                          Locked (No Activities)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 

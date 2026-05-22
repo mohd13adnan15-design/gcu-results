@@ -701,7 +701,6 @@ export function marksheetCoursesToStudentMarkInserts(
       max_marks,
       grade: c.grade_obtained || "RA",
       grade_points: c.grade_points,
-      semester_label: semesterLabel || null,
     };
   });
 }

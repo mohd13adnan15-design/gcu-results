@@ -394,8 +394,6 @@ export function StudentMarksAdminEditor({
         max_marks: maxMarks,
         grade: g,
         grade_points: gradePoints,
-        semester: student.semester || 1,
-        semester_label: selectedSemFilter !== "ALL" ? selectedSemFilter : header?.semester_label || `Semester ${student.semester || 1}`,
       };
       const { data, error } = await supabase
         .from("student_marks")
