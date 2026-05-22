@@ -311,31 +311,11 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
             <p className="text-sm font-semibold text-primary">
               Grade card Details
             </p>
-            {allMarksheets.length > 1 && (
-              <div className="flex flex-wrap gap-2">
-                {allMarksheets.map((m) => {
-                  const semName = (m.semester_label || "").toLowerCase().startsWith("sem")
-                    ? m.semester_label
-                    : `Sem ${m.semester_label}`;
-                  const isSelected = selectedSemLabel === m.semester_label;
-                  return (
-                    <button
-                      key={m.id || m.semester_label}
-                      type="button"
-                      onClick={() => {
-                        setMarksheet(m);
-                        setSelectedSemLabel(m.semester_label);
-                      }}
-                      className={`rounded-md px-3 py-1.5 text-xs font-semibold border transition ${
-                        isSelected
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-white text-primary border-primary/30 hover:bg-primary/10"
-                      }`}
-                    >
-                      {semName}
-                    </button>
-                  );
-                })}
+            {selectedSemLabel && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-primary uppercase tracking-wider">
+                  Viewing Semester: <span className="font-extrabold text-amber-900">{selectedSemLabel}</span>
+                </span>
               </div>
             )}
           </div>
