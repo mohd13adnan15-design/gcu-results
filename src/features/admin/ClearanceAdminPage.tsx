@@ -138,6 +138,7 @@ export function ClearanceAdminPage({ kind }: Props) {
   const [newBookAuthor, setNewBookAuthor] = useState("");
   const [newBookBorrowedAt, setNewBookBorrowedAt] = useState(new Date().toISOString().split("T")[0]);
   const [addingBook, setAddingBook] = useState(false);
+  const [unreturnedStudentIds, setUnreturnedStudentIds] = useState<Set<string>>(new Set());
 
   const loadStudentBooks = useCallback(async (studentId: string) => {
     setBooksLoading(true);
@@ -180,6 +181,7 @@ export function ClearanceAdminPage({ kind }: Props) {
       if (error) {
         toast.error(error.message);
       } else {
+        await supabase.from("students").update({ library_cleared: false }).eq("id", booksModalStudent.id);
         toast.success("Book added successfully.");
         setNewBookTitle("");
         setNewBookAuthor("");
@@ -207,6 +209,9 @@ export function ClearanceAdminPage({ kind }: Props) {
     if (error) {
       toast.error(error.message);
     } else {
+      if (!nextStatus) {
+        await supabase.from("students").update({ library_cleared: false }).eq("id", booksModalStudent.id);
+      }
       toast.success(nextStatus ? "Book marked as returned." : "Book marked as pending.");
       void loadStudentBooks(booksModalStudent.id);
       void load();
@@ -244,7 +249,28 @@ export function ClearanceAdminPage({ kind }: Props) {
       .eq(membership as string, true)
       .order("student_id");
     if (error) toast.error(error.message);
-    setStudents((data as Student[]) ?? []);
+    
+    const studentsList = (data as Student[]) ?? [];
+    setStudents(studentsList);
+
+    // Dynamic unreturned library books check
+    if (kind === "library" && studentsList.length > 0) {
+      const studentIds = studentsList.map((s) => s.id);
+      const { data: booksData } = await supabase
+        .from("library_books")
+        .select("student_id")
+        .in("student_id", studentIds)
+        .eq("returned", false);
+      
+      const unreturnedSet = new Set<string>();
+      if (booksData) {
+        booksData.forEach((b) => unreturnedSet.add(b.student_id));
+      }
+      setUnreturnedStudentIds(unreturnedSet);
+    } else {
+      setUnreturnedStudentIds(new Set());
+    }
+
     setLoading(false);
   }, [kind]);
 
@@ -280,6 +306,10 @@ export function ClearanceAdminPage({ kind }: Props) {
   });
 
   async function toggleCleared(id: string, current: boolean) {
+    if (kind === "library" && !current && unreturnedStudentIds.has(id)) {
+      toast.error("Cannot clear student: they have unreturned borrowed books!");
+      return;
+    }
     const { error } = await supabase
       .from("students")
       .update({ [cfg.cleared]: !current } as never)
@@ -686,12 +716,12 @@ export function ClearanceAdminPage({ kind }: Props) {
                   {kind !== "library" && kind !== "hostel" && <th className="py-3 px-4 font-medium">Year</th>}
                   {money && <th className="py-3 px-4 font-medium text-right">Paid / Total</th>}
                   <th className="py-3 px-4 font-medium text-center">{cfg.label}</th>
-                  <th className="py-3 px-4 font-medium"></th>
+          <th className="py-3 px-4 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((s) => {
-                  const cleared = Boolean(s[cfg.cleared]);
+                  const cleared = kind === "library" && unreturnedStudentIds.has(s.id) ? false : Boolean(s[cfg.cleared]);
                   const paid = money ? Number(s[money.paid] ?? 0) : 0;
                   const total = money ? Number(s[money.total] ?? 0) : 0;
                   const isEditing = money && editingStudentId === s.id;
