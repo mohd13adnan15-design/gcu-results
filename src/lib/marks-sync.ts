@@ -36,14 +36,36 @@ export async function syncStudentGradeAndMarksheet(
   const base = await fetchStudentMarksheet(supabase, studentId);
   if (!base) return;
 
-  const { data: marksRows } = await supabase
+  const targetSemesterLabel = overrides?.semester_label || base?.semester_label;
+
+  let query = supabase
     .from("student_marks")
     .select(
-      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points",
+      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
     )
-    .eq("student_id", studentId)
+    .eq("student_id", studentId);
+
+  if (targetSemesterLabel) {
+    query = query.eq("semester_label", targetSemesterLabel);
+  }
+
+  let { data: marksRows } = await query
     .order("course_priority", { ascending: true })
     .order("subject_code", { ascending: true });
+
+  // Fallback for legacy data where semester_label is null
+  if (targetSemesterLabel && (!marksRows || marksRows.length === 0)) {
+    const { data: fallbackRows } = await supabase
+      .from("student_marks")
+      .select(
+        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
+      )
+      .eq("student_id", studentId)
+      .order("course_priority", { ascending: true })
+      .order("subject_code", { ascending: true });
+    
+    marksRows = fallbackRows;
+  }
 
   const marks = ((marksRows as LegacyMarkRow[] | null) ?? []).filter(Boolean);
 

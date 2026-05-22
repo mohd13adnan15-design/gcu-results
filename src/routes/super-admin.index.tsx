@@ -826,6 +826,8 @@ function MarksUploader() {
           max_marks: row.max_marks,
           grade: row.grade,
           grade_points: row.grade_points,
+          semester: Number(row.semester) || 1,
+          semester_label: row.semester_label || `Semester ${row.semester}`,
         });
 
         // Main grade card (limit to 40 rows per student)
