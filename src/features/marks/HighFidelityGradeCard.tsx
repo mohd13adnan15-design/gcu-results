@@ -295,7 +295,7 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
 
         .header-section {
           display: grid;
-          grid-template-columns: 70px 1fr 80px;
+          grid-template-columns: 100px 1fr 100px;
           align-items: start;
           margin-bottom: 25px;
         }
@@ -350,10 +350,10 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
         .student-photo-container {
           width: 100px;
           height: 125px;
-          border: 1px solid #ccc;
+          border: 1.5px solid #4b4b4b;
           margin-left: auto;
           margin-top: 10px;
-          background: transparent;
+          background: #f7f4ee;
           overflow: hidden;
           box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
           mix-blend-mode: multiply;
@@ -363,7 +363,7 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
           width: 100%;
           height: 100%;
           object-fit: cover;
-          filter: grayscale(0.1) contrast(1.1);
+          filter: contrast(1.15) brightness(1.02);
           mix-blend-mode: multiply;
         }
 
