@@ -79,8 +79,12 @@ export function MarksheetSavedPreview({ marksheet, readOnlyNotice }: MarksheetSa
             </tr>
           </thead>
           <tbody>
-            {marksheet.courses.map((course) => (
-              <CourseRow key={`${course.sl_no}-${course.course_code}`} course={course} />
+            {marksheet.courses.map((course, index) => (
+              <CourseRow
+                key={`${course.sl_no}-${course.course_code}`}
+                course={course}
+                index={index}
+              />
             ))}
           </tbody>
         </table>
@@ -98,10 +102,10 @@ function InfoLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CourseRow({ course }: { course: MarksheetCourse }) {
+function CourseRow({ course, index }: { course: MarksheetCourse; index: number }) {
   return (
     <tr className="border-b border-border/60">
-      <td className="px-2 py-2">{course.sl_no}</td>
+      <td className="px-2 py-2">{index + 1}</td>
       <td className="px-2 py-2">{course.course_code}</td>
       <td className="px-2 py-2">
         {course.course_title}

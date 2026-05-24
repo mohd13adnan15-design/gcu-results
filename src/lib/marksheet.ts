@@ -701,6 +701,7 @@ export function marksheetCoursesToStudentMarkInserts(
       max_marks,
       grade: c.grade_obtained || "RA",
       grade_points: c.grade_points,
+      semester_label: semesterLabel || "",
     };
   });
 }
@@ -729,11 +730,14 @@ export function studentMarksToMarksheet(
       : totals.sgpa;
   const finalGrade = text(header?.final_grade) || totals.finalGrade;
 
+  const university = text(header?.university) || "Garden City University";
+  const schoolName = text(header?.school_name) || "SCHOOL OF ENGINEERING AND TECHNOLOGY";
+
   return {
     student_id: student.id,
     student_roll_no: student.student_id,
-    university: "Garden City University",
-    school_name: "SCHOOL OF ENGINEERING AND TECHNOLOGY",
+    university,
+    school_name: schoolName,
     programme_title: programmeTitle,
     programme_code: programmeCode,
     student_name: studentName,
@@ -754,56 +758,150 @@ export function studentMarksToMarksheet(
   };
 }
 
-export async function fetchStudentMarksheet(supabase: SupabaseClient, studentId: string) {
+let _hasSemesterLabelColumn: boolean | null = null;
+
+export async function checkSemesterLabelColumnExists(supabase: SupabaseClient): Promise<boolean> {
+  if (_hasSemesterLabelColumn !== null) return _hasSemesterLabelColumn;
+  try {
+    const { error } = await supabase
+      .from("student_marks")
+      .select("semester_label")
+      .limit(1);
+    _hasSemesterLabelColumn = !error;
+  } catch {
+    _hasSemesterLabelColumn = false;
+  }
+  return _hasSemesterLabelColumn;
+}
+
+export async function fetchStudentMarksSafe(
+  supabase: SupabaseClient,
+  studentId: string,
+  selectStr?: string,
+) {
+  const hasSemCol = await checkSemesterLabelColumnExists(supabase);
+  const queryStr =
+    selectStr ||
+    "id,subject,subject_code,course_category,credits,credits_earned,marks_obtained,max_marks,grade,grade_points,course_priority,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,semester_label";
+
+  let finalQueryStr = queryStr;
+  if (!hasSemCol) {
+    finalQueryStr = queryStr
+      .split(",")
+      .filter((col) => col.trim() !== "semester_label")
+      .join(",");
+  }
+
   const { data, error } = await supabase
-    .from("student_marksheets")
-    .select("*")
+    .from("student_marks")
+    .select(finalQueryStr)
     .eq("student_id", studentId)
-    .order("semester_label", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("course_priority", { ascending: true })
+    .order("subject_code", { ascending: true });
 
   if (error) throw error;
-  if (data) return normalizeMarksheet(data);
+  return data || [];
+}
+
+export async function fetchStudentMarksheet(supabase: SupabaseClient, studentId: string) {
+  const { data: studentProfile } = await supabase
+    .from("students")
+    .select("semester")
+    .eq("id", studentId)
+    .maybeSingle();
+
+  const activeSem = studentProfile?.semester || 1;
+
+  const { data: sheets, error } = await supabase
+    .from("student_marksheets")
+    .select("*")
+    .eq("student_id", studentId);
+
+  if (error) throw error;
+
+  if (sheets && sheets.length > 0) {
+    const romanNumerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+    const activeRoman = romanNumerals[activeSem] || "";
+
+    const matchedSheet = sheets.find((s) => {
+      const label = (s.semester_label || "").toUpperCase();
+      const numPattern = new RegExp(`\\b${activeSem}\\b`);
+      const romanPattern = activeRoman ? new RegExp(`\\b${activeRoman}\\b`) : null;
+      return numPattern.test(label) || (romanPattern && romanPattern.test(label));
+    });
+
+    if (matchedSheet) {
+      return normalizeMarksheet(matchedSheet);
+    }
+
+    const sorted = [...sheets].sort((a, b) =>
+      (b.semester_label || "").localeCompare(a.semester_label || "")
+    );
+    return normalizeMarksheet(sorted[0]);
+  }
 
   const [
     { data: studentData, error: studentError },
     { data: headerData, error: headerError },
-    { data: marksData, error: marksError },
   ] = await Promise.all([
     supabase.from("students").select("*").eq("id", studentId).maybeSingle(),
     supabase.from("grade_card_details").select("*").eq("student_id", studentId).maybeSingle(),
-    supabase
-      .from("student_marks")
-      .select(
-        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points",
-      )
-      .eq("student_id", studentId)
-      .order("course_priority", { ascending: true })
-      .order("subject_code", { ascending: true }),
   ]);
 
   if (studentError) throw studentError;
   if (headerError) throw headerError;
-  if (marksError) throw marksError;
 
   const student = studentData as Student | null;
   if (!student) return null;
+
+  let marksData: any[] = [];
+  try {
+    marksData = await fetchStudentMarksSafe(
+      supabase,
+      studentId,
+      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
+    );
+  } catch (err) {
+    throw err;
+  }
 
   const header = (headerData as Record<string, unknown> | null) ?? null;
   const targetSemLabel = header?.semester_label || `Semester ${student.semester || 1}`;
 
   let marks = ((marksData as any[]) ?? []).filter(Boolean);
-  const hasSemMarks = marks.some((m) => m.semester_label === targetSemLabel);
-  if (hasSemMarks) {
-    marks = marks.filter((m) => m.semester_label === targetSemLabel);
+
+  const hasSemCol = await checkSemesterLabelColumnExists(supabase);
+  if (hasSemCol && targetSemLabel) {
+    const romanNumerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+    marks = marks.filter((m: any) => {
+      const rowLabel = (m.semester_label || "").toUpperCase().trim();
+      const targetLabel = String(targetSemLabel).toUpperCase().trim();
+      if (rowLabel === targetLabel) return true;
+
+      const matchTargetNum = targetLabel.match(/\d+/);
+      const matchRowNum = rowLabel.match(/\d+/);
+      if (matchTargetNum && matchRowNum && matchTargetNum[0] === matchRowNum[0]) return true;
+
+      const targetRomanMatch = targetLabel.match(/\b(I|II|III|IV|V|VI|VII|VIII|IX|X)\b/);
+      const rowRomanMatch = rowLabel.match(/\b(I|II|III|IV|V|VI|VII|VIII|IX|X)\b/);
+      if (targetRomanMatch && rowRomanMatch && targetRomanMatch[0] === rowRomanMatch[0]) return true;
+
+      if (matchTargetNum) {
+        const numVal = parseInt(matchTargetNum[0], 10);
+        const romanVal = romanNumerals[numVal] || "";
+        if (romanVal && rowRomanMatch && rowRomanMatch[0] === romanVal) return true;
+      }
+      if (matchRowNum) {
+        const numVal = parseInt(matchRowNum[0], 10);
+        const romanVal = romanNumerals[numVal] || "";
+        if (romanVal && targetRomanMatch && targetRomanMatch[0] === romanVal) return true;
+      }
+
+      return false;
+    });
   }
 
-  return studentMarksToMarksheet(
-    student,
-    header,
-    marks,
-  );
+  return studentMarksToMarksheet(student, header, marks as LegacyMarkRow[]);
 }
 
 export async function fetchAllStudentMarksheets(supabase: SupabaseClient, studentId: string) {
@@ -824,23 +922,25 @@ export async function fetchAllStudentMarksheets(supabase: SupabaseClient, studen
   const [
     { data: studentData, error: studentError },
     { data: headerData, error: headerError },
-    { data: marksData, error: marksError },
   ] = await Promise.all([
     supabase.from("students").select("*").eq("id", studentId).maybeSingle(),
     supabase.from("grade_card_details").select("*").eq("student_id", studentId).maybeSingle(),
-    supabase
-      .from("student_marks")
-      .select(
-        "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points",
-      )
-      .eq("student_id", studentId)
-      .order("course_priority", { ascending: true })
-      .order("subject_code", { ascending: true }),
   ]);
 
-  if (studentError || marksError) return [];
+  if (studentError) return [];
   const student = studentData as Student | null;
   if (!student) return [];
+
+  let marksData: any[] = [];
+  try {
+    marksData = await fetchStudentMarksSafe(
+      supabase,
+      studentId,
+      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
+    );
+  } catch (err) {
+    return [];
+  }
 
   const marks = ((marksData as any[]) ?? []).filter(Boolean);
   if (marks.length === 0) return [];

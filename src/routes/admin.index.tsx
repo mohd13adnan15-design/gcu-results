@@ -5,7 +5,15 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { StudentMarksheet } from "@/lib/marksheet";
-import { normalizeMarksheet } from "@/lib/marksheet";
+import {
+  normalizeMarksheet,
+  fetchStudentMarksheet,
+  fetchAllStudentMarksheets,
+  resolveStudentPhotoUrl,
+  calculateMarksheetTotals,
+} from "@/lib/marksheet";
+import { HighFidelityGradeCard } from "@/features/marks/HighFidelityGradeCard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   buildAdminVerificationUpdate,
   calculateFeeStatus,
@@ -27,6 +35,139 @@ export function AdminPage() {
   const [verificationFilter, setVerificationFilter] = useState<
     "all" | "pending_faculty" | "pending_admin" | "admin_done"
   >("all");
+
+  const [previewStudent, setPreviewStudent] = useState<Student | null>(null);
+  const [previewMarksheet, setPreviewMarksheet] = useState<StudentMarksheet | null>(null);
+  const [previewAllSheets, setPreviewAllSheets] = useState<StudentMarksheet[]>([]);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showAllSemesters, setShowAllSemesters] = useState(false);
+
+  function getSemesterNumber(label: string): number {
+    const clean = (label || "").toUpperCase().trim();
+    if (clean.includes("VIII") || clean.includes("8")) return 8;
+    if (clean.includes("VII") || clean.includes("7")) return 7;
+    if (clean.includes("VI") || clean.includes("6")) return 6;
+    if (clean.includes("IV") || clean.includes("4")) return 4;
+    if (clean.includes("III") || clean.includes("3")) return 3;
+    if (clean.includes("II") || clean.includes("2")) return 2;
+    if (clean.includes("I") || clean.includes("1")) return 1;
+    if (clean.includes("V") || clean.includes("5")) return 5;
+    return 1;
+  }
+
+  function getFilteredMarksheet(
+    currentSheet: StudentMarksheet | null,
+    allSheets: StudentMarksheet[],
+    showAll: boolean
+  ): StudentMarksheet | null {
+    if (!currentSheet) return null;
+    if (showAll) {
+      const sorted = [...allSheets].sort((a, b) =>
+        getSemesterNumber(b.semester_label) - getSemesterNumber(a.semester_label)
+      );
+      const latest = sorted[0] || currentSheet;
+      const reindexedCourses = (latest.courses || []).map((c, i) => ({
+        ...c,
+        sl_no: i + 1,
+      }));
+      const totals = calculateMarksheetTotals(reindexedCourses);
+      return {
+        ...latest,
+        courses: reindexedCourses,
+        total_credits: totals.totalCredits,
+        total_credits_earned: totals.totalCreditsEarned,
+        total_credit_points: totals.totalCreditPoints,
+        sgpa: totals.sgpa,
+        final_grade: totals.finalGrade,
+      };
+    }
+
+    const currentSemNum = getSemesterNumber(currentSheet.semester_label);
+    const previousCourseCodes = new Set<string>();
+
+    for (const sheet of allSheets) {
+      if (getSemesterNumber(sheet.semester_label) < currentSemNum) {
+        const courses = Array.isArray(sheet.courses) ? sheet.courses : [];
+        for (const c of courses) {
+          const code = String((c as any).course_code || (c as any).subject_code || "").toUpperCase().trim();
+          if (code) previousCourseCodes.add(code);
+        }
+      }
+    }
+
+    const rawCourses = Array.isArray(currentSheet.courses) ? currentSheet.courses : [];
+    const filteredCourses = rawCourses.filter((c) => {
+      const code = String((c as any).course_code || (c as any).subject_code || "").toUpperCase().trim();
+      return !previousCourseCodes.has(code);
+    });
+
+    const reindexedCourses = filteredCourses.map((c, i) => ({
+      ...c,
+      sl_no: i + 1,
+    }));
+
+    const totals = calculateMarksheetTotals(reindexedCourses);
+
+    return {
+      ...currentSheet,
+      courses: reindexedCourses,
+      total_credits: totals.totalCredits,
+      total_credits_earned: totals.totalCreditsEarned,
+      total_credit_points: totals.totalCreditPoints,
+      sgpa: totals.sgpa,
+      final_grade: totals.finalGrade,
+    };
+  }
+
+  async function handleOpenPreview(student: Student) {
+    setPreviewStudent(student);
+    setPreviewLoading(true);
+    setPreviewMarksheet(null);
+    setPreviewAllSheets([]);
+    setPreviewPhotoUrl(null);
+    setShowAllSemesters(false);
+    try {
+      const sheets = await fetchAllStudentMarksheets(supabase, student.id);
+      setPreviewAllSheets(sheets);
+
+      const activeSem = student.semester || 1;
+      const romanNumerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+      const activeRoman = romanNumerals[activeSem] || "";
+
+      let initialSheet = sheets.find((s) => {
+        const label = (s.semester_label || "").toUpperCase();
+        const numPattern = new RegExp(`\\b${activeSem}\\b`);
+        const romanPattern = activeRoman ? new RegExp(`\\b${activeRoman}\\b`) : null;
+        return numPattern.test(label) || (romanPattern && romanPattern.test(label));
+      });
+
+      if (!initialSheet && sheets.length > 0) {
+        initialSheet = sheets[0];
+      }
+
+      setPreviewMarksheet(initialSheet || null);
+      if (initialSheet) {
+        const photoUrl = await resolveStudentPhotoUrl(supabase, initialSheet);
+        setPreviewPhotoUrl(photoUrl);
+      }
+    } catch (e) {
+      toast.error("Could not load grade card preview");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function handleSelectPreviewSemester(sheet: StudentMarksheet) {
+    setPreviewMarksheet(sheet);
+    setShowAllSemesters(false);
+    try {
+      const photoUrl = await resolveStudentPhotoUrl(supabase, sheet);
+      setPreviewPhotoUrl(photoUrl);
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -315,6 +456,7 @@ export function AdminPage() {
                       void markAdminVerified(student, marksheet, legacyCourseCount > 0, next)
                     }
                     onReport={() => void reportIssue(student)}
+                    onPreview={() => void handleOpenPreview(student)}
                   />
                 ),
               )}
@@ -324,7 +466,98 @@ export function AdminPage() {
             <h2 className="text-xl font-bold text-primary">Admin Queue</h2>
           )}
         </div>
-      )}
+            <Dialog open={Boolean(previewStudent)} onOpenChange={(open) => { if (!open) setPreviewStudent(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-800 text-white p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-white">
+              Grade Card Preview: {previewStudent?.full_name} ({previewStudent?.student_id})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 flex flex-col items-center">
+            {!previewLoading && previewAllSheets.length > 1 && (
+              <div className="mb-6 flex flex-wrap justify-center items-center gap-2.5 bg-slate-800/40 p-3.5 rounded-xl border border-slate-700/50 w-full max-w-xl">
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider mr-2">
+                  Select Semester:
+                </span>
+                {previewAllSheets.map((sheet) => {
+                  const semName = (sheet.semester_label || "").toLowerCase().startsWith("sem")
+                    ? sheet.semester_label
+                    : `Sem ${sheet.semester_label}`;
+                  const isSelected = !showAllSemesters && previewMarksheet?.semester_label === sheet.semester_label;
+                  return (
+                    <button
+                      key={sheet.semester_label}
+                      type="button"
+                      onClick={() => void handleSelectPreviewSemester(sheet)}
+                      className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-extrabold transition duration-200 border shadow-sm ${
+                        isSelected
+                          ? "bg-emerald-600 border-emerald-500 text-white shadow-emerald-900/50 scale-105"
+                          : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      {semName}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setShowAllSemesters(true)}
+                  className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-extrabold transition duration-200 border shadow-sm ${
+                    showAllSemesters
+                      ? "bg-emerald-600 border-emerald-500 text-white shadow-emerald-900/50 scale-105"
+                      : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white"
+                  }`}
+                >
+                  All Sem
+                </button>
+              </div>
+            )}
+
+            {previewLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-slate-400">Loading grade card preview...</p>
+              </div>
+            ) : previewMarksheet ? (
+              <div className="w-full overflow-x-auto flex justify-center bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                {showAllSemesters ? (
+                  <div className="flex flex-col gap-10 w-full items-center my-4">
+                    {[...previewAllSheets]
+                      .sort((a, b) => getSemesterNumber(a.semester_label) - getSemesterNumber(b.semester_label))
+                      .map((sheet) => {
+                        const filteredSheet = getFilteredMarksheet(sheet, previewAllSheets, false)!;
+                        return (
+                          <div key={sheet.id || sheet.semester_label} className="flex flex-col items-center w-full">
+                            <div className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider bg-slate-800/80 px-4 py-1.5 rounded-full border border-slate-700/50">
+                              Semester {sheet.semester_label}
+                            </div>
+                            <div className="origin-top scale-[0.85] md:scale-100 shadow-2xl border border-slate-800 rounded-xl overflow-hidden">
+                              <HighFidelityGradeCard
+                                marksheet={filteredSheet}
+                                photoUrl={previewPhotoUrl}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <div className="origin-top scale-[0.85] md:scale-100 my-4">
+                    <HighFidelityGradeCard
+                      marksheet={getFilteredMarksheet(previewMarksheet, previewAllSheets, false)!}
+                      photoUrl={previewPhotoUrl}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="py-20 text-center text-slate-400">
+                No marksheet data found for this student.
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -338,6 +571,7 @@ function AdminStudentRow({
   busy,
   onVerify,
   onReport,
+  onPreview,
 }: {
   student: Student;
   marksheet: StudentMarksheet | null;
@@ -347,6 +581,7 @@ function AdminStudentRow({
   busy: boolean;
   onVerify: (next: boolean) => void;
   onReport: () => void;
+  onPreview: () => void;
 }) {
   const academic = calculateFeeStatus({
     paid: student.fees_paid,
@@ -444,6 +679,14 @@ function AdminStudentRow({
       </td>
       <td className="px-2 py-3 text-right">
         <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onPreview}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 transition-colors px-3 py-1 text-xs font-semibold text-white disabled:opacity-60 shadow-sm"
+          >
+            <Eye className="h-3.5 w-3.5" /> Preview
+          </button>
           <button
             type="button"
             onClick={onReport}
