@@ -272,31 +272,28 @@ function drawHeader(
   doc.setFont("times", "bold");
   doc.setFontSize(7.5);
   setText(doc, DARK);
-  const uniqueId = (marksheet.student_id || "").split("-")[0].toUpperCase() || marksheet.grade_card_no;
+  const uniqueId = marksheet.id?.split("-")[0].toUpperCase() || marksheet.grade_card_no;
   doc.text(uniqueId, x + 32, y + 12, { align: "center" });
   if (images.qr) {
     doc.addImage(images.qr.dataUrl, images.qr.type, x + 12, y + 18, 42, 42);
   }
 
-  const photoX = x + width - rightWidth + 14;
   if (images.logo) {
-    const qrEndX = x + 54;
-    const photoStartX = photoX + 2;
-    const availableWidth = photoStartX - qrEndX;
-    const logoWidth = 380;
+    const centerX = x + leftWidth;
+    const centerWidth = width - leftWidth - rightWidth;
+    const logoWidth = 250;
     const logoHeight = 170;
-    const logoX = qrEndX + (availableWidth - logoWidth) / 2;
+    const logoX = centerX + (centerWidth - logoWidth) / 2;
     doc.addImage(images.logo.dataUrl, images.logo.type, logoX, y - 42, logoWidth, logoHeight);
   }
 
+  const photoX = x + width - rightWidth + 14;
   if (images.photo) {
     doc.addImage(images.photo.dataUrl, images.photo.type, photoX + 2, y + 3, 68, 84);
   } else {
     drawPhotoBox(doc, photoX + 2, y + 3, 68, 84);
   }
 }
-
-
 
 function drawDetailsTable(
   doc: jsPDF,
@@ -333,7 +330,7 @@ function drawDetailsTable(
     const rightValueWidth = doc.getTextWidth(rightValue);
     doc.setFont("times", "normal");
     const rightLabelWidth = doc.getTextWidth(rightLabel);
-    
+
     // Max width for the left value so it doesn't overlap with the right column
     const maxV1Width = (x + width) - rightValueWidth - rightLabelWidth - col1ValueX - 10;
 
@@ -388,8 +385,8 @@ function drawMarksTable(
     setStroke(doc);
     doc.rect(x, y, width, 15, "S");
     doc.setFont("times", "bold");
+    doc.setFontSize(11);
     const isPractical = group.section.trim().toLowerCase().includes("practical");
-    doc.setFontSize(isPractical ? 9.5 : 12);
     setText(doc, isPractical ? BLACK : RED);
     doc.text(group.section, isPractical ? x + 4 : x + width / 2, y + 10.5, {
       align: isPractical ? "left" : "center",
@@ -513,13 +510,12 @@ function drawFirstPageFooter(
     align: "center",
   });
 
-  if (images.seal) doc.addImage(images.seal.dataUrl, images.seal.type, 42, 705, 96, 96);
+  if (images.seal) doc.addImage(images.seal.dataUrl, images.seal.type, 32, 705, 96, 96);
   if (images.embossedSeal) {
     doc.addImage(images.embossedSeal.dataUrl, images.embossedSeal.type, 452, 705, 64, 64);
   }
   if (images.rightSignature) {
-    // Increased size to 140x70 (2:1 aspect ratio) and shifted up to y=745 to prevent compression and look prominent
-    doc.addImage(images.rightSignature.dataUrl, images.rightSignature.type, 410, 745, 140, 70);
+    doc.addImage(images.rightSignature.dataUrl, images.rightSignature.type, 410, 770, 140, 48);
   }
 }
 
