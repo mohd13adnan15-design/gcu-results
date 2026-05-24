@@ -25,7 +25,7 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
           <div className="header-section">
             <div className="header-left">
               <span className="unique-id">
-                {marksheet.id?.split("-")[0].toUpperCase() || marksheet.grade_card_no}
+                {(marksheet.student_id || "").split("-")[0].toUpperCase() || marksheet.grade_card_no}
               </span>
               <div className="qr-code-placeholder">
                 <div className="qr-box" />
@@ -127,7 +127,7 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
                           color: isPractical ? "#2e2e2e" : "#6b1f1f",
                           paddingLeft: isPractical ? "12px" : "8px",
                           fontWeight: "bold",
-                          fontSize: "14px",
+                          fontSize: isPractical ? "11.5px" : "14.5px",
                           backgroundColor: "#fcf8f8",
                           height: "30px",
                           borderBottom: "1px solid #ddd"
@@ -553,7 +553,7 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
         }
 
         .signature-img {
-          width: 150px;
+          width: 190px;
           margin-bottom: -8px;
           mix-blend-mode: multiply;
           filter: brightness(0.85) contrast(1.1) sepia(0.25) hue-rotate(85deg);
