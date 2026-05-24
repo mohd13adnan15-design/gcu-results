@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { StudentMarksheet } from "@/lib/marksheet";
-import { fetchStudentMarksheet, fetchAllStudentMarksheets } from "@/lib/marksheet";
+import { fetchStudentMarksheet, fetchAllStudentMarksheets, calculateMarksheetTotals } from "@/lib/marksheet";
 import { MarksheetSavedPreview } from "@/features/marks/MarksheetDisplay";
 import {
   buildAdminVerificationUpdate,
@@ -16,6 +16,83 @@ import {
 } from "@/lib/marksheet-verification";
 import { hasRecentDuplicateSuperAdminReport } from "@/lib/portal-report-dedupe";
 import type { Student } from "@/lib/types";
+
+function getSemesterNumber(label: string): number {
+  const clean = (label || "").toUpperCase().trim();
+  if (clean.includes("VIII") || clean.includes("8")) return 8;
+  if (clean.includes("VII") || clean.includes("7")) return 7;
+  if (clean.includes("VI") || clean.includes("6")) return 6;
+  if (clean.includes("IV") || clean.includes("4")) return 4;
+  if (clean.includes("III") || clean.includes("3")) return 3;
+  if (clean.includes("II") || clean.includes("2")) return 2;
+  if (clean.includes("I") || clean.includes("1")) return 1;
+  if (clean.includes("V") || clean.includes("5")) return 5;
+  return 1;
+}
+
+function getFilteredMarksheet(
+  currentSheet: StudentMarksheet | null,
+  allSheets: StudentMarksheet[],
+  showAll: boolean
+): StudentMarksheet | null {
+  if (!currentSheet) return null;
+  if (showAll) {
+    const sorted = [...allSheets].sort((a, b) =>
+      getSemesterNumber(b.semester_label) - getSemesterNumber(a.semester_label)
+    );
+    const latest = sorted[0] || currentSheet;
+    const reindexedCourses = (latest.courses || []).map((c, i) => ({
+      ...c,
+      sl_no: i + 1,
+    }));
+    const totals = calculateMarksheetTotals(reindexedCourses);
+    return {
+      ...latest,
+      courses: reindexedCourses,
+      total_credits: totals.totalCredits,
+      total_credits_earned: totals.totalCreditsEarned,
+      total_credit_points: totals.totalCreditPoints,
+      sgpa: totals.sgpa,
+      final_grade: totals.finalGrade,
+    };
+  }
+
+  const currentSemNum = getSemesterNumber(currentSheet.semester_label);
+  const previousCourseCodes = new Set<string>();
+
+  for (const sheet of allSheets) {
+    if (getSemesterNumber(sheet.semester_label) < currentSemNum) {
+      const courses = Array.isArray(sheet.courses) ? sheet.courses : [];
+      for (const c of courses) {
+        const code = String((c as any).course_code || (c as any).subject_code || "").toUpperCase().trim();
+        if (code) previousCourseCodes.add(code);
+      }
+    }
+  }
+
+  const rawCourses = Array.isArray(currentSheet.courses) ? currentSheet.courses : [];
+  const filteredCourses = rawCourses.filter((c) => {
+    const code = String((c as any).course_code || (c as any).subject_code || "").toUpperCase().trim();
+    return !previousCourseCodes.has(code);
+  });
+
+  const reindexedCourses = filteredCourses.map((c, i) => ({
+    ...c,
+    sl_no: i + 1,
+  }));
+
+  const totals = calculateMarksheetTotals(reindexedCourses);
+
+  return {
+    ...currentSheet,
+    courses: reindexedCourses,
+    total_credits: totals.totalCredits,
+    total_credits_earned: totals.totalCreditsEarned,
+    total_credit_points: totals.totalCreditPoints,
+    sgpa: totals.sgpa,
+    final_grade: totals.finalGrade,
+  };
+}
 
 type PortalMode = "admin_1" | "admin_2";
 
@@ -29,6 +106,7 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
   const [marksheet, setMarksheet] = useState<StudentMarksheet | null>(null);
   const [allMarksheets, setAllMarksheets] = useState<StudentMarksheet[]>([]);
   const [selectedSemLabel, setSelectedSemLabel] = useState<string | null>(null);
+  const [showAllSemesters, setShowAllSemesters] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
@@ -47,6 +125,7 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
       setMarksheet(null);
       setAllMarksheets([]);
       setSelectedSemLabel(null);
+      setShowAllSemesters(false);
       setPageLoading(false);
       return;
     }
@@ -57,6 +136,7 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
       setMarksheet(null);
       setAllMarksheets([]);
       setSelectedSemLabel(null);
+      setShowAllSemesters(false);
       setPageLoading(false);
       return;
     }
@@ -69,15 +149,18 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
         const latest = sheets[sheets.length - 1];
         setMarksheet(latest);
         setSelectedSemLabel(latest.semester_label);
+        setShowAllSemesters(false);
       } else {
         setMarksheet(null);
         setSelectedSemLabel(null);
+        setShowAllSemesters(false);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not load marksheet");
       setMarksheet(null);
       setAllMarksheets([]);
       setSelectedSemLabel(null);
+      setShowAllSemesters(false);
     } finally {
       setPageLoading(false);
     }
@@ -317,7 +400,7 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
                   const semName = (m.semester_label || "").toLowerCase().startsWith("sem")
                     ? m.semester_label
                     : `Sem ${m.semester_label}`;
-                  const isSelected = selectedSemLabel === m.semester_label;
+                  const isSelected = !showAllSemesters && selectedSemLabel === m.semester_label;
                   return (
                     <button
                       key={m.id || m.semester_label}
@@ -325,6 +408,7 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
                       onClick={() => {
                         setMarksheet(m);
                         setSelectedSemLabel(m.semester_label);
+                        setShowAllSemesters(false);
                       }}
                       className={`rounded-md px-3 py-1.5 text-xs font-semibold border transition ${
                         isSelected
@@ -336,10 +420,21 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
                     </button>
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => setShowAllSemesters(true)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold border transition ${
+                    showAllSemesters
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-white text-primary border-primary/30 hover:bg-primary/10"
+                  }`}
+                >
+                  All Sem
+                </button>
               </div>
             )}
           </div>
-          <MarksheetSavedPreview marksheet={marksheet} />
+          <MarksheetSavedPreview marksheet={getFilteredMarksheet(marksheet, allMarksheets, showAllSemesters)} />
         </div>
 
         {portal === "admin_1" && (

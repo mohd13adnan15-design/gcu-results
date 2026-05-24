@@ -112,15 +112,16 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
                 <th style={{ width: "13%" }}>GRADE POINTS</th>
               </tr>
             </thead>
-            <tbody>
-              {groupCoursesBySection(marksheet.courses).map((group, groupIdx) => {
+            {(() => {
+              let slNoCounter = 1;
+              return groupCoursesBySection(marksheet.courses).map((group, groupIdx) => {
                 const isPractical = group.section.trim().toLowerCase().includes("practical");
                 return (
-                  <React.Fragment key={groupIdx}>
-                    <tr className="section-header">
+                  <tbody key={groupIdx}>
+                    {/* Section Header Row */}
+                    <tr className="section-header-row">
                       <td
                         colSpan={7}
-                        className={isPractical ? "left charcoal" : "center maroon"}
                         style={{
                           textAlign: isPractical ? "left" : "center",
                           color: isPractical ? "#2e2e2e" : "#6b1f1f",
@@ -135,27 +136,32 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
                         {group.section}
                       </td>
                     </tr>
-                    {group.courses.map((course, idx) => (
-                      <tr key={idx}>
-                        <td className="center">{course.sl_no}</td>
-                        <td className="center">{course.course_code}</td>
-                        <td className="left">
-                          {course.course_title}
-                          {course.total_marks_practical && course.total_marks_practical > 0 ? (
-                            <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>
-                              (Theory: {course.total_marks_theory || 0}, Practical: {course.total_marks_practical})
-                            </div>
-                          ) : null}
-                        </td>
-                        <td className="center">{course.course_credits?.toFixed(1)}</td>
-                        <td className="center">{course.credits_earned?.toFixed(1)}</td>
-                        <td className="center">{course.grade_obtained}</td>
-                        <td className="center">{course.grade_points?.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </React.Fragment>
+                    {group.courses.map((course, idx) => {
+                      const currentSl = slNoCounter++;
+                      return (
+                        <tr key={idx}>
+                          <td className="center">{currentSl}</td>
+                          <td className="center">{course.course_code}</td>
+                          <td className="left">
+                            {course.course_title}
+                            {course.total_marks_practical && course.total_marks_practical > 0 ? (
+                              <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>
+                                (Theory: {course.total_marks_theory || 0}, Practical: {course.total_marks_practical})
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="center">{course.course_credits?.toFixed(1)}</td>
+                          <td className="center">{course.credits_earned?.toFixed(1)}</td>
+                          <td className="center">{course.grade_obtained}</td>
+                          <td className="center">{course.grade_points?.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 );
-              })}
+              });
+            })()}
+            <tbody>
               <tr className="total-row">
                 <td colSpan={2}></td>
                 <td className="right bold maroon">TOTAL</td>

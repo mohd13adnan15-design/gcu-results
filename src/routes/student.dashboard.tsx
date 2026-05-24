@@ -21,34 +21,31 @@ export function StudentDashboardPage() {
   return <StudentLayout title="Dashboard">{() => <Dashboard />}</StudentLayout>;
 }
 
-function TimerCountdown({ startTime }: { startTime: string }) {
-  const [timeLeft, setTimeLeft] = useState("");
-  const [expired, setExpired] = useState(false);
+function VerificationTimerText({ startTime }: { startTime: string }) {
+  const [isAfter48Hours, setIsAfter48Hours] = useState(false);
 
   useEffect(() => {
     const start = new Date(startTime).getTime();
     const end = start + 48 * 60 * 60 * 1000;
 
-    const update = () => {
+    const checkTime = () => {
       const now = Date.now();
-      const diff = end - now;
-      if (diff <= 0) {
-        setExpired(true);
-        setTimeLeft("00:00:00");
+      if (now >= end) {
+        setIsAfter48Hours(true);
       } else {
-        const h = Math.floor(diff / (1000 * 60 * 60));
-        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const s = Math.floor((diff % (1000 * 60)) / 1000);
-        setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+        setIsAfter48Hours(false);
       }
     };
-    update();
-    const interval = setInterval(update, 1000);
+
+    checkTime();
+    const interval = setInterval(checkTime, 60000);
     return () => clearInterval(interval);
   }, [startTime]);
 
-  if (expired) return <span className="text-amber-600 font-semibold">Your Grade card is under Verification</span>;
-  return <span>Approval time remaining: <strong className="font-mono text-lg ml-2">{timeLeft}</strong></span>;
+  if (isAfter48Hours) {
+    return <span className="text-amber-800 font-semibold">Your Grade card will be Generated Soon</span>;
+  }
+  return <span>Your Grade card will be Generated in 48 Hours</span>;
 }
 
 function Dashboard() {
@@ -233,7 +230,7 @@ function Dashboard() {
       {student.marksheet_verification_requested_at && !eligible && (
          <section className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
           <p className="text-sm text-amber-800 flex items-center gap-2">
-            <TimerCountdown startTime={student.marksheet_verification_requested_at} />
+            <VerificationTimerText startTime={student.marksheet_verification_requested_at} />
           </p>
         </section>
       )}

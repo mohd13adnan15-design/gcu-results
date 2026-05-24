@@ -412,7 +412,30 @@ function FlowDiagram({
 }
 
 function CountdownTimer({ requestedAtStr }: { requestedAtStr: string }) {
-  return <span className="font-medium text-amber-800">Your Grade Card Under Verification</span>;
+  const [isAfter48Hours, setIsAfter48Hours] = useState(false);
+
+  useEffect(() => {
+    const start = new Date(requestedAtStr).getTime();
+    const end = start + 48 * 60 * 60 * 1000;
+
+    const checkTime = () => {
+      const now = Date.now();
+      if (now >= end) {
+        setIsAfter48Hours(true);
+      } else {
+        setIsAfter48Hours(false);
+      }
+    };
+
+    checkTime();
+    const interval = setInterval(checkTime, 60000);
+    return () => clearInterval(interval);
+  }, [requestedAtStr]);
+
+  if (isAfter48Hours) {
+    return <span className="font-medium text-amber-800">Your Grade card will be Generated Soon</span>;
+  }
+  return <span className="font-medium text-amber-800">Your Grade card will be Generated in 48 Hours</span>;
 }
 
 function FlowNode({

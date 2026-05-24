@@ -6,6 +6,8 @@ import {
   calculateMarksheetTotals,
   fetchStudentMarksheet,
   legacyMarkRowsToMarksheetCourses,
+  checkSemesterLabelColumnExists,
+  fetchStudentMarksSafe,
 } from "@/lib/marksheet";
 
 /**
@@ -38,16 +40,51 @@ export async function syncStudentGradeAndMarksheet(
 
   const targetSemesterLabel = overrides?.semester_label || base?.semester_label;
 
-  const { data: marksRows } = await supabase
-    .from("student_marks")
-    .select(
-      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points",
-    )
-    .eq("student_id", studentId)
-    .order("course_priority", { ascending: true })
-    .order("subject_code", { ascending: true });
+  let marksRows: any[] = [];
+  try {
+    marksRows = await fetchStudentMarksSafe(
+      supabase,
+      studentId,
+      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label"
+    );
+  } catch (err) {
+    console.error("fetchStudentMarksSafe failed:", err);
+  }
 
   let marks = ((marksRows as LegacyMarkRow[] | null) ?? []).filter(Boolean);
+
+  if (targetSemesterLabel && marks.length > 0) {
+    const hasSemCol = await checkSemesterLabelColumnExists(supabase);
+    if (hasSemCol) {
+      const romanNumerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+      marks = marks.filter((m: any) => {
+        const rowLabel = (m.semester_label || "").toUpperCase().trim();
+        const targetLabel = String(targetSemesterLabel).toUpperCase().trim();
+        if (rowLabel === targetLabel) return true;
+
+        const matchTargetNum = targetLabel.match(/\d+/);
+        const matchRowNum = rowLabel.match(/\d+/);
+        if (matchTargetNum && matchRowNum && matchTargetNum[0] === matchRowNum[0]) return true;
+
+        const targetRomanMatch = targetLabel.match(/\b(I|II|III|IV|V|VI|VII|VIII|IX|X)\b/);
+        const rowRomanMatch = rowLabel.match(/\b(I|II|III|IV|V|VI|VII|VIII|IX|X)\b/);
+        if (targetRomanMatch && rowRomanMatch && targetRomanMatch[0] === rowRomanMatch[0]) return true;
+
+        if (matchTargetNum) {
+          const numVal = parseInt(matchTargetNum[0], 10);
+          const romanVal = romanNumerals[numVal] || "";
+          if (romanVal && rowRomanMatch && rowRomanMatch[0] === romanVal) return true;
+        }
+        if (matchRowNum) {
+          const numVal = parseInt(matchRowNum[0], 10);
+          const romanVal = romanNumerals[numVal] || "";
+          if (romanVal && targetRomanMatch && targetRomanMatch[0] === romanVal) return true;
+        }
+
+        return false;
+      });
+    }
+  }
 
   if (targetSemesterLabel && marks.length > 0) {
     const { data: targetSheet } = await supabase

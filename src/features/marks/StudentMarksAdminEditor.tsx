@@ -3,7 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { buildMainGradeCardRows } from "@/lib/main-grade-card";
 import { syncStudentGradeAndMarksheet } from "@/lib/marks-sync";
 import { gradePointsFromGradeLetter } from "@/lib/marks-excel-template";
-import { fetchStudentMarksheet, marksheetCoursesToStudentMarkInserts } from "@/lib/marksheet";
+import {
+  fetchStudentMarksheet,
+  marksheetCoursesToStudentMarkInserts,
+  fetchStudentMarksSafe,
+  checkSemesterLabelColumnExists,
+} from "@/lib/marksheet";
 import type { Student, StudentMarkRow } from "@/lib/types";
 import { toast } from "sonner";
 import { RefreshCw, Plus, Save, Trash2 } from "lucide-react";
@@ -127,7 +132,7 @@ export function StudentMarksAdminEditor({
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: studentData }, { data: headerData }, { data: marksData }, { data: msheet }, { data: allSheetsData }] =
+    const [{ data: studentData }, { data: headerData }, marksData, { data: msheet }, { data: allSheetsData }] =
       await Promise.all([
         supabase.from("students").select("*").eq("id", studentId).maybeSingle(),
         supabase
@@ -137,14 +142,7 @@ export function StudentMarksAdminEditor({
           .order("updated_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
-        supabase
-          .from("student_marks")
-          .select(
-            "id,subject,subject_code,course_category,credits,credits_earned,marks_obtained,max_marks,grade,grade_points,course_priority,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical",
-          )
-          .eq("student_id", studentId)
-          .order("course_priority", { ascending: true, nullsFirst: false })
-          .order("subject_code", { ascending: true }),
+        fetchStudentMarksSafe(supabase, studentId),
         supabase
           .from("student_marksheets")
           .select("university,school_name,grade_card_no,qr_data")
@@ -189,40 +187,57 @@ export function StudentMarksAdminEditor({
     setHeader(nextHeader);
     setAllSheets(allSheetsData ?? []);
 
-    let nextMarks = ((marksData as DraftMark[]) ?? []).filter(Boolean);
-
-    if (nextMarks.length === 0 && currentStudent) {
-      try {
-        const sheet = await fetchStudentMarksheet(supabase, studentId);
-        if (sheet?.courses?.length) {
-          const inserts = marksheetCoursesToStudentMarkInserts(studentId, sheet.courses, sheet.semester_label);
-          const { data: inserted, error: insErr } = await supabase
-            .from("student_marks")
-            .insert(inserts)
-            .select(
-              "id,subject,subject_code,course_category,credits,credits_earned,marks_obtained,max_marks,grade,grade_points",
-            );
-          if (insErr) throw insErr;
-          if (inserted?.length) {
-            nextMarks = inserted as DraftMark[];
-            toast.success(
-              `Loaded ${inserted.length} courses from marksheet JSON into editable rows (student_marks).`,
-            );
-            await syncMainGradeCardForStudent(currentStudent, nextHeader, nextMarks);
-            await syncStudentGradeAndMarksheet(supabase, studentId);
-            onMarksheetSynced?.();
-          }
-        }
-      } catch (e) {
-        toast.error(
-          e instanceof Error ? e.message : "Could not import courses from marksheet JSON",
-        );
-      }
-    }
+    const nextMarks = ((marksData as any) ?? []).filter(Boolean) as DraftMark[];
 
     setMarks(nextMarks);
     setLoading(false);
   }, [studentId, onMarksheetSynced]);
+
+  const handleImportFromMarksheet = async () => {
+    if (!student) return;
+    setLoading(true);
+    try {
+      const sheet = await fetchStudentMarksheet(supabase, studentId);
+      if (sheet?.courses?.length) {
+        let inserts = marksheetCoursesToStudentMarkInserts(studentId, sheet.courses, sheet.semester_label);
+        const hasSemCol = await checkSemesterLabelColumnExists(supabase);
+        if (!hasSemCol) {
+          inserts = inserts.map((ins: any) => {
+            const { semester_label, ...rest } = ins;
+            return rest;
+          });
+        }
+        const { data: inserted, error: insErr } = await supabase
+          .from("student_marks")
+          .insert(inserts)
+          .select(
+            "id,subject,subject_code,course_category,credits,credits_earned,marks_obtained,max_marks,grade,grade_points",
+          );
+        if (insErr) throw insErr;
+        if (inserted?.length) {
+          const nextMarks = inserted as DraftMark[];
+          setMarks(nextMarks);
+          toast.success(
+            `Successfully imported ${inserted.length} courses from marksheet JSON!`,
+          );
+          await syncMainGradeCardForStudent(student, header, nextMarks);
+          await syncStudentGradeAndMarksheet(supabase, studentId);
+          onMarksheetSynced?.();
+          await load();
+        } else {
+          toast.info("No courses were imported.");
+        }
+      } else {
+        toast.error("No uploaded Excel marksheet data found for this student. Please upload the marksheet first.");
+      }
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not import courses from marksheet JSON",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     void load();
@@ -261,19 +276,24 @@ export function StudentMarksAdminEditor({
         const credits = Number(row.credits ?? 0);
         const creditsEarned = Number(row.credits_earned ?? 0) || (grade === "RA" ? 0 : credits);
         const gradePoints = Number(row.grade_points ?? 0) || gradePointsFromGradeLetter(grade || "RA");
+        const updatePayload: Record<string, any> = {
+          subject: row.subject,
+          subject_code: row.subject_code,
+          course_category: row.course_category,
+          credits,
+          credits_earned: creditsEarned,
+          marks_obtained: Number(row.marks_obtained ?? 0),
+          max_marks: Number(row.max_marks ?? 100),
+          grade,
+          grade_points: gradePoints,
+        };
+        const hasSemCol = await checkSemesterLabelColumnExists(supabase);
+        if (hasSemCol) {
+          updatePayload.semester_label = row.semester_label || header.semester_label;
+        }
         await supabase
           .from("student_marks")
-          .update({
-            subject: row.subject,
-            subject_code: row.subject_code,
-            course_category: row.course_category,
-            credits,
-            credits_earned: creditsEarned,
-            marks_obtained: Number(row.marks_obtained ?? 0),
-            max_marks: Number(row.max_marks ?? 100),
-            grade,
-            grade_points: gradePoints,
-          })
+          .update(updatePayload as any)
           .eq("id", row.id);
       }
 
@@ -323,19 +343,24 @@ export function StudentMarksAdminEditor({
     const gradePoints = Number(row.grade_points ?? 0) || gradePointsFromGradeLetter(grade || "RA");
     setSavingId(row.id);
     try {
+      const updatePayload: Record<string, any> = {
+        subject: row.subject,
+        subject_code: row.subject_code,
+        course_category: row.course_category,
+        credits,
+        credits_earned: creditsEarned,
+        marks_obtained: marksObtained,
+        max_marks: maxMarks,
+        grade,
+        grade_points: gradePoints,
+      };
+      const hasSemCol = await checkSemesterLabelColumnExists(supabase);
+      if (hasSemCol) {
+        updatePayload.semester_label = row.semester_label || header?.semester_label;
+      }
       const { error } = await supabase
         .from("student_marks")
-        .update({
-          subject: row.subject,
-          subject_code: row.subject_code,
-          course_category: row.course_category,
-          credits,
-          credits_earned: creditsEarned,
-          marks_obtained: marksObtained,
-          max_marks: maxMarks,
-          grade,
-          grade_points: gradePoints,
-        })
+        .update(updatePayload as any)
         .eq("id", row.id);
       if (error) throw error;
       const nextMarks = marks.map((item) => (item.id === row.id ? { ...item, ...row } : item));
@@ -383,7 +408,7 @@ export function StudentMarksAdminEditor({
       const category = String(draft.course_category ?? "CORE COURSE").trim().toUpperCase();
       const isPractical = category.includes("PRACTICAL");
       const maxMarks = isPractical ? 50 : Number(draft.max_marks ?? 100);
-      const payload = {
+      const payload: Record<string, any> = {
         student_id: student.id,
         subject: draft.subject,
         subject_code: draft.subject_code,
@@ -395,9 +420,13 @@ export function StudentMarksAdminEditor({
         grade: g,
         grade_points: gradePoints,
       };
+      const hasSemCol = await checkSemesterLabelColumnExists(supabase);
+      if (hasSemCol) {
+        payload.semester_label = selectedSemFilter !== "ALL" ? selectedSemFilter : `Semester ${student.semester}`;
+      }
       const { data, error } = await supabase
         .from("student_marks")
-        .insert(payload)
+        .insert(payload as any)
         .select()
         .single();
       if (error) throw error;
@@ -780,6 +809,25 @@ export function StudentMarksAdminEditor({
           </div>
         </div>
       )}
+
+      {marks.length === 0 ? (
+        <div className="my-6 rounded-xl border border-dashed border-amber-300 bg-amber-50/50 p-6 text-center shadow-sm">
+          <p className="text-sm font-medium text-amber-800">
+            No courses are currently assigned to this student in the editor.
+          </p>
+          <p className="mt-1 text-xs text-amber-600">
+            You can import the courses and marks directly from the student's Excel-uploaded marksheet.
+          </p>
+          <button
+            type="button"
+            onClick={() => void handleImportFromMarksheet()}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Import Courses from Excel Marksheet
+          </button>
+        </div>
+      ) : null}
 
       <div
         className={`overflow-x-auto ${compact ? "mt-4" : "mt-4"} ${prettyCard ? "rounded-xl border border-primary/20 bg-white/90 p-3 shadow-inner" : ""}`}
