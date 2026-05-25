@@ -15,6 +15,8 @@ const ASSET_PATHS = {
   rightSignatureOld: "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png",
   rightSignatureNew: "/templates/assets/sibimamsign.png",
   backPage: "/templates/assets/file_00000000f02871f897434ec5582a144c.png",
+  backCheckedSig: "/templates/assets/back-checked-by-sig.png",
+  backVerifiedSig: "/templates/assets/back-verified-by-sig.png",
 };
 
 const GOLD: [number, number, number] = [184, 134, 11]; // DarkGoldenRod
@@ -52,13 +54,73 @@ export function isMarksheetAfterJuly2024(marksheet: StudentMarksheet) {
   return d > new Date("July 31, 2024");
 }
 
+export async function drawBackPageSignatures(
+  doc: jsPDF,
+  marksheet: StudentMarksheet,
+  backCheckedSig: LoadedDataUrl | null,
+  backVerifiedSig: LoadedDataUrl | null,
+) {
+  const rawPath = marksheet.photo_path || "";
+  
+  // Clean covers to wipe out default background's printed signatures
+  doc.setFillColor(253, 252, 247);
+  doc.rect(65, 735, 130, 42, "F");
+  doc.rect(380, 735, 130, 42, "F");
+
+  let customVerifiedSigUrl: string | null = null;
+  let showChecked = true;
+  let showVerified = true;
+
+  if (rawPath.includes("|")) {
+    const rawJson = rawPath.split("|")[1] || "";
+    try {
+      const approval = JSON.parse(rawJson);
+      if (approval && approval.signature_url) {
+        customVerifiedSigUrl = approval.signature_url;
+      }
+    } catch {
+      if (rawJson === "none") {
+        showChecked = false;
+        showVerified = false;
+      } else if (rawJson === "checked_only") {
+        showVerified = false;
+      } else if (rawJson === "verified_only") {
+        showChecked = false;
+      }
+    }
+  }
+
+  // Draw Checked By Signature
+  if (showChecked && backCheckedSig) {
+    doc.addImage(backCheckedSig.dataUrl, backCheckedSig.type, 78, 725, 95, 48);
+  }
+
+  // Draw Verified By Signature
+  if (showVerified) {
+    if (customVerifiedSigUrl) {
+      try {
+        const matches = customVerifiedSigUrl.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+        const format = (matches?.[1]?.toUpperCase() || "PNG") as "PNG" | "JPEG" | "WEBP";
+        doc.addImage(customVerifiedSigUrl, format, 385, 722, 105, 52);
+      } catch (err) {
+        console.error("Failed to render custom signature in PDF", err);
+        if (backVerifiedSig) {
+          doc.addImage(backVerifiedSig.dataUrl, backVerifiedSig.type, 385, 725, 100, 48);
+        }
+      }
+    } else if (backVerifiedSig) {
+      doc.addImage(backVerifiedSig.dataUrl, backVerifiedSig.type, 385, 725, 100, 48);
+    }
+  }
+}
+
 export async function generateMarksheetPdf(
   marksheet: StudentMarksheet,
   options: MarksheetDocumentOptions = {},
 ) {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const qr = await generateDynamicQrDataUrl(marksheet);
-  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] = await Promise.all([
+  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo, backCheckedSig, backVerifiedSig] = await Promise.all([
     loadDataUrl(ASSET_PATHS.background),
     loadDataUrl(ASSET_PATHS.logo),
     loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
@@ -69,6 +131,8 @@ export async function generateMarksheetPdf(
     options.photoUrl
       ? loadDataUrl(options.photoUrl, { dropLightBackground: true, trimEdges: 18 })
       : Promise.resolve(null),
+    loadDataUrl(ASSET_PATHS.backCheckedSig, { dropLightBackground: true }),
+    loadDataUrl(ASSET_PATHS.backVerifiedSig, { dropLightBackground: true }),
   ]);
 
   const rightSignature = isMarksheetAfterJuly2024(marksheet) ? rightSignatureNew : rightSignatureOld;
@@ -93,6 +157,7 @@ export async function generateMarksheetPdf(
       doc.internal.pageSize.getWidth(),
       doc.internal.pageSize.getHeight(),
     );
+    await drawBackPageSignatures(doc, marksheet, backCheckedSig, backVerifiedSig);
   }
 
   return doc.output("blob");
@@ -104,7 +169,7 @@ export async function generateAllSemestersPdf(
 ) {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
 
-  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] = await Promise.all([
+  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo, backCheckedSig, backVerifiedSig] = await Promise.all([
     loadDataUrl(ASSET_PATHS.background),
     loadDataUrl(ASSET_PATHS.logo),
     loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
@@ -115,6 +180,8 @@ export async function generateAllSemestersPdf(
     options.photoUrl
       ? loadDataUrl(options.photoUrl, { dropLightBackground: true, trimEdges: 18 })
       : Promise.resolve(null),
+    loadDataUrl(ASSET_PATHS.backCheckedSig, { dropLightBackground: true }),
+    loadDataUrl(ASSET_PATHS.backVerifiedSig, { dropLightBackground: true }),
   ]);
 
   for (let i = 0; i < marksheets.length; i++) {
@@ -144,6 +211,9 @@ export async function generateAllSemestersPdf(
       doc.internal.pageSize.getWidth(),
       doc.internal.pageSize.getHeight(),
     );
+    // Draw the signatures dynamically on the back page of the generated PDF
+    const latestMarksheet = marksheets[marksheets.length - 1];
+    await drawBackPageSignatures(doc, latestMarksheet, backCheckedSig, backVerifiedSig);
   }
 
   return doc.output("blob");
@@ -395,10 +465,6 @@ function drawMarksTable(
 
     for (const course of group.courses) {
       let displayTitle = course.course_title;
-      const hasPractical = course.total_marks_practical && course.total_marks_practical > 0;
-      if (hasPractical) {
-        displayTitle += ` (Theory: ${course.total_marks_theory || 0}, Practical: ${course.total_marks_practical})`;
-      }
 
       const titleLines = fitLines(doc, displayTitle, widths[2] - 7, 3);
       const rowHeight = titleLines.length > 2 ? 30 : titleLines.length > 1 ? 24 : 18;
@@ -711,7 +777,6 @@ async function trimImageEdges(source: string, trimPx: number): Promise<string> {
       const sw = Math.max(1, img.width - t * 2);
       const sh = Math.max(1, img.height - t * 2);
       ctx.drawImage(img, t, t, sw, sh, 0, 0, img.width, img.height);
-      // Remove any remaining anti-aliased dark frame artifacts on the image edges.
       const edgeClear = 2;
       ctx.clearRect(0, 0, img.width, edgeClear);
       ctx.clearRect(0, img.height - edgeClear, img.width, edgeClear);
@@ -745,8 +810,7 @@ async function removeLightBackground(source: string): Promise<string> {
         const b = data[i + 2];
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
-        // More robust check to catch WhatsApp JPEG artifacting on off-white backgrounds
-        const isNearWhite = max > 195 && min > 185 && (max - min < 30);
+        const isNearWhite = max > 195 && min > 185 && max - min < 30;
         if (isNearWhite) data[i + 3] = 0;
       }
       ctx.putImageData(image, 0, 0);

@@ -223,7 +223,7 @@ function CertificateFlow() {
     void (async () => {
       const ok = await startCertificateProcess({ silent: true });
       if (ok) {
-        toast.success("Your Grade card will be generated in 48 hours.");
+        toast.success("Your grade card will be available within 2–3 working days.");
       }
       clearRouteState();
     })();
@@ -307,12 +307,12 @@ function CertificateFlow() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-semibold text-primary">
-                {hasRequest ? "Process running" : "Ready to start"}
+                {hasRequest ? "Your request is being processed" : "Ready to generate"}
               </p>
               <p className="text-sm text-muted-foreground">
                   {hasRequest
-                    ? "Internal verification is in progress. This page updates automatically."
-                    : "One tap submits your file for verification - no separate request step."}
+                    ? "Your grade card is being carefully verified and prepared. You'll receive it shortly!"
+                    : "Click to submit your grade card request - instant verification with secure delivery."}
               </p>
             </div>
             <button
@@ -435,7 +435,7 @@ function CountdownTimer({ requestedAtStr }: { requestedAtStr: string }) {
   if (isAfter48Hours) {
     return <span className="font-medium text-amber-800">Your Grade card will be Generated Soon</span>;
   }
-  return <span className="font-medium text-amber-800">Your Grade card will be Generated in 48 Hours</span>;
+  return <span className="font-medium text-amber-800">Your grade card will be available within 2–3 working days</span>;
 }
 
 function FlowNode({

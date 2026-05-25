@@ -142,14 +142,7 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
                         <tr key={idx}>
                           <td className="center">{currentSl}</td>
                           <td className="center">{course.course_code}</td>
-                          <td className="left">
-                            {course.course_title}
-                            {course.total_marks_practical && course.total_marks_practical > 0 ? (
-                              <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>
-                                (Theory: {course.total_marks_theory || 0}, Practical: {course.total_marks_practical})
-                              </div>
-                            ) : null}
-                          </td>
+                          <td className="left">{course.course_title}</td>
                           <td className="center">{course.course_credits?.toFixed(1)}</td>
                           <td className="center">{course.credits_earned?.toFixed(1)}</td>
                           <td className="center">{course.grade_obtained}</td>
@@ -200,7 +193,7 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
 
               <div className="signature-container">
                 <div className="signature-block">
-                  <img 
+                  <img
                     src={(() => {
                       if (!marksheet.exam_month_year) return "/templates/assets/sibimamsign.png";
                       const match = marksheet.exam_month_year.match(/([a-zA-Z]+)\s*(?:-)?\s*(\d{4})/);
@@ -208,22 +201,21 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
                       const month = match[1];
                       const year = parseInt(match[2], 10);
                       const d = new Date(`${month} 1, ${year}`);
-                      return d > new Date("July 31, 2024") 
-                        ? "/templates/assets/sibimamsign.png" 
+                      return d > new Date("July 31, 2024")
+                        ? "/templates/assets/sibimamsign.png"
                         : "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png";
-                    })()} 
-                    alt="Signature" 
-                    className={`signature-img ${
-                      (() => {
-                        if (!marksheet.exam_month_year) return "sibi-sig";
-                        const match = marksheet.exam_month_year.match(/([a-zA-Z]+)\s*(?:-)?\s*(\d{4})/);
-                        if (!match) return "sibi-sig";
-                        const month = match[1];
-                        const year = parseInt(match[2], 10);
-                        const d = new Date(`${month} 1, ${year}`);
-                        return d > new Date("July 31, 2024") ? "sibi-sig" : "bheeja-sig";
-                      })()
-                    }`} 
+                    })()}
+                    alt="Signature"
+                    className={`signature-img ${(() => {
+                      if (!marksheet.exam_month_year) return "sibi-sig";
+                      const match = marksheet.exam_month_year.match(/([a-zA-Z]+)\s*(?:-)?\s*(\d{4})/);
+                      if (!match) return "sibi-sig";
+                      const month = match[1];
+                      const year = parseInt(match[2], 10);
+                      const d = new Date(`${month} 1, ${year}`);
+                      return d > new Date("July 31, 2024") ? "sibi-sig" : "bheeja-sig";
+                    })()
+                      }`}
                   />
                   <div className="signature-label">Controller of Examinations</div>
                 </div>

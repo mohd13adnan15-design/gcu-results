@@ -585,7 +585,7 @@ export function ClearanceAdminPage({ kind }: Props) {
       );
 
       if (inserts.length > 0) {
-        const { error: insErr } = await supabase.from("students").insert(inserts);
+        const { error: insErr } = await supabase.from("students").upsert(inserts, { onConflict: "student_id" });
         if (insErr) failures.push(`Inserts failed: ${insErr.message}`);
         else created += inserts.length;
       }
@@ -915,7 +915,7 @@ export function ClearanceAdminPage({ kind }: Props) {
                     fees_cleared: false,
                     ...payload
                   };
-                  const { error } = await supabase.from("students").insert(newPayload as any);
+                  const { error } = await supabase.from("students").upsert(newPayload as any, { onConflict: "student_id" });
                   if (error) return toast.error(error.message);
                 }
                 toast.success("Student details saved.");

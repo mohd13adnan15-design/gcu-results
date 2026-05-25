@@ -152,4 +152,15 @@ describe("marksheet data helpers", () => {
       }),
     ).toBe("24btre152/profile.jpeg");
   });
+
+  it("prefers a flat registration-number photo file from ZIP upload", () => {
+    expect(
+      pickStudentPhotoPath({
+        configuredPath: "23MSDA105.jpg",
+        rollNo: "1GC22CS002",
+        registrationNo: "23MSDA105",
+        candidates: ["23msda105.jpg", "1gc22cs002/profile.jpeg"],
+      }),
+    ).toBe("23msda105.jpg");
+  });
 });

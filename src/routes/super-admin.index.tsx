@@ -15,7 +15,6 @@ import {
   Trash2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import JSZip from "jszip";
 
 import {
   MARKS_TEMPLATE_HEADERS_FULL,
@@ -30,6 +29,15 @@ import {
   legacyMarkRowsToMarksheetCourses,
   normalizeMarksheet,
 } from "@/lib/marksheet";
+import {
+  extractStudentPhotosFromZip,
+  matchStudentPhotoFromZip,
+  studentPhotoContentType,
+  studentPhotoLookupKeys,
+  studentPhotoStorageFileName,
+  toTypedStudentPhotoBlob,
+  type ExtractedStudentPhoto,
+} from "@/lib/student-photo-zip";
 import { notificationPortalLabel } from "@/lib/portal";
 
 export function SuperAdminPage() {
@@ -551,20 +559,10 @@ function MarksUploader() {
 
     try {
       // 1. Process ZIP File if provided
-      const uploadedImages = new Map<string, Blob>();
+      let uploadedImages = new Map<string, ExtractedStudentPhoto>();
       if (zipFile) {
         try {
-          const zip = await JSZip.loadAsync(zipFile);
-          for (const [filename, fileObj] of Object.entries(zip.files)) {
-            if (fileObj.dir) continue;
-            
-            const lowerName = filename.toLowerCase();
-            if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg") || lowerName.endsWith(".png")) {
-              const content = await fileObj.async("blob");
-              const baseName = filename.split('/').pop() || filename;
-              uploadedImages.set(baseName.toLowerCase().trim(), content);
-            }
-          }
+          uploadedImages = await extractStudentPhotosFromZip(zipFile);
           console.log("Successfully extracted images from ZIP:", uploadedImages.size);
         } catch (err) {
           toast.error("Failed to extract ZIP file. Ensure it is a valid ZIP archive.");
@@ -701,11 +699,17 @@ function MarksUploader() {
             department: row.department || "General",
             semester: Number(row.semester) || 1,
             year: Number(row.year) || 1,
+            registration_no: row.registration_no?.trim() || row.student_id.trim(),
             in_fees: true,
             in_hostel: false,
             in_library: false,
             image_path: row.image_path || null,
           });
+        } else {
+          const existing = studentsMap.get(sid)!;
+          if (!existing.registration_no && row.registration_no) {
+            existing.registration_no = row.registration_no.trim();
+          }
         }
       });
 
@@ -736,51 +740,69 @@ function MarksUploader() {
         }
       });
 
-      // 4. Match and Upload ZIP photos
+      // 4. Match and Upload ZIP photos (filename must match registration no, e.g. 23MSDA105.jpg)
       const uniqueStudentsList = Array.from(studentsMap.values());
+      let photosMatched = 0;
+      let photosMissing = 0;
+
       for (const s of uniqueStudentsList) {
-        const regLower = (s.registration_no || s.student_id).toLowerCase().trim();
-        const possibleKeys = [
-          s.image_path?.toLowerCase(),
-          `${regLower}.jpg`,
-          `${regLower}.jpeg`,
-          `${regLower}.png`
-        ].filter((k): k is string => !!k);
+        const registrationNo = (s.registration_no || s.student_id).trim();
+        const lookupKeys = studentPhotoLookupKeys({
+          registrationNo,
+          studentId: s.student_id,
+          imagePath: s.image_path,
+        });
 
-        let imageBlob: Blob | undefined;
-        let detectedExt = "jpg";
-        for (const key of possibleKeys) {
-          if (uploadedImages.has(key)) {
-            imageBlob = uploadedImages.get(key);
-            detectedExt = key.split('.').pop() || "jpg";
-            break;
-          }
-        }
+        const matched = matchStudentPhotoFromZip(uploadedImages, lookupKeys);
 
-        if (imageBlob) {
-          const storageFileName = `${s.student_id}.${detectedExt}`;
+        if (matched) {
+          const storageFileName = studentPhotoStorageFileName(registrationNo, matched.ext);
+          const typedBlob = toTypedStudentPhotoBlob(matched.blob, matched.ext);
           try {
             const { error: uploadErr } = await supabase.storage
               .from("student-photos")
-              .upload(storageFileName, imageBlob, {
+              .upload(storageFileName, typedBlob, {
                 upsert: true,
-                contentType: imageBlob.type || `image/${detectedExt === 'png' ? 'png' : 'jpeg'}`
+                contentType: studentPhotoContentType(matched.ext),
               });
             if (uploadErr) {
-              console.error(`Error uploading photo for ${s.student_id}:`, uploadErr);
+              console.error(`Error uploading photo for ${registrationNo}:`, uploadErr);
+              photosMissing += 1;
             } else {
               s.image_path = storageFileName;
+              photosMatched += 1;
             }
           } catch (err) {
-            console.error(`Exception uploading photo for ${s.student_id}:`, err);
+            console.error(`Exception uploading photo for ${registrationNo}:`, err);
+            photosMissing += 1;
           }
+        } else if (uploadedImages.size > 0) {
+          photosMissing += 1;
+          console.warn(`No ZIP photo matched registration no "${registrationNo}"`);
         }
       }
 
-      // Upsert students (onConflict: student_id)
+      if (uploadedImages.size > 0) {
+        console.log(`Photo matching: ${photosMatched} matched, ${photosMissing} missing`);
+      }
+
+      // Upsert students (onConflict: student_id) — registration_no stays in memory only (not on students table)
+      const studentRows = Array.from(studentsMap.values()).map((s) => ({
+        student_id: s.student_id,
+        email: s.email,
+        full_name: s.full_name,
+        department: s.department,
+        semester: s.semester,
+        year: s.year,
+        in_fees: s.in_fees,
+        in_hostel: s.in_hostel,
+        in_library: s.in_library,
+        image_path: s.image_path,
+      }));
+
       const { data: studentSyncData, error: studentSyncErr } = await supabase
         .from("students")
-        .upsert(Array.from(studentsMap.values()), { onConflict: "student_id" })
+        .upsert(studentRows, { onConflict: "student_id" })
         .select("id, student_id");
 
       if (studentSyncErr) {
@@ -947,7 +969,9 @@ function MarksUploader() {
 
         const firstRow = rows[0];
         const studentInfo = studentsMap.get(firstRow.student_id.toLowerCase().trim());
-        const dbImagePath = studentInfo?.image_path || `${firstRow.registration_no || firstRow.student_id}/profile.jpeg`;
+        const registrationNo = firstRow.registration_no || studentInfo?.registration_no || firstRow.student_id;
+        const dbImagePath =
+          studentInfo?.image_path || studentPhotoStorageFileName(registrationNo, "jpg");
 
         marksheetsToUpsert.push({
           student_id: uuid,
@@ -1015,18 +1039,26 @@ function MarksUploader() {
 
       if (failCount > 0) {
         const firstFew = rejected.slice(0, 3).map(r => `Row ${r.row}: ${r.reason}`).join("\n");
+        const photoNote =
+          uploadedImages.size > 0
+            ? `\n📷 Photos: ${photosMatched} matched, ${photosMissing} missing (use registration no as filename, e.g. 23MSDA105.jpg).`
+            : "";
         toast.error(
           `Upload partially successful.\n` +
           `✅ ${successCount} rows parsed (${studentCount} students).\n` +
-          `❌ ${failCount} rows failed validation.\n` +
+          `❌ ${failCount} rows failed validation.${photoNote}\n` +
           `First few errors:\n${firstFew}${failCount > 3 ? "\n...see console for more" : ""}`,
           { duration: 6000 }
         );
         console.table(rejected);
       } else {
+        const photoNote =
+          uploadedImages.size > 0
+            ? ` ${photosMatched} student photo(s) matched from ZIP.`
+            : "";
         toast.success(
-          `Successfully processed ${successCount} rows for ${studentCount} students. ` +
-          `All grade cards generated and synced.`
+          `Successfully processed ${successCount} rows for ${studentCount} students.` +
+          ` All grade cards generated and synced.${photoNote}`
         );
         setExcelFile(null);
         setZipFile(null);
@@ -1049,7 +1081,7 @@ function MarksUploader() {
             <FileSpreadsheet className="h-5 w-5" /> Upload student marks
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Upload the Excel spreadsheet containing marks and student records, and optionally select a ZIP archive containing student photo files matched by registration number.
+            Upload the Excel spreadsheet containing marks and student records, and optionally select a ZIP archive containing student photo files. Each photo must be named exactly as the student&apos;s registration number (e.g. <strong>23MSDA105.jpg</strong> or <strong>23MSDA105.png</strong>).
           </p>
         </div>
         <button

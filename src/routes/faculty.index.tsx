@@ -201,7 +201,7 @@ export function FacultyPage() {
       ),
     );
     setStudentMarks((markRows as any[]) ?? []);
-    
+
     setUnresolvedReports(
       new Set(
         ((notificationRows ?? []) as { student_id: string | null }[])
@@ -407,7 +407,7 @@ export function FacultyPage() {
     if (!issueModal) return;
     const { student, marksheet, legacyCourseCount } = issueModal;
     const hasMarksheetData = Boolean(marksheet) || legacyCourseCount > 0;
-    
+
     setBusyStudentId(student.id);
     try {
       const payload = {
@@ -658,11 +658,10 @@ export function FacultyPage() {
                       key={sheet.semester_label}
                       type="button"
                       onClick={() => void handleSelectPreviewSemester(sheet)}
-                      className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-extrabold transition duration-200 border shadow-sm ${
-                        isSelected
+                      className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-extrabold transition duration-200 border shadow-sm ${isSelected
                           ? "bg-emerald-600 border-emerald-500 text-white shadow-emerald-900/50 scale-105"
                           : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white"
-                      }`}
+                        }`}
                     >
                       {semName}
                     </button>
@@ -671,11 +670,10 @@ export function FacultyPage() {
                 <button
                   type="button"
                   onClick={() => setShowAllSemesters(true)}
-                  className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-extrabold transition duration-200 border shadow-sm ${
-                    showAllSemesters
+                  className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-extrabold transition duration-200 border shadow-sm ${showAllSemesters
                       ? "bg-amber-600 border-amber-500 text-white shadow-amber-900/50 scale-105"
                       : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white"
-                  }`}
+                    }`}
                 >
                   All Sem
                 </button>

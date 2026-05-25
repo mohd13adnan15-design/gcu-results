@@ -45,7 +45,7 @@ function VerificationTimerText({ startTime }: { startTime: string }) {
   if (isAfter48Hours) {
     return <span className="text-amber-800 font-semibold">Your Grade card will be Generated Soon</span>;
   }
-  return <span>Your Grade card will be Generated in 48 Hours</span>;
+  return <span>Your grade card will be available within 2–3 working days</span>;
 }
 
 function Dashboard() {

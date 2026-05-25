@@ -107,14 +107,7 @@ function CourseRow({ course, index }: { course: MarksheetCourse; index: number }
     <tr className="border-b border-border/60">
       <td className="px-2 py-2">{index + 1}</td>
       <td className="px-2 py-2">{course.course_code}</td>
-      <td className="px-2 py-2">
-        {course.course_title}
-        {course.total_marks_practical && course.total_marks_practical > 0 ? (
-          <div className="text-xs text-muted-foreground mt-0.5">
-            (Theory: {course.total_marks_theory || 0}, Practical: {course.total_marks_practical})
-          </div>
-        ) : null}
-      </td>
+      <td className="px-2 py-2">{course.course_title}</td>
       <td className="px-2 py-2">{course.section}</td>
       <td className="px-2 py-2">{course.course_credits}</td>
       <td className="px-2 py-2">{course.credits_earned}</td>
