@@ -272,19 +272,18 @@ function drawHeader(
   doc.setFont("times", "bold");
   doc.setFontSize(7.5);
   setText(doc, DARK);
-  const uniqueId = marksheet.id?.split("-")[0].toUpperCase() || marksheet.grade_card_no;
+  const uniqueId = marksheet.student_id?.split("-")[0].toUpperCase() || marksheet.grade_card_no;
   doc.text(uniqueId, x + 32, y + 12, { align: "center" });
   if (images.qr) {
     doc.addImage(images.qr.dataUrl, images.qr.type, x + 12, y + 18, 42, 42);
   }
 
   if (images.logo) {
-    const centerX = x + leftWidth;
-    const centerWidth = width - leftWidth - rightWidth;
-    const logoWidth = 250;
-    const logoHeight = 170;
-    const logoX = centerX + (centerWidth - logoWidth) / 2;
-    doc.addImage(images.logo.dataUrl, images.logo.type, logoX, y - 42, logoWidth, logoHeight);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const logoWidth = 310;
+    const logoHeight = 155;
+    const logoX = (pageWidth - logoWidth) / 2;
+    doc.addImage(images.logo.dataUrl, images.logo.type, logoX, y - 40, logoWidth, logoHeight);
   }
 
   const photoX = x + width - rightWidth + 14;
@@ -385,10 +384,11 @@ function drawMarksTable(
     setStroke(doc);
     doc.rect(x, y, width, 15, "S");
     doc.setFont("times", "bold");
-    doc.setFontSize(11);
     const isPractical = group.section.trim().toLowerCase().includes("practical");
+    doc.setFontSize(isPractical ? 9.5 : 13.5);
     setText(doc, isPractical ? BLACK : RED);
-    doc.text(group.section, isPractical ? x + 4 : x + width / 2, y + 10.5, {
+    const displayText = isPractical ? "Practical" : group.section;
+    doc.text(displayText, isPractical ? x + 4 : x + width / 2, y + 11.5, {
       align: isPractical ? "left" : "center",
     });
     y += 15;
@@ -512,10 +512,15 @@ function drawFirstPageFooter(
 
   if (images.seal) doc.addImage(images.seal.dataUrl, images.seal.type, 32, 705, 96, 96);
   if (images.embossedSeal) {
-    doc.addImage(images.embossedSeal.dataUrl, images.embossedSeal.type, 452, 705, 64, 64);
+    doc.addImage(images.embossedSeal.dataUrl, images.embossedSeal.type, 448, 672, 64, 64);
   }
   if (images.rightSignature) {
-    doc.addImage(images.rightSignature.dataUrl, images.rightSignature.type, 410, 770, 140, 48);
+    const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
+    const sigX = isAfterJuly24 ? 375 : 390;
+    const sigY = isAfterJuly24 ? 735 : 742;
+    const sigW = isAfterJuly24 ? 210 : 180;
+    const sigH = isAfterJuly24 ? 93 : 80;
+    doc.addImage(images.rightSignature.dataUrl, images.rightSignature.type, sigX, sigY, sigW, sigH);
   }
 }
 
