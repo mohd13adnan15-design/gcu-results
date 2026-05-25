@@ -492,7 +492,7 @@ export function groupCoursesBySection(courses: MarksheetCourse[]): MarksheetCour
       const isPractical = isPracticalCourse(course);
       const effectiveSection = isPractical ? "PRACTICAL" : course.section;
       const previous = groups.at(-1);
-      
+
       if (previous?.section === effectiveSection) {
         previous.courses.push(course);
       } else {
@@ -519,19 +519,34 @@ export function getStudentPhotoPublicUrl(
 
 export async function resolveStudentPhotoUrl(
   supabase: SupabaseClient,
-  marksheet: Pick<StudentMarksheet, "photo_bucket" | "photo_path" | "student_roll_no">,
+  marksheet: Pick<
+    StudentMarksheet,
+    "photo_bucket" | "photo_path" | "student_roll_no" | "registration_no" | "student_id"
+  >,
 ) {
+  const registrationNo = text(marksheet.registration_no || marksheet.student_roll_no);
   const roll = marksheet.student_roll_no?.toLowerCase();
-  if (roll === "24btre152") return "/templates/assets/v_sai_tejashvi_profile.jpeg";
-  if (roll === "23bsft101") return "/templates/assets/abigail_profile.jpeg";
-  if (roll === "23msda110" || roll === "23msda110@gcu.edu.in") {
-    return "/templates/assets/sibi_profile.jpeg";
-  }
-  if (roll === "23msda105" || roll === "23msda105@gcu.edu.in") {
-    return "/templates/assets/princy akka.jpeg";
+
+  const publicPhotoUrl = (path: string) =>
+    supabase.storage.from(STUDENT_PHOTOS_BUCKET).getPublicUrl(path).data.publicUrl;
+
+  // 1. Saved image_path on the student record (matched by registration no during COE upload)
+  if (marksheet.student_id) {
+    try {
+      const { data: student } = await supabase
+        .from("students")
+        .select("image_path")
+        .eq("id", marksheet.student_id)
+        .maybeSingle();
+
+      if (student?.image_path) {
+        return publicPhotoUrl(student.image_path);
+      }
+    } catch (e) {
+      console.error("Failed to query student photo:", e);
+    }
   }
 
-  // 1. Check students table first
   if (marksheet.student_roll_no) {
     try {
       const { data: student } = await supabase
@@ -541,27 +556,34 @@ export async function resolveStudentPhotoUrl(
         .maybeSingle();
 
       if (student?.image_path) {
-        return supabase.storage.from("student-photos").getPublicUrl(student.image_path).data.publicUrl;
+        return publicPhotoUrl(student.image_path);
       }
     } catch (e) {
-      console.error("Failed to query student photo:", e);
+      console.error("Failed to query student photo by roll:", e);
     }
   }
 
-  // 2. Fallback to configured photo bucket and path list
-  if (marksheet.photo_bucket) {
-    const configuredPath = normalizeStoragePath(marksheet.photo_path);
+  // 2. Explicit photo_path on the marksheet (e.g. 23MSDA105.jpg from ZIP upload)
+  const configuredPath = normalizeStoragePath(marksheet.photo_path);
+  if (marksheet.photo_bucket && configuredPath) {
+    const directUrl = getStudentPhotoPublicUrl(supabase, marksheet);
+    if (directUrl) return directUrl;
+  }
 
+  // 3. Search storage by registration number (flat file: 23MSDA105.jpg / .png)
+  if (marksheet.photo_bucket && registrationNo) {
     const candidates = await listStudentPhotoCandidates(
       supabase,
       marksheet.photo_bucket,
       marksheet.student_roll_no,
       configuredPath,
+      registrationNo,
     );
 
     const resolvedPath = pickStudentPhotoPath({
       configuredPath,
       rollNo: marksheet.student_roll_no,
+      registrationNo,
       candidates,
     });
 
@@ -570,17 +592,28 @@ export async function resolveStudentPhotoUrl(
     }
   }
 
-  // 3. Absolute fallback to default-avatar
+  // 4. Demo / seed assets when no uploaded photo exists
+  if (roll === "24btre152") return "/templates/assets/v_sai_tejashvi_profile.jpeg";
+  if (roll === "23bsft101") return "/templates/assets/abigail_profile.jpeg";
+  if (roll === "23msda110" || roll === "23msda110@gcu.edu.in") {
+    return "/templates/assets/sibi_profile.jpeg";
+  }
+  if (roll === "23msda105" || roll === "23msda105@gcu.edu.in") {
+    return "/templates/assets/princy akka.jpeg";
+  }
+
   return "/templates/assets/default-avatar.png";
 }
 
 export function pickStudentPhotoPath({
   configuredPath,
   rollNo,
+  registrationNo,
   candidates,
 }: {
   configuredPath?: string | null;
   rollNo: string;
+  registrationNo?: string | null;
   candidates: string[];
 }) {
   const configured = normalizeStoragePath(configuredPath);
@@ -590,10 +623,17 @@ export function pickStudentPhotoPath({
     .filter(isImagePath);
   if (configured && imageCandidates.includes(configured)) return configured;
 
+  const regKey = text(registrationNo || rollNo).toLowerCase();
+  const flatMatch = imageCandidates.find((candidate) => {
+    const base = baseNameWithoutExtension(candidate).toLowerCase();
+    return !folderName(candidate) && base === regKey;
+  });
+  if (flatMatch) return flatMatch;
+
   const configuredFolder = configured ? folderName(configured) : "";
   const configuredBase = configured ? baseNameWithoutExtension(configured) : "";
   const rollFolder = rollNo.toLowerCase();
-  const preferredFolder = configuredFolder || rollFolder;
+  const preferredFolder = configuredFolder || rollFolder || regKey;
 
   return (
     imageCandidates.find(
@@ -606,6 +646,10 @@ export function pickStudentPhotoPath({
         folderName(candidate).toLowerCase() === preferredFolder.toLowerCase() &&
         baseNameWithoutExtension(candidate).toLowerCase() === "profile",
     ) ??
+    imageCandidates.find((candidate) => {
+      const base = baseNameWithoutExtension(candidate).toLowerCase();
+      return base === regKey || candidate.toLowerCase().includes(regKey);
+    }) ??
     imageCandidates.find((candidate) => candidate.toLowerCase().includes(rollFolder)) ??
     imageCandidates.find(
       (candidate) => folderName(candidate).toLowerCase() === preferredFolder.toLowerCase(),
@@ -956,7 +1000,7 @@ export async function fetchAllStudentMarksheets(supabase: SupabaseClient, studen
   });
 
   const marksheets: StudentMarksheet[] = [];
-  
+
   // Sort the semester labels naturally if possible
   const sortedLabels = Array.from(semGroups.keys()).sort((a, b) => {
     const aMatch = a.match(/\d+/);
@@ -1094,8 +1138,11 @@ async function listStudentPhotoCandidates(
   bucket: string,
   rollNo: string,
   configuredPath: string | null,
+  registrationNo?: string | null,
 ) {
   const prefixes = new Set(["", rollNo.toLowerCase()]);
+  const reg = text(registrationNo).toLowerCase();
+  if (reg) prefixes.add(reg);
   const configuredFolder = configuredPath ? folderName(configuredPath) : "";
   if (configuredFolder) prefixes.add(configuredFolder);
 
