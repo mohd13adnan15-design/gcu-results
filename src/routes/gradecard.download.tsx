@@ -4,6 +4,7 @@ import { FileDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { fetchApprovedBackPageSignatures } from "@/lib/grade-card-e-signature";
 import {
   fetchMarksheetByRegistrationNo,
   resolveStudentPhotoUrl,
@@ -55,11 +56,19 @@ export function GradecardQrDownloadPage() {
     if (!marksheet) return;
     setDownloading(true);
     try {
-      const [{ generateMarksheetPdf, downloadMarksheetBlob }, photoUrl] = await Promise.all([
+      const [{ generateMarksheetPdf, downloadMarksheetBlob }, photoUrl, backSigs] = await Promise.all([
         import("@/lib/marksheet-documents"),
         resolveStudentPhotoUrl(supabase, marksheet),
+        fetchApprovedBackPageSignatures(supabase, marksheet.student_id),
       ]);
-      const blob = await generateMarksheetPdf(marksheet, { photoUrl, allMarksheets });
+      const blob = await generateMarksheetPdf(marksheet, {
+        photoUrl,
+        allMarksheets,
+        backPageSignatures: {
+          checkedByUrl: backSigs.checkedByUrl,
+          verifiedByUrl: backSigs.verifiedByUrl,
+        },
+      });
       downloadMarksheetBlob(marksheet, "pdf", blob);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not generate grade card PDF");

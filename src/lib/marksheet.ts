@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { studentPhotoCandidatePaths } from "@/lib/student-photo-zip";
 import type { Student } from "@/lib/types";
 
 export type MarksheetCourse = {
@@ -517,92 +518,107 @@ export function getStudentPhotoPublicUrl(
   return supabase.storage.from(marksheet.photo_bucket).getPublicUrl(photoPath).data.publicUrl;
 }
 
+export type ResolveStudentPhotoOptions = {
+  /** Students table UUID — most reliable lookup when previewing by student record. */
+  studentUuid?: string | null;
+};
+
+const STATIC_PHOTOS_BY_ROLL: Record<string, string> = {
+  "24btre152": "/templates/assets/v_sai_tejashvi_profile.jpeg",
+  "23bsft101": "/templates/assets/abigail_profile.jpeg",
+  "23msda110": "/templates/assets/sibi_profile.jpeg",
+  "23msda105": "/templates/assets/princy akka.jpeg",
+};
+
 export async function resolveStudentPhotoUrl(
   supabase: SupabaseClient,
   marksheet: Pick<
     StudentMarksheet,
     "photo_bucket" | "photo_path" | "student_roll_no" | "registration_no" | "student_id"
   >,
-) {
+  options: ResolveStudentPhotoOptions = {},
+): Promise<string | null> {
   const registrationNo = text(marksheet.registration_no || marksheet.student_roll_no);
-  const roll = marksheet.student_roll_no?.toLowerCase();
+  const rollKey = normalizeRollKey(marksheet.student_roll_no || registrationNo);
+  const bucket = marksheet.photo_bucket || STUDENT_PHOTOS_BUCKET;
+  const configuredPath = normalizeStoragePath(marksheet.photo_path);
 
-  const publicPhotoUrl = (path: string) =>
-    supabase.storage.from(STUDENT_PHOTOS_BUCKET).getPublicUrl(path).data.publicUrl;
+  const candidatePaths: string[] = [];
 
-  // 1. Saved image_path on the student record (matched by registration no during COE upload)
-  if (marksheet.student_id) {
+  function addPath(path: string | null | undefined) {
+    const normalized = normalizeStoragePath(path);
+    if (normalized) candidatePaths.push(normalized);
+  }
+
+  const studentUuid =
+    options.studentUuid ?? (looksLikeUuid(marksheet.student_id) ? marksheet.student_id : null);
+
+  if (studentUuid) {
     try {
       const { data: student } = await supabase
         .from("students")
         .select("image_path")
-        .eq("id", marksheet.student_id)
+        .eq("id", studentUuid)
         .maybeSingle();
-
-      if (student?.image_path) {
-        return publicPhotoUrl(student.image_path);
-      }
+      addPath(student?.image_path);
     } catch (e) {
-      console.error("Failed to query student photo:", e);
+      console.error("Failed to query student photo by UUID:", e);
     }
   }
 
-  if (marksheet.student_roll_no) {
+  for (const roll of uniqueStrings([marksheet.student_roll_no, registrationNo])) {
     try {
       const { data: student } = await supabase
         .from("students")
         .select("image_path")
-        .eq("student_id", marksheet.student_roll_no)
+        .ilike("student_id", roll)
         .maybeSingle();
-
-      if (student?.image_path) {
-        return publicPhotoUrl(student.image_path);
-      }
+      addPath(student?.image_path);
     } catch (e) {
       console.error("Failed to query student photo by roll:", e);
     }
   }
 
-  // 2. Explicit photo_path on the marksheet (e.g. 23MSDA105.jpg from ZIP upload)
-  const configuredPath = normalizeStoragePath(marksheet.photo_path);
-  if (marksheet.photo_bucket && configuredPath) {
-    const directUrl = getStudentPhotoPublicUrl(supabase, marksheet);
-    if (directUrl) return directUrl;
+  addPath(configuredPath);
+
+  if (registrationNo) {
+    for (const path of studentPhotoCandidatePaths(registrationNo)) {
+      addPath(path);
+    }
   }
 
-  // 3. Search storage by registration number (flat file: 23MSDA105.jpg / .png)
-  if (marksheet.photo_bucket && registrationNo) {
-    const candidates = await listStudentPhotoCandidates(
+  if (registrationNo || marksheet.student_roll_no) {
+    const listed = await listStudentPhotoCandidates(
       supabase,
-      marksheet.photo_bucket,
+      bucket,
       marksheet.student_roll_no,
       configuredPath,
       registrationNo,
     );
+    addPath(
+      pickStudentPhotoPath({
+        configuredPath,
+        rollNo: marksheet.student_roll_no,
+        registrationNo,
+        candidates: listed,
+      }),
+    );
+  }
 
-    const resolvedPath = pickStudentPhotoPath({
-      configuredPath,
-      rollNo: marksheet.student_roll_no,
-      registrationNo,
-      candidates,
-    });
-
-    if (resolvedPath) {
-      return supabase.storage.from(marksheet.photo_bucket).getPublicUrl(resolvedPath).data.publicUrl;
+  const seen = new Set<string>();
+  for (const path of candidatePaths) {
+    const key = path.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (await storagePathExists(supabase, bucket, path)) {
+      return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
     }
   }
 
-  // 4. Demo / seed assets when no uploaded photo exists
-  if (roll === "24btre152") return "/templates/assets/v_sai_tejashvi_profile.jpeg";
-  if (roll === "23bsft101") return "/templates/assets/abigail_profile.jpeg";
-  if (roll === "23msda110" || roll === "23msda110@gcu.edu.in") {
-    return "/templates/assets/sibi_profile.jpeg";
-  }
-  if (roll === "23msda105" || roll === "23msda105@gcu.edu.in") {
-    return "/templates/assets/princy akka.jpeg";
-  }
+  const staticPhoto = STATIC_PHOTOS_BY_ROLL[rollKey];
+  if (staticPhoto) return staticPhoto;
 
-  return "/templates/assets/default-avatar.png";
+  return null;
 }
 
 export function pickStudentPhotoPath({
@@ -776,6 +792,7 @@ export function studentMarksToMarksheet(
 
   const university = text(header?.university) || "Garden City University";
   const schoolName = text(header?.school_name) || "SCHOOL OF ENGINEERING AND TECHNOLOGY";
+  const photoPath = student.image_path ? normalizeStoragePath(student.image_path) : null;
 
   return {
     student_id: student.id,
@@ -791,8 +808,8 @@ export function studentMarksToMarksheet(
     issue_date: issueDate,
     grade_card_no: "",
     qr_data: `${student.student_id}|${student.email}|grade-data`,
-    photo_bucket: null,
-    photo_path: null,
+    photo_bucket: photoPath ? STUDENT_PHOTOS_BUCKET : null,
+    photo_path: photoPath,
     total_credits: totals.totalCredits,
     total_credits_earned: totals.totalCreditsEarned,
     total_credit_points: totals.totalCreditPoints,
@@ -1064,7 +1081,7 @@ export function normalizeMarksheet(row: Record<string, unknown>): StudentMarkshe
     issue_date: text(row.issue_date),
     grade_card_no: text(row.grade_card_no),
     qr_data: text(row.qr_data),
-    photo_bucket: nullableText(row.photo_bucket),
+    photo_bucket: nullableText(row.photo_bucket) ?? (nullableText(row.photo_path) ? STUDENT_PHOTOS_BUCKET : null),
     photo_path: nullableText(row.photo_path),
     total_credits: numberOr(row.total_credits, totals.totalCredits),
     total_credits_earned: numberOr(row.total_credits_earned, totals.totalCreditsEarned),
@@ -1163,10 +1180,45 @@ async function listStudentPhotoCandidates(
   return [...candidates];
 }
 
+async function storagePathExists(
+  supabase: SupabaseClient,
+  bucket: string,
+  path: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.storage.from(bucket).download(path);
+    return !error && data !== null && data.size > 0;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeRollKey(value: string | null | undefined): string {
+  return text(value).split("@")[0].toLowerCase();
+}
+
+function looksLikeUuid(value: string | null | undefined): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text(value));
+}
+
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const trimmed = text(value);
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
 
 
 function normalizeStoragePath(value: string | null | undefined) {
-  const path = text(value).replace(/^\/+/, "").replace(/\\/g, "/");
+  const path = text(value).split("|")[0].trim().replace(/^\/+/, "").replace(/\\/g, "/");
   return path || null;
 }
 

@@ -19,6 +19,7 @@ import {
   resolveStudentPhotoUrl,
   type StudentMarksheet,
 } from "@/lib/marksheet";
+import { fetchApprovedBackPageSignatures } from "@/lib/grade-card-e-signature";
 import { getMarksheetEligibility, missingReasonLabel } from "@/lib/marksheet-verification";
 
 export function StudentMarksCardPage() {
@@ -218,11 +219,19 @@ function MarksCard() {
 
     setDownloadBusy(targetMarksheet.id ?? "current");
     try {
-      const [{ downloadMarksheetBlob, generateMarksheetPdf }, photoUrl] = await Promise.all([
+      const [{ downloadMarksheetBlob, generateMarksheetPdf }, photoUrl, backSigs] = await Promise.all([
         import("@/lib/marksheet-documents"),
         resolveStudentPhotoUrl(supabase, targetMarksheet),
+        fetchApprovedBackPageSignatures(supabase, student.id),
       ]);
-      const blob = await generateMarksheetPdf(targetMarksheet, { photoUrl, allMarksheets });
+      const blob = await generateMarksheetPdf(targetMarksheet, {
+        photoUrl,
+        allMarksheets,
+        backPageSignatures: {
+          checkedByUrl: backSigs.checkedByUrl,
+          verifiedByUrl: backSigs.verifiedByUrl,
+        },
+      });
       downloadMarksheetBlob(targetMarksheet, "pdf", blob);
       toast.success("PDF marksheet generated");
     } catch (error) {
@@ -250,11 +259,18 @@ function MarksCard() {
 
     setDownloadBusy("all");
     try {
-      const [{ downloadBlob, generateAllSemestersPdf }, photoUrl] = await Promise.all([
+      const [{ downloadBlob, generateAllSemestersPdf }, photoUrl, backSigs] = await Promise.all([
         import("@/lib/marksheet-documents"),
         resolveStudentPhotoUrl(supabase, marksheet || allMarksheets[0]),
+        fetchApprovedBackPageSignatures(supabase, student.id),
       ]);
-      const blob = await generateAllSemestersPdf(allMarksheets, { photoUrl });
+      const blob = await generateAllSemestersPdf(allMarksheets, {
+        photoUrl,
+        backPageSignatures: {
+          checkedByUrl: backSigs.checkedByUrl,
+          verifiedByUrl: backSigs.verifiedByUrl,
+        },
+      });
       // Build file name similar to single marksheet but with AllSemesters
       const studentSlug = (marksheet || allMarksheets[0]).student_name
         .toLowerCase()

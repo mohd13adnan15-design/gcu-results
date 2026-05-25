@@ -5,6 +5,11 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { HighFidelityGradeCard } from "@/features/marks/HighFidelityGradeCard";
 import {
+  GradeCardESignaturePanel,
+  useGradeCardSignatureApproved,
+} from "@/features/marks/GradeCardESignaturePanel";
+import { fetchApprovedBackPageSignatures } from "@/lib/grade-card-e-signature";
+import {
   calculateMarksheetTotals,
   fetchAllStudentMarksheets,
   resolveStudentPhotoUrl,
@@ -94,6 +99,7 @@ export function GradeCardPreviewPanel({ studentId, semester = 1, refreshKey = 0 
   const [activeSheet, setActiveSheet] = useState<StudentMarksheet | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [showAllSemesters, setShowAllSemesters] = useState(false);
+  const { approved, refresh: refreshSignatures } = useGradeCardSignatureApproved(studentId);
 
   const loadPreview = useCallback(async () => {
     setLoading(true);
@@ -118,7 +124,7 @@ export function GradeCardPreviewPanel({ studentId, semester = 1, refreshKey = 0 
       setActiveSheet(initialSheet || null);
 
       if (initialSheet) {
-        const url = await resolveStudentPhotoUrl(supabase, initialSheet);
+        const url = await resolveStudentPhotoUrl(supabase, initialSheet, { studentUuid: studentId });
         setPhotoUrl(url);
       } else {
         setPhotoUrl(null);
@@ -141,7 +147,7 @@ export function GradeCardPreviewPanel({ studentId, semester = 1, refreshKey = 0 
     setActiveSheet(sheet);
     setShowAllSemesters(false);
     try {
-      const url = await resolveStudentPhotoUrl(supabase, sheet);
+      const url = await resolveStudentPhotoUrl(supabase, sheet, { studentUuid: studentId });
       setPhotoUrl(url);
     } catch (e) {
       console.error(e);
@@ -150,17 +156,28 @@ export function GradeCardPreviewPanel({ studentId, semester = 1, refreshKey = 0 
 
   async function downloadPdf() {
     if (!activeSheet) return;
+    if (!approved) {
+      toast.error("Approve e-signatures before generating the final grade card PDF.");
+      return;
+    }
     setDownloading(true);
     try {
-      const resolvedPhoto = await resolveStudentPhotoUrl(supabase, activeSheet);
+      const [resolvedPhoto, backSigs] = await Promise.all([
+        resolveStudentPhotoUrl(supabase, activeSheet, { studentUuid: studentId }),
+        fetchApprovedBackPageSignatures(supabase, studentId),
+      ]);
       const filtered = getFilteredMarksheet(activeSheet, allSheets, showAllSemesters);
       if (!filtered) return;
       const blob = await generateMarksheetPdf(filtered, {
         photoUrl: resolvedPhoto,
         allMarksheets: allSheets,
+        backPageSignatures: {
+          checkedByUrl: backSigs.checkedByUrl,
+          verifiedByUrl: backSigs.verifiedByUrl,
+        },
       });
-      downloadMarksheetBlob(blob, filtered);
-      toast.success("Grade card PDF downloaded.");
+      downloadMarksheetBlob(filtered, "pdf", blob);
+      toast.success("Final grade card PDF downloaded.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not generate grade card PDF.");
     } finally {
@@ -181,18 +198,25 @@ export function GradeCardPreviewPanel({ studentId, semester = 1, refreshKey = 0 
         </div>
         <button
           type="button"
-          disabled={!displaySheet || downloading}
+          disabled={!displaySheet || downloading || !approved}
           onClick={() => void downloadPdf()}
           className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          title={!approved ? "Approve e-signatures first" : undefined}
         >
           {downloading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Download className="h-4 w-4" />
           )}
-          Download PDF
+          Generate Final PDF
         </button>
       </div>
+
+      <GradeCardESignaturePanel
+        studentId={studentId}
+        darkTheme
+        onApprovalChange={() => void refreshSignatures()}
+      />
 
       {allSheets.length > 1 && (
         <div className="flex flex-wrap items-center gap-2">

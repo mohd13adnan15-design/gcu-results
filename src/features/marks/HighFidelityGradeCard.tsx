@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { groupCoursesBySection, type StudentMarksheet } from "@/lib/marksheet";
 
 interface HighFidelityGradeCardProps {
@@ -10,6 +10,12 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
   marksheet,
   photoUrl,
 }) => {
+  const [photoSrc, setPhotoSrc] = useState<string | null>(photoUrl ?? null);
+
+  useEffect(() => {
+    setPhotoSrc(photoUrl ?? null);
+  }, [photoUrl]);
+
   return (
     <div className="grade-card-container">
       <div className="grade-card-paper">
@@ -45,8 +51,13 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
 
             <div className="header-right">
               <div className="student-photo-container">
-                {photoUrl ? (
-                  <img src={photoUrl} alt="Student" className="student-photo" />
+                {photoSrc ? (
+                  <img
+                    src={photoSrc}
+                    alt="Student"
+                    className="student-photo"
+                    onError={() => setPhotoSrc(null)}
+                  />
                 ) : (
                   <div className="photo-placeholder">Student Photo</div>
                 )}
