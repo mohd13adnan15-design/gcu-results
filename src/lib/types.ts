@@ -31,6 +31,8 @@ export interface Student {
   hostel_paid: number;
   /** UUID of `profiles.id` in the external library Supabase project - for penalty sync. */
   library_remote_profile_id?: string | null;
+  /** Supabase storage path in `student-photos` (e.g. `23MSDA105.jpg`) from COE ZIP upload. */
+  image_path?: string | null;
 }
 
 export interface StudentMarkRow {

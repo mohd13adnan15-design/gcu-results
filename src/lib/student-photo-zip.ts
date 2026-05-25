@@ -82,6 +82,24 @@ export function studentPhotoStorageFileName(registrationNo: string, ext: string)
   return `${safeReg}.${safeExt}`;
 }
 
+/** Likely flat storage paths for a registration number (ZIP upload naming). */
+export function studentPhotoCandidatePaths(registrationNo: string): string[] {
+  const safeReg = registrationNo.trim();
+  if (!safeReg) return [];
+  const flat = [
+    `${safeReg}.jpg`,
+    `${safeReg}.jpeg`,
+    `${safeReg}.png`,
+    `${safeReg}.JPG`,
+    `${safeReg}.JPEG`,
+    `${safeReg}.PNG`,
+  ];
+  const folder = ["profile.jpeg", "profile.jpg", "profile.png"].map(
+    (name) => `${safeReg}/${name}`,
+  );
+  return [...flat, ...folder];
+}
+
 export function studentPhotoContentType(ext: string): string {
   const normalized = ext.replace(/^\./, "").toLowerCase();
   if (normalized === "png") return "image/png";

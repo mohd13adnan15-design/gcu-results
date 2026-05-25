@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Loader2, MessageSquareWarning, ShieldCheck, X } from "lucide-react";
+import { Eye, Loader2, MessageSquareWarning, ShieldCheck, X, Download } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,13 @@ import {
   calculateMarksheetTotals,
 } from "@/lib/marksheet";
 import { HighFidelityGradeCard } from "@/features/marks/HighFidelityGradeCard";
+import { BackPageSignaturePreview } from "@/features/marks/BackPageSignaturePreview";
+import {
+  GradeCardESignaturePanel,
+  useGradeCardSignatureApproved,
+} from "@/features/marks/GradeCardESignaturePanel";
+import { fetchApprovedBackPageSignatures } from "@/lib/grade-card-e-signature";
+import { downloadMarksheetBlob, generateMarksheetPdf } from "@/lib/marksheet-documents";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   buildAdminVerificationUpdate,
@@ -44,6 +51,9 @@ export function FacultyPage() {
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showAllSemesters, setShowAllSemesters] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const { approved: signaturesApproved, previewUrls, refresh: refreshSignatures } =
+    useGradeCardSignatureApproved(previewStudent?.id ?? "");
 
   function getSemesterNumber(label: string): number {
     const clean = (label || "").toUpperCase().trim();
@@ -150,7 +160,9 @@ export function FacultyPage() {
 
       setPreviewMarksheet(initialSheet || null);
       if (initialSheet) {
-        const photoUrl = await resolveStudentPhotoUrl(supabase, initialSheet);
+        const photoUrl = await resolveStudentPhotoUrl(supabase, initialSheet, {
+          studentUuid: student.id,
+        });
         setPreviewPhotoUrl(photoUrl);
       }
     } catch (e) {
@@ -164,10 +176,43 @@ export function FacultyPage() {
     setPreviewMarksheet(sheet);
     setShowAllSemesters(false);
     try {
-      const photoUrl = await resolveStudentPhotoUrl(supabase, sheet);
+      const photoUrl = await resolveStudentPhotoUrl(supabase, sheet, {
+        studentUuid: previewStudent?.id,
+      });
       setPreviewPhotoUrl(photoUrl);
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  async function handleGenerateFinalPdf() {
+    if (!previewStudent || !previewMarksheet) return;
+    if (!signaturesApproved) {
+      toast.error("Approve e-signatures before generating the final grade card PDF.");
+      return;
+    }
+    setPdfBusy(true);
+    try {
+      const sheet = getFilteredMarksheet(previewMarksheet, previewAllSheets, showAllSemesters);
+      if (!sheet) return;
+      const [photoUrl, backSigs] = await Promise.all([
+        resolveStudentPhotoUrl(supabase, previewMarksheet, { studentUuid: previewStudent.id }),
+        fetchApprovedBackPageSignatures(supabase, previewStudent.id),
+      ]);
+      const blob = await generateMarksheetPdf(sheet, {
+        photoUrl,
+        allMarksheets: previewAllSheets,
+        backPageSignatures: {
+          checkedByUrl: backSigs.checkedByUrl,
+          verifiedByUrl: backSigs.verifiedByUrl,
+        },
+      });
+      downloadMarksheetBlob(sheet, "pdf", blob);
+      toast.success("Final grade card PDF downloaded.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not generate PDF.");
+    } finally {
+      setPdfBusy(false);
     }
   }
 
@@ -642,6 +687,28 @@ export function FacultyPage() {
               Grade Card Preview: {previewStudent?.full_name} ({previewStudent?.student_id})
             </DialogTitle>
           </DialogHeader>
+
+          {previewStudent && (
+            <div className="space-y-4">
+              <GradeCardESignaturePanel
+                studentId={previewStudent.id}
+                darkTheme
+                onApprovalChange={() => void refreshSignatures()}
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  disabled={!previewMarksheet || pdfBusy || !signaturesApproved}
+                  onClick={() => void handleGenerateFinalPdf()}
+                  className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Generate Final PDF
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-col items-center">
             {!previewLoading && previewAllSheets.length > 1 && (
               <div className="mb-6 flex flex-wrap justify-center items-center gap-2.5 bg-slate-800/40 p-3.5 rounded-xl border border-slate-700/50 w-full max-w-xl">
@@ -720,6 +787,20 @@ export function FacultyPage() {
             ) : (
               <div className="py-20 text-center text-slate-400">
                 No marksheet data found for this student.
+              </div>
+            )}
+
+            {(previewUrls.checkedByUrl || previewUrls.verifiedByUrl) && (
+              <div className="mt-8 w-full">
+                <p className="mb-3 text-center text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Back Page — Signature Preview
+                </p>
+                <div className="flex justify-center rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <BackPageSignaturePreview
+                    checkedByUrl={previewUrls.checkedByUrl}
+                    verifiedByUrl={previewUrls.verifiedByUrl}
+                  />
+                </div>
               </div>
             )}
           </div>

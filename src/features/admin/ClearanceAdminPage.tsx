@@ -103,6 +103,41 @@ function parseAmount(raw: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+type StudentLookupRow = { id: string; student_id: string; email?: string };
+
+function normalizeRollNo(rollNo: string): string {
+  return rollNo.trim().toLowerCase();
+}
+
+function buildStudentRollIndex(rows: StudentLookupRow[]): Map<string, StudentLookupRow> {
+  const index = new Map<string, StudentLookupRow>();
+  for (const row of rows) {
+    index.set(normalizeRollNo(row.student_id), row);
+  }
+  return index;
+}
+
+async function findStudentByRoll(rollNo: string): Promise<StudentLookupRow | null> {
+  const trimmed = rollNo.trim();
+  if (!trimmed) return null;
+
+  const { data, error } = await supabase
+    .from("students")
+    .select("id, student_id, email")
+    .ilike("student_id", trimmed)
+    .maybeSingle();
+
+  if (!error && data) return data as StudentLookupRow;
+
+  const { data: byEmail } = await supabase
+    .from("students")
+    .select("id, student_id, email")
+    .eq("email", `${normalizeRollNo(trimmed)}@gcu.edu.in`)
+    .maybeSingle();
+
+  return (byEmail as StudentLookupRow | null) ?? null;
+}
+
 export function ClearanceAdminPage({ kind }: Props) {
   const cfg = FIELD[kind];
   const money = kind === "fees" || kind === "hostel" ? MONEY[kind] : null;
@@ -499,27 +534,16 @@ export function ClearanceAdminPage({ kind }: Props) {
         return;
       }
 
-      const ids = Array.from(updates.keys());
-      const lookupQuery = supabase
+      const { data: existingRows, error: lookupErr } = await supabase
         .from("students")
-        .select("id, student_id")
-        .in("student_id", ids);
-      const { data: existing, error: lookupErr } = await lookupQuery;
+        .select("id, student_id");
 
       if (lookupErr) {
         toast.error(`Lookup failed: ${lookupErr.message}`);
         return;
       }
 
-      type LookupRow = {
-        id: string;
-        student_id: string;
-      } & Record<string, unknown>;
-
-      const found = new Map<string, LookupRow>();
-      for (const r of (existing ?? []) as unknown as LookupRow[]) {
-        found.set(String(r.student_id).toLowerCase(), r);
-      }
+      const found = buildStudentRollIndex((existingRows ?? []) as StudentLookupRow[]);
 
       let updated = 0;
       let created = 0;
@@ -585,7 +609,7 @@ export function ClearanceAdminPage({ kind }: Props) {
       );
 
       if (inserts.length > 0) {
-        const { error: insErr } = await supabase.from("students").upsert(inserts, { onConflict: "student_id" });
+        const { error: insErr } = await supabase.from("students").insert(inserts);
         if (insErr) failures.push(`Inserts failed: ${insErr.message}`);
         else created += inserts.length;
       }
@@ -869,11 +893,11 @@ export function ClearanceAdminPage({ kind }: Props) {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                const sid = manualData.student_id.trim().toLowerCase();
+                const sid = manualData.student_id.trim();
                 if (!sid) return toast.error("Student ID required");
-                
-                const { data: existing } = await supabase.from("students").select("id").eq("student_id", sid).maybeSingle();
-                
+
+                const existing = await findStudentByRoll(sid);
+
                 let finalCleared = manualData.cleared;
                 const payload: Record<string, unknown> = {
                   [cfg.membership]: true,
@@ -893,14 +917,17 @@ export function ClearanceAdminPage({ kind }: Props) {
                 payload[cfg.cleared] = finalCleared;
 
                 if (existing) {
-                  const { error } = await supabase.from("students").update(payload as never).eq("id", existing.id);
+                  const { error } = await supabase
+                    .from("students")
+                    .update(payload as never)
+                    .eq("id", existing.id);
                   if (error) return toast.error(error.message);
                 } else {
                   const newPayload = {
                     student_id: sid,
-                    email: `${sid}@gcu.edu.in`,
+                    email: `${normalizeRollNo(sid)}@gcu.edu.in`,
                     full_name: manualData.full_name || sid,
-                    department: manualData.department as any,
+                    department: manualData.department as string,
                     semester: manualData.semester,
                     year: manualData.year,
                     fees_total: 100000,
@@ -913,12 +940,16 @@ export function ClearanceAdminPage({ kind }: Props) {
                     library_cleared: false,
                     hostel_cleared: false,
                     fees_cleared: false,
-                    ...payload
+                    ...payload,
                   };
-                  const { error } = await supabase.from("students").upsert(newPayload as any, { onConflict: "student_id" });
+                  const { error } = await supabase.from("students").insert(newPayload as never);
                   if (error) return toast.error(error.message);
                 }
-                toast.success("Student details saved.");
+                toast.success(
+                  existing
+                    ? "Existing student enrolled in this portal."
+                    : "Student details saved.",
+                );
                 setManualEntryOpen(false);
                 setManualData({ student_id: "", full_name: "", department: depts[0] || "CSE", semester: 1, year: 1, paid: "", total: "", cleared: false });
                 load();
