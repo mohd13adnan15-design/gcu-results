@@ -127,13 +127,13 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
                           color: isPractical ? "#2e2e2e" : "#6b1f1f",
                           paddingLeft: isPractical ? "12px" : "8px",
                           fontWeight: "bold",
-                          fontSize: isPractical ? "11.5px" : "14.5px",
+                          fontSize: isPractical ? "11px" : "14.5px",
                           backgroundColor: "#fcf8f8",
                           height: "30px",
                           borderBottom: "1px solid #ddd"
                         }}
                       >
-                        {group.section}
+                        {isPractical ? "Practical" : group.section}
                       </td>
                     </tr>
                     {group.courses.map((course, idx) => {
@@ -213,7 +213,17 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
                         : "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png";
                     })()} 
                     alt="Signature" 
-                    className="signature-img" 
+                    className={`signature-img ${
+                      (() => {
+                        if (!marksheet.exam_month_year) return "sibi-sig";
+                        const match = marksheet.exam_month_year.match(/([a-zA-Z]+)\s*(?:-)?\s*(\d{4})/);
+                        if (!match) return "sibi-sig";
+                        const month = match[1];
+                        const year = parseInt(match[2], 10);
+                        const d = new Date(`${month} 1, ${year}`);
+                        return d > new Date("July 31, 2024") ? "sibi-sig" : "bheeja-sig";
+                      })()
+                    }`} 
                   />
                   <div className="signature-label">Controller of Examinations</div>
                 </div>
@@ -553,14 +563,22 @@ export const HighFidelityGradeCard: React.FC<HighFidelityGradeCardProps> = ({
         }
 
         .signature-img {
-          width: 190px;
-          margin-bottom: -8px;
           mix-blend-mode: multiply;
           filter: brightness(0.85) contrast(1.1) sepia(0.25) hue-rotate(85deg);
         }
 
+        .signature-img.sibi-sig {
+          width: 300px;
+          margin-bottom: -16px;
+        }
+
+        .signature-img.bheeja-sig {
+          width: 240px;
+          margin-bottom: -12px;
+        }
+
         .signature-label {
-          font-size: 15px;
+          font-size: 19px;
           font-weight: bold;
           color: #2f2f2f;
           margin-top: 5px;
