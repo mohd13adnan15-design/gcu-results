@@ -1081,7 +1081,11 @@ function MarksUploader() {
             <FileSpreadsheet className="h-5 w-5" /> Upload student marks
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Upload the Excel spreadsheet containing marks and student records, and optionally select a ZIP archive containing student photo files. Each photo must be named exactly as the student&apos;s registration number (e.g. <strong>23MSDA105.jpg</strong> or <strong>23MSDA105.png</strong>).
+            Upload the Excel spreadsheet containing student records and marks, along with a ZIP archive of student photos.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Each photo file must be named exactly according to the student&apos;s registration number (for example:{" "}
+            <strong>23MSDA105.jpg</strong> or <strong>23MSDA105.png</strong>).
           </p>
         </div>
         <button
@@ -1097,7 +1101,7 @@ function MarksUploader() {
         <div className="grid gap-6 md:grid-cols-2">
           {/* Excel Input */}
           <div className="flex flex-col gap-2 rounded-xl border border-border bg-cream/20 p-4">
-            <label className="text-sm font-semibold text-primary">Excel Marks Sheet (Required)</label>
+            <label className="text-sm font-semibold text-primary">Excel Marks Sheet</label>
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -1115,7 +1119,7 @@ function MarksUploader() {
 
           {/* ZIP Input */}
           <div className="flex flex-col gap-2 rounded-xl border border-border bg-cream/20 p-4">
-            <label className="text-sm font-semibold text-primary">Student Photos ZIP (Optional)</label>
+            <label className="text-sm font-semibold text-primary">Student Photos ZIP</label>
             <input
               type="file"
               accept=".zip"

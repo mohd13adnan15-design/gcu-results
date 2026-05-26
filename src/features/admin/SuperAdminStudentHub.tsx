@@ -6,7 +6,6 @@ import { DEPARTMENTS, SEMESTERS, YEARS } from "@/lib/types";
 import { fetchDepartments, insertDepartment } from "@/lib/departments-db";
 import { cn } from "@/lib/utils";
 import { StudentMarksAdminEditor } from "@/features/marks/StudentMarksAdminEditor";
-import { GradeCardPreviewPanel } from "@/features/marks/GradeCardPreviewPanel";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -44,7 +43,6 @@ function StatusPill({ ok, label }: { ok: boolean; label: string }) {
 export function SuperAdminStudentHub({ studentId }: Props) {
   const [tab, setTab] = useState<TabId>("overview");
   const [loading, setLoading] = useState(true);
-  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [student, setStudent] = useState<Student | null>(null);
   const [localDepts, setLocalDepts] = useState<string[]>([]);
   const [selectedDept, setSelectedDept] = useState("");
@@ -579,20 +577,10 @@ export function SuperAdminStudentHub({ studentId }: Props) {
 
       {tab === "marks" && (
         <div className="space-y-6">
-          <GradeCardPreviewPanel
-            studentId={studentId}
-            semester={student.semester}
-            refreshKey={previewRefreshKey}
-          />
           <div className="rounded-2xl border-2 border-primary/25 bg-cream p-6 shadow-sm">
             <h2 className="text-xl font-bold text-primary">Modify Gradecard</h2>
             <div className="mt-5">
-              <StudentMarksAdminEditor
-                compact
-                prettyCard
-                studentId={studentId}
-                onMarksheetSynced={() => setPreviewRefreshKey((k) => k + 1)}
-              />
+              <StudentMarksAdminEditor compact prettyCard studentId={studentId} />
             </div>
           </div>
         </div>

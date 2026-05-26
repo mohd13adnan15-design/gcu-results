@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Loader2, MessageSquareWarning, ShieldCheck, X, Download } from "lucide-react";
+import { Eye, Loader2, MessageSquareWarning, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -10,16 +10,8 @@ import {
   fetchStudentMarksheet,
   fetchAllStudentMarksheets,
   resolveStudentPhotoUrl,
-  calculateMarksheetTotals,
 } from "@/lib/marksheet";
-import { HighFidelityGradeCard } from "@/features/marks/HighFidelityGradeCard";
-import { BackPageSignaturePreview } from "@/features/marks/BackPageSignaturePreview";
-import {
-  GradeCardESignaturePanel,
-  useGradeCardSignatureApproved,
-} from "@/features/marks/GradeCardESignaturePanel";
-import { fetchApprovedBackPageSignatures } from "@/lib/grade-card-e-signature";
-import { downloadMarksheetBlob, generateMarksheetPdf } from "@/lib/marksheet-documents";
+import { GradeCardPreviewViewer } from "@/features/marks/GradeCardPreviewViewer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   buildAdminVerificationUpdate,
@@ -51,86 +43,6 @@ export function FacultyPage() {
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showAllSemesters, setShowAllSemesters] = useState(false);
-  const [pdfBusy, setPdfBusy] = useState(false);
-  const { approved: signaturesApproved, previewUrls, refresh: refreshSignatures } =
-    useGradeCardSignatureApproved(previewStudent?.id ?? "");
-
-  function getSemesterNumber(label: string): number {
-    const clean = (label || "").toUpperCase().trim();
-    if (clean.includes("VIII") || clean.includes("8")) return 8;
-    if (clean.includes("VII") || clean.includes("7")) return 7;
-    if (clean.includes("VI") || clean.includes("6")) return 6;
-    if (clean.includes("IV") || clean.includes("4")) return 4;
-    if (clean.includes("III") || clean.includes("3")) return 3;
-    if (clean.includes("II") || clean.includes("2")) return 2;
-    if (clean.includes("I") || clean.includes("1")) return 1;
-    if (clean.includes("V") || clean.includes("5")) return 5;
-    return 1;
-  }
-
-  function getFilteredMarksheet(
-    currentSheet: StudentMarksheet | null,
-    allSheets: StudentMarksheet[],
-    showAll: boolean
-  ): StudentMarksheet | null {
-    if (!currentSheet) return null;
-    if (showAll) {
-      const sorted = [...allSheets].sort((a, b) =>
-        getSemesterNumber(b.semester_label) - getSemesterNumber(a.semester_label)
-      );
-      const latest = sorted[0] || currentSheet;
-      const reindexedCourses = (latest.courses || []).map((c, i) => ({
-        ...c,
-        sl_no: i + 1,
-      }));
-      const totals = calculateMarksheetTotals(reindexedCourses);
-      return {
-        ...latest,
-        courses: reindexedCourses,
-        total_credits: totals.totalCredits,
-        total_credits_earned: totals.totalCreditsEarned,
-        total_credit_points: totals.totalCreditPoints,
-        sgpa: totals.sgpa,
-        final_grade: totals.finalGrade,
-      };
-    }
-
-    const currentSemNum = getSemesterNumber(currentSheet.semester_label);
-    const previousCourseCodes = new Set<string>();
-
-    for (const sheet of allSheets) {
-      if (getSemesterNumber(sheet.semester_label) < currentSemNum) {
-        const courses = Array.isArray(sheet.courses) ? sheet.courses : [];
-        for (const c of courses) {
-          const code = String((c as any).course_code || (c as any).subject_code || "").toUpperCase().trim();
-          if (code) previousCourseCodes.add(code);
-        }
-      }
-    }
-
-    const rawCourses = Array.isArray(currentSheet.courses) ? currentSheet.courses : [];
-    const filteredCourses = rawCourses.filter((c) => {
-      const code = String((c as any).course_code || (c as any).subject_code || "").toUpperCase().trim();
-      return !previousCourseCodes.has(code);
-    });
-
-    const reindexedCourses = filteredCourses.map((c, i) => ({
-      ...c,
-      sl_no: i + 1,
-    }));
-
-    const totals = calculateMarksheetTotals(reindexedCourses);
-
-    return {
-      ...currentSheet,
-      courses: reindexedCourses,
-      total_credits: totals.totalCredits,
-      total_credits_earned: totals.totalCreditsEarned,
-      total_credit_points: totals.totalCreditPoints,
-      sgpa: totals.sgpa,
-      final_grade: totals.finalGrade,
-    };
-  }
 
   async function handleOpenPreview(student: Student) {
     setPreviewStudent(student);
@@ -182,37 +94,6 @@ export function FacultyPage() {
       setPreviewPhotoUrl(photoUrl);
     } catch (e) {
       console.error(e);
-    }
-  }
-
-  async function handleGenerateFinalPdf() {
-    if (!previewStudent || !previewMarksheet) return;
-    if (!signaturesApproved) {
-      toast.error("Approve e-signatures before generating the final grade card PDF.");
-      return;
-    }
-    setPdfBusy(true);
-    try {
-      const sheet = getFilteredMarksheet(previewMarksheet, previewAllSheets, showAllSemesters);
-      if (!sheet) return;
-      const [photoUrl, backSigs] = await Promise.all([
-        resolveStudentPhotoUrl(supabase, previewMarksheet, { studentUuid: previewStudent.id }),
-        fetchApprovedBackPageSignatures(supabase, previewStudent.id),
-      ]);
-      const blob = await generateMarksheetPdf(sheet, {
-        photoUrl,
-        allMarksheets: previewAllSheets,
-        backPageSignatures: {
-          checkedByUrl: backSigs.checkedByUrl,
-          verifiedByUrl: backSigs.verifiedByUrl,
-        },
-      });
-      downloadMarksheetBlob(sheet, "pdf", blob);
-      toast.success("Final grade card PDF downloaded.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not generate PDF.");
-    } finally {
-      setPdfBusy(false);
     }
   }
 
@@ -689,121 +570,19 @@ export function FacultyPage() {
           </DialogHeader>
 
           {previewStudent && (
-            <div className="space-y-4">
-              <GradeCardESignaturePanel
-                studentId={previewStudent.id}
-                darkTheme
-                onApprovalChange={() => void refreshSignatures()}
-              />
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  disabled={!previewMarksheet || pdfBusy || !signaturesApproved}
-                  onClick={() => void handleGenerateFinalPdf()}
-                  className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                >
-                  {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                  Generate Final PDF
-                </button>
-              </div>
-            </div>
+            <GradeCardPreviewViewer
+              studentId={previewStudent.id}
+              activeSheet={previewMarksheet}
+              allSheets={previewAllSheets}
+              photoUrl={previewPhotoUrl}
+              showAllSemesters={showAllSemesters}
+              loading={previewLoading}
+              darkTheme
+              onSelectSemester={(sheet) => void handleSelectPreviewSemester(sheet)}
+              onShowAllSemesters={() => setShowAllSemesters(true)}
+              emptyMessage="No marksheet data found for this student."
+            />
           )}
-
-          <div className="mt-4 flex flex-col items-center">
-            {!previewLoading && previewAllSheets.length > 1 && (
-              <div className="mb-6 flex flex-wrap justify-center items-center gap-2.5 bg-slate-800/40 p-3.5 rounded-xl border border-slate-700/50 w-full max-w-xl">
-                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider mr-2">
-                  Select Semester:
-                </span>
-                {previewAllSheets.map((sheet) => {
-                  const semName = (sheet.semester_label || "").toLowerCase().startsWith("sem")
-                    ? sheet.semester_label
-                    : `Sem ${sheet.semester_label}`;
-                  const isSelected = !showAllSemesters && previewMarksheet?.semester_label === sheet.semester_label;
-                  return (
-                    <button
-                      key={sheet.semester_label}
-                      type="button"
-                      onClick={() => void handleSelectPreviewSemester(sheet)}
-                      className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-extrabold transition duration-200 border shadow-sm ${isSelected
-                          ? "bg-emerald-600 border-emerald-500 text-white shadow-emerald-900/50 scale-105"
-                          : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white"
-                        }`}
-                    >
-                      {semName}
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => setShowAllSemesters(true)}
-                  className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-extrabold transition duration-200 border shadow-sm ${showAllSemesters
-                      ? "bg-amber-600 border-amber-500 text-white shadow-amber-900/50 scale-105"
-                      : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white"
-                    }`}
-                >
-                  All Sem
-                </button>
-              </div>
-            )}
-
-            {previewLoading ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-slate-400">Loading grade card preview...</p>
-              </div>
-            ) : previewMarksheet ? (
-              <div className="w-full overflow-x-auto flex justify-center bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                {showAllSemesters ? (
-                  <div className="flex flex-col gap-10 w-full items-center my-4">
-                    {[...previewAllSheets]
-                      .sort((a, b) => getSemesterNumber(a.semester_label) - getSemesterNumber(b.semester_label))
-                      .map((sheet) => {
-                        const filteredSheet = getFilteredMarksheet(sheet, previewAllSheets, false)!;
-                        return (
-                          <div key={sheet.id || sheet.semester_label} className="flex flex-col items-center w-full">
-                            <div className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider bg-slate-800/80 px-4 py-1.5 rounded-full border border-slate-700/50">
-                              Semester {sheet.semester_label}
-                            </div>
-                            <div className="origin-top scale-[0.85] md:scale-100 shadow-2xl border border-slate-800 rounded-xl overflow-hidden">
-                              <HighFidelityGradeCard
-                                marksheet={filteredSheet}
-                                photoUrl={previewPhotoUrl}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                ) : (
-                  <div className="origin-top scale-[0.85] md:scale-100 my-4">
-                    <HighFidelityGradeCard
-                      marksheet={getFilteredMarksheet(previewMarksheet, previewAllSheets, false)!}
-                      photoUrl={previewPhotoUrl}
-                    />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="py-20 text-center text-slate-400">
-                No marksheet data found for this student.
-              </div>
-            )}
-
-            {(previewUrls.checkedByUrl || previewUrls.verifiedByUrl) && (
-              <div className="mt-8 w-full">
-                <p className="mb-3 text-center text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Back Page — Signature Preview
-                </p>
-                <div className="flex justify-center rounded-xl border border-slate-800 bg-slate-950 p-4">
-                  <BackPageSignaturePreview
-                    checkedByUrl={previewUrls.checkedByUrl}
-                    verifiedByUrl={previewUrls.verifiedByUrl}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
         </DialogContent>
       </Dialog>
     </div>
