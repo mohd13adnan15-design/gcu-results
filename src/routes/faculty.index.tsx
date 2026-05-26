@@ -578,6 +578,7 @@ export function FacultyPage() {
               showAllSemesters={showAllSemesters}
               loading={previewLoading}
               darkTheme
+              showDownloadButton
               onSelectSemester={(sheet) => void handleSelectPreviewSemester(sheet)}
               onShowAllSemesters={() => setShowAllSemesters(true)}
               emptyMessage="No marksheet data found for this student."

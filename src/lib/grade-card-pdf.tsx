@@ -12,6 +12,17 @@ import { A4_HEIGHT, A4_WIDTH } from "@/lib/grade-card-constants";
 import type { BackPageSignatureOptions, MarksheetDocumentOptions } from "@/lib/marksheet-documents";
 import type { StudentMarksheet } from "@/lib/marksheet";
 
+/** html2canvas cannot parse modern CSS color functions from app stylesheets (e.g. oklch). */
+function prepareDocumentCloneForCanvas(clonedDoc: Document) {
+  clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => node.remove());
+  clonedDoc.documentElement.style.background = "#f6f3eb";
+  if (clonedDoc.body) {
+    clonedDoc.body.style.background = "#f6f3eb";
+    clonedDoc.body.style.margin = "0";
+    clonedDoc.body.style.padding = "0";
+  }
+}
+
 async function waitForImages(container: HTMLElement, timeoutMs = 8000) {
   const images = Array.from(container.querySelectorAll("img"));
   await Promise.all(
@@ -47,6 +58,7 @@ export async function capturePagesToPdf(pageElements: HTMLElement[]): Promise<Bl
       height: A4_HEIGHT,
       windowWidth: A4_WIDTH,
       windowHeight: A4_HEIGHT,
+      onclone: prepareDocumentCloneForCanvas,
     });
     const imgData = canvas.toDataURL("image/jpeg", 0.92);
     doc.addImage(imgData, "JPEG", 0, 0, A4_WIDTH, A4_HEIGHT);

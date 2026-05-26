@@ -46,7 +46,7 @@ export function GradeCardPreviewViewer({
   onSelectSemester,
   onShowAllSemesters,
   emptyMessage = "No grade card data yet. Upload the Excel marks sheet (and optional photo ZIP) from the COE home page.",
-  showDownloadButton = true,
+  showDownloadButton = false,
 }: Props) {
   const documentRef = useRef<GradeCardDocumentHandle>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
