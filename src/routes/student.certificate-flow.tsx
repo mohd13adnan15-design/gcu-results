@@ -179,11 +179,11 @@ function CertificateFlow() {
         if (error) throw error;
 
         await supabase.from("portal_notifications").insert({
-          recipient_portal: "admin_1",
+          recipient_portal: "admin_2",
           sender_portal: "fees",
           student_id: student.id,
-          title: "Student requested grade card verification",
-          message: `${student.student_id} (${student.full_name}) started the certificate process. Review under Verification 1.`,
+          title: "Grade card requested",
+          message: `${student.full_name} (${student.student_id}) requested a grade card. Review in the Admin Queue.`,
         });
 
         if (!opts?.silent) {
@@ -223,7 +223,9 @@ function CertificateFlow() {
     void (async () => {
       const ok = await startCertificateProcess({ silent: true });
       if (ok) {
-        toast.success("Your grade card will be available within 2–3 working days.");
+        toast.success(
+          "After the verification process is completed, your grade card will be generated in 3 working days.",
+        );
       }
       clearRouteState();
     })();
@@ -435,7 +437,11 @@ function CountdownTimer({ requestedAtStr }: { requestedAtStr: string }) {
   if (isAfter48Hours) {
     return <span className="font-medium text-amber-800">Your Grade card will be Generated Soon</span>;
   }
-  return <span className="font-medium text-amber-800">Your grade card will be available within 2–3 working days</span>;
+  return (
+    <span className="font-medium text-amber-800">
+      After the verification process is completed, your grade card will be generated in 3 working days
+    </span>
+  );
 }
 
 function FlowNode({
