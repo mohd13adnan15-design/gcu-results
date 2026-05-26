@@ -282,9 +282,12 @@ function Dashboard() {
           </div>
           <button
             onClick={() =>
-              navigate("/student/certificate-flow", {
-                state: { autoStartCertificate: !eligible },
-              })
+              navigate(
+                eligible ? "/student/marks-card" : "/student/certificate-flow",
+                {
+                  state: { autoStartCertificate: !eligible },
+                },
+              )
             }
             disabled={!certificateEntryUnlocked}
             className="rounded-md bg-primary px-6 py-3 text-primary-foreground font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"

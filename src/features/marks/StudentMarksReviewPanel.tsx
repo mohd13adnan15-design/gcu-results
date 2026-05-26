@@ -99,9 +99,15 @@ type PortalMode = "admin_1" | "admin_2";
 type Props = {
   studentId: string;
   portal: PortalMode;
+  /** When false, hides the combined "All Sem" grade view (Admin portal). */
+  showAllSemestersButton?: boolean;
 };
 
-export function StudentMarksReviewPanel({ studentId, portal }: Props) {
+export function StudentMarksReviewPanel({
+  studentId,
+  portal,
+  showAllSemestersButton = true,
+}: Props) {
   const [student, setStudent] = useState<Student | null>(null);
   const [marksheet, setMarksheet] = useState<StudentMarksheet | null>(null);
   const [allMarksheets, setAllMarksheets] = useState<StudentMarksheet[]>([]);
@@ -420,17 +426,19 @@ export function StudentMarksReviewPanel({ studentId, portal }: Props) {
                     </button>
                   );
                 })}
-                <button
-                  type="button"
-                  onClick={() => setShowAllSemesters(true)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold border transition ${
-                    showAllSemesters
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-white text-primary border-primary/30 hover:bg-primary/10"
-                  }`}
-                >
-                  All Sem
-                </button>
+                {showAllSemestersButton && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllSemesters(true)}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold border transition ${
+                      showAllSemesters
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-white text-primary border-primary/30 hover:bg-primary/10"
+                    }`}
+                  >
+                    All Sem
+                  </button>
+                )}
               </div>
             )}
           </div>

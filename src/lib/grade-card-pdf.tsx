@@ -90,8 +90,15 @@ function OffscreenCapture({
     void (async () => {
       try {
         await waitForImages(containerRef.current ?? document.body);
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
         if (cancelled) return;
         const pages = docRef.current?.getPageElements() ?? [];
+        if (pages.length === 0) {
+          onError(new Error("No grade card pages to export."));
+          return;
+        }
         onCaptured(pages);
       } catch (error) {
         if (!cancelled) onError(error);
@@ -117,16 +124,28 @@ function OffscreenCapture({
 }
 
 async function renderGradeCardPdfOffscreen(options: RenderPdfOptions): Promise<Blob> {
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.style.zIndex = "-1";
-  document.body.appendChild(container);
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText = `position:fixed;left:-10000px;top:0;width:${A4_WIDTH}px;height:${A4_HEIGHT}px;border:0;visibility:hidden;`;
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    document.body.removeChild(iframe);
+    throw new Error("Could not initialize PDF capture frame.");
+  }
+
+  iframeDoc.open();
+  iframeDoc.write(
+    '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f6f3eb"></body></html>',
+  );
+  iframeDoc.close();
+
+  const mount = iframeDoc.body;
 
   try {
     const pageElements = await new Promise<HTMLElement[]>((resolve, reject) => {
-      const root = createRoot(container);
+      const root = createRoot(mount);
       root.render(
         <OffscreenCapture
           options={options}
@@ -142,9 +161,13 @@ async function renderGradeCardPdfOffscreen(options: RenderPdfOptions): Promise<B
       );
     });
 
+    if (pageElements.length === 0) {
+      throw new Error("No grade card pages to export.");
+    }
+
     return await capturePagesToPdf(pageElements);
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 }
 

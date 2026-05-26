@@ -22,6 +22,24 @@ import {
 import { fetchApprovedBackPageSignatures } from "@/lib/grade-card-e-signature";
 import { getMarksheetEligibility, missingReasonLabel } from "@/lib/marksheet-verification";
 
+const OTP_SESSION_KEY = "gcu-student-marks-otp-verified";
+
+function hasOtpSession(studentId: string) {
+  try {
+    return sessionStorage.getItem(`${OTP_SESSION_KEY}:${studentId}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setOtpSession(studentId: string) {
+  try {
+    sessionStorage.setItem(`${OTP_SESSION_KEY}:${studentId}`, "1");
+  } catch {
+    // ignore storage failures
+  }
+}
+
 export function StudentMarksCardPage() {
   return <StudentLayout title="Grade Card">{() => <MarksCard />}</StudentLayout>;
 }
@@ -129,12 +147,22 @@ function MarksCard() {
       student
         ? getMarksheetEligibility({
           student,
-          hasMarksheet: Boolean(marksheet),
+          hasMarksheet: allMarksheets.length > 0 || Boolean(marksheet),
           hasLibraryPenalty,
         })
         : null,
-    [student, marksheet, hasLibraryPenalty],
+    [student, marksheet, allMarksheets.length, hasLibraryPenalty],
   );
+
+  const canDownloadWithoutOtp = Boolean(eligibility?.eligible && student?.fully_verified);
+  const showDownloadPanel = canDownloadWithoutOtp || verified;
+
+  useEffect(() => {
+    if (!student?.id) return;
+    if (canDownloadWithoutOtp || hasOtpSession(student.id)) {
+      setVerified(true);
+    }
+  }, [canDownloadWithoutOtp, student?.id]);
 
   async function sendOtp() {
     if (!student) return;
@@ -195,6 +223,7 @@ function MarksCard() {
         .eq("id", (data as { id: string }).id);
 
       setVerified(true);
+      setOtpSession(student.id);
       toast.success("Verified ✓");
     } finally {
       setBusy(false);
@@ -328,7 +357,7 @@ function MarksCard() {
         <ArrowLeft className="h-4 w-4" /> Back to dashboard
       </Link>
 
-      {!verified ? (
+      {!showDownloadPanel ? (
         <div className="card-elevated mx-auto max-w-xl rounded-2xl p-8">
           <div className="flex items-center gap-3 text-primary">
             <ShieldCheck className="h-6 w-6" />

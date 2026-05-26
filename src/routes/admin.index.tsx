@@ -40,7 +40,6 @@ export function AdminPage() {
   const [previewAllSheets, setPreviewAllSheets] = useState<StudentMarksheet[]>([]);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [showAllSemesters, setShowAllSemesters] = useState(false);
 
   async function handleOpenPreview(student: Student) {
     setPreviewStudent(student);
@@ -48,7 +47,6 @@ export function AdminPage() {
     setPreviewMarksheet(null);
     setPreviewAllSheets([]);
     setPreviewPhotoUrl(null);
-    setShowAllSemesters(false);
     try {
       const sheets = await fetchAllStudentMarksheets(supabase, student.id);
       setPreviewAllSheets(sheets);
@@ -84,7 +82,6 @@ export function AdminPage() {
 
   async function handleSelectPreviewSemester(sheet: StudentMarksheet) {
     setPreviewMarksheet(sheet);
-    setShowAllSemesters(false);
     try {
       const photoUrl = await resolveStudentPhotoUrl(supabase, sheet, {
         studentUuid: previewStudent?.id,
@@ -406,12 +403,10 @@ export function AdminPage() {
               activeSheet={previewMarksheet}
               allSheets={previewAllSheets}
               photoUrl={previewPhotoUrl}
-              showAllSemesters={showAllSemesters}
               loading={previewLoading}
               darkTheme
               showDownloadButton={false}
               onSelectSemester={(sheet) => void handleSelectPreviewSemester(sheet)}
-              onShowAllSemesters={() => setShowAllSemesters(true)}
               emptyMessage="No marksheet data found for this student."
             />
           )}
