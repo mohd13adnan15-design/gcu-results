@@ -126,20 +126,132 @@ export async function drawBackPageSignatures(
   await drawSlot(signatures.verifiedByUrl, BACK_PAGE_LAYOUT_REF.slots.verifiedBy, "Verified by");
 }
 
+async function loadMarksheetPdfAssets(photoUrl?: string | null) {
+  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] =
+    await Promise.all([
+      loadDataUrl(ASSET_PATHS.background),
+      loadDataUrl(ASSET_PATHS.logo),
+      loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
+      loadDataUrl(ASSET_PATHS.embossedSeal),
+      loadDataUrl(ASSET_PATHS.rightSignatureOld, { dropLightBackground: true }),
+      loadDataUrl(ASSET_PATHS.rightSignatureNew, { dropLightBackground: true }),
+      loadDataUrl(ASSET_PATHS.backPage),
+      photoUrl
+        ? loadDataUrl(photoUrl, { dropLightBackground: true, trimEdges: 18 })
+        : Promise.resolve(null),
+    ]);
+
+  return {
+    background,
+    logo,
+    seal,
+    embossedSeal,
+    rightSignatureOld,
+    rightSignatureNew,
+    backPage,
+    photo,
+  };
+}
+
+function sortMarksheetsBySemester(marksheets: StudentMarksheet[]) {
+  const semesterOrder: Record<string, number> = {
+    I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8,
+    "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8,
+  };
+  return [...marksheets].sort((a, b) => {
+    const normA = (a.semester_label || "").trim().toUpperCase().replace(/^SEM\s+/, "");
+    const normB = (b.semester_label || "").trim().toUpperCase().replace(/^SEM\s+/, "");
+    return (semesterOrder[normA] ?? 99) - (semesterOrder[normB] ?? 99);
+  });
+}
+
+async function appendBackPage(
+  doc: jsPDF,
+  backPage: LoadedDataUrl | null,
+  signatures: BackPageSignatureOptions,
+) {
+  if (!backPage) return;
+  doc.addPage();
+  doc.addImage(
+    backPage.dataUrl,
+    backPage.type,
+    0,
+    0,
+    doc.internal.pageSize.getWidth(),
+    doc.internal.pageSize.getHeight(),
+  );
+  await drawBackPageSignatures(doc, signatures);
+}
+
 export async function generateMarksheetPdf(
   marksheet: StudentMarksheet,
   options: MarksheetDocumentOptions = {},
 ) {
-  const { generateMarksheetPdfFromTemplate } = await import("@/lib/grade-card-pdf");
-  return generateMarksheetPdfFromTemplate(marksheet, options);
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const qr = await generateDynamicQrDataUrl(marksheet);
+  const assets = await loadMarksheetPdfAssets(options.photoUrl);
+  const rightSignature = isMarksheetAfterJuly2024(marksheet)
+    ? assets.rightSignatureNew
+    : assets.rightSignatureOld;
+
+  drawMarksheetPage(
+    doc,
+    marksheet,
+    {
+      background: assets.background,
+      logo: assets.logo,
+      qr,
+      seal: assets.seal,
+      embossedSeal: assets.embossedSeal,
+      rightSignature,
+      photo: assets.photo,
+    },
+    options,
+  );
+
+  await appendBackPage(doc, assets.backPage, options.backPageSignatures ?? {});
+  return doc.output("blob");
 }
 
 export async function generateAllSemestersPdf(
   marksheets: StudentMarksheet[],
   options: MarksheetDocumentOptions = {},
 ) {
-  const { generateAllSemestersPdfFromTemplate } = await import("@/lib/grade-card-pdf");
-  return generateAllSemestersPdfFromTemplate(marksheets, options);
+  if (marksheets.length === 0) {
+    throw new Error("No grade card data to generate.");
+  }
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const assets = await loadMarksheetPdfAssets(options.photoUrl);
+  const sorted = sortMarksheetsBySemester(marksheets);
+
+  for (let i = 0; i < sorted.length; i++) {
+    const marksheet = sorted[i];
+    if (i > 0) doc.addPage();
+
+    const qr = await generateDynamicQrDataUrl(marksheet);
+    const rightSignature = isMarksheetAfterJuly2024(marksheet)
+      ? assets.rightSignatureNew
+      : assets.rightSignatureOld;
+
+    drawMarksheetPage(
+      doc,
+      marksheet,
+      {
+        background: assets.background,
+        logo: assets.logo,
+        qr,
+        seal: assets.seal,
+        embossedSeal: assets.embossedSeal,
+        rightSignature,
+        photo: assets.photo,
+      },
+      { ...options, allMarksheets: sorted },
+    );
+  }
+
+  await appendBackPage(doc, assets.backPage, options.backPageSignatures ?? {});
+  return doc.output("blob");
 }
 
 export function downloadMarksheetBlob(marksheet: StudentMarksheet, extension: "pdf", blob: Blob) {

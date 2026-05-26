@@ -5,5 +5,5 @@ import { StudentMarksReviewPanel } from "@/features/marks/StudentMarksReviewPane
 export function AdminStudentMarksPage() {
   const { studentId } = useParams<{ studentId: string }>();
   if (!studentId) return null;
-  return <StudentMarksReviewPanel studentId={studentId} portal="admin_2" />;
+  return <StudentMarksReviewPanel studentId={studentId} portal="admin_2" showAllSemestersButton={false} />;
 }
