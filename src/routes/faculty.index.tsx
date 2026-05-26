@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Loader2, MessageSquareWarning, ShieldCheck, X } from "lucide-react";
+import { CheckCircle2, Clock, Eye, Loader2, MessageSquareWarning, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -28,9 +28,10 @@ export function FacultyPage() {
   const [busyStudentId, setBusyStudentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortKey, setSortKey] = useState<"roll" | "name" | "dept">("roll");
+  const [sortKey, setSortKey] = useState<"request" | "roll" | "name" | "dept">("request");
   const [verifiedFilter, setVerifiedFilter] = useState<"all" | "pending" | "done">("all");
   const [unresolvedReports, setUnresolvedReports] = useState<Set<string>>(new Set());
+  const [previewConfirmedIds, setPreviewConfirmedIds] = useState<Set<string>>(new Set());
   const [issueModal, setIssueModal] = useState<{
     student: Student;
     marksheet: StudentMarksheet | null;
@@ -43,6 +44,25 @@ export function FacultyPage() {
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showAllSemesters, setShowAllSemesters] = useState(false);
+
+  async function handleConfirmPreview() {
+    if (!previewStudent) return;
+    setPreviewConfirmedIds((prev) => new Set(prev).add(previewStudent.id));
+    toast.success("Preview confirmed. You can now issue the grade card.");
+  }
+
+  function formatRequestDate(value: string | null | undefined) {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
 
   async function handleOpenPreview(student: Student) {
     setPreviewStudent(student);
@@ -241,6 +261,15 @@ export function FacultyPage() {
     }
 
     return [...list].sort((a, b) => {
+      if (sortKey === "request") {
+        const aTime = a.student.marksheet_verification_requested_at
+          ? new Date(a.student.marksheet_verification_requested_at).getTime()
+          : Number.MAX_SAFE_INTEGER;
+        const bTime = b.student.marksheet_verification_requested_at
+          ? new Date(b.student.marksheet_verification_requested_at).getTime()
+          : Number.MAX_SAFE_INTEGER;
+        return aTime - bTime;
+      }
       if (sortKey === "name") {
         return a.student.full_name.localeCompare(b.student.full_name);
       }
@@ -290,7 +319,7 @@ export function FacultyPage() {
   async function reportIssue(student: Student) {
     setBusyStudentId(student.id);
     try {
-      const title = "Grade Card issue reported";
+      const title = "Grade Card correction requested";
       if (
         await hasRecentDuplicateSuperAdminReport(supabase, {
           studentId: student.id,
@@ -298,9 +327,9 @@ export function FacultyPage() {
           senderPortal: "admin_2",
         })
       ) {
-        toast.message("Already reported", {
+        toast.message("Already sent", {
           description:
-            "An open report for this student was sent recently. Wait before reporting again.",
+            "An open correction for this student was sent recently. Wait before sending again.",
         });
         return;
       }
@@ -309,7 +338,7 @@ export function FacultyPage() {
         recipient_portal: "head_of_coe",
         sender_portal: "admin_2",
         student_id: student.id,
-        title: "Admin reported a mismatch",
+        title: "Admin requested a correction",
         message: `Please recheck and edit grade card data for ${student.student_id} (${student.full_name}).`,
       });
       if (notificationError) throw notificationError;
@@ -320,10 +349,10 @@ export function FacultyPage() {
         .eq("id", student.id);
       if (studentError) throw studentError;
 
-      toast.success("Issue reported");
+      toast.success("Correction sent to COE");
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Report failed");
+      toast.error(error instanceof Error ? error.message : "Correction failed");
     } finally {
       setBusyStudentId(null);
     }
@@ -351,6 +380,11 @@ export function FacultyPage() {
 
       toast.success("Grade card issued for student.");
       setIssueModal(null);
+      setPreviewConfirmedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(student.id);
+        return next;
+      });
       await load();
     } catch (error: any) {
       toast.error(error?.message || "Issue failed");
@@ -378,9 +412,10 @@ export function FacultyPage() {
           Sort by
           <select
             value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as "roll" | "name" | "dept")}
+            onChange={(e) => setSortKey(e.target.value as "request" | "roll" | "name" | "dept")}
             className="rounded-md border border-border bg-cream px-3 py-2 text-sm text-primary"
           >
+            <option value="request">Request date (first come)</option>
             <option value="roll">Roll number</option>
             <option value="name">Name</option>
             <option value="dept">Department</option>
@@ -414,6 +449,8 @@ export function FacultyPage() {
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="px-2 py-2">Student</th>
+                <th className="px-2 py-2">Requested</th>
+                <th className="px-2 py-2">Status</th>
                 <th className="px-2 py-2">Grade Card</th>
                 <th className="px-2 py-2 text-center">Courses</th>
                 <th className="px-2 py-2 text-center">Grade</th>
@@ -422,14 +459,58 @@ export function FacultyPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map(({ student, marksheet, legacyCourseCount }) => {
+              {filteredRows.map(({ student, marksheet, legacyCourseCount }, rowIndex) => {
                 const courseCount = courseCountByStudentId.get(student.id) || 0;
                 const hasMarks = Boolean(marksheet) || legacyCourseCount > 0;
+                const isIssued = Boolean(student.admin_verified);
+                const previewConfirmed = previewConfirmedIds.has(student.id);
+                const isFirstInQueue = sortKey === "request" && rowIndex === 0 && !isIssued;
+                const issueDisabled =
+                  busyStudentId === student.id ||
+                  unresolvedReports.has(student.id) ||
+                  isIssued ||
+                  !previewConfirmed;
+                const correctionDisabled =
+                  busyStudentId === student.id || isIssued || unresolvedReports.has(student.id);
+
                 return (
-                  <tr key={student.id} className="border-b border-border/60">
+                  <tr
+                    key={student.id}
+                    className={`border-b border-border/60 transition-colors ${
+                      isFirstInQueue
+                        ? "bg-amber-50/90 ring-1 ring-inset ring-amber-300"
+                        : isIssued
+                          ? "bg-emerald-50/40"
+                          : "hover:bg-muted/20"
+                    }`}
+                  >
                     <td className="px-2 py-3">
-                      <p className="font-medium text-primary">{student.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{student.student_id}</p>
+                      <div>
+                        <p className="font-medium text-primary">{student.full_name}</p>
+                        <p className="text-xs text-muted-foreground">{student.student_id}</p>
+                        {isFirstInQueue && (
+                          <span className="mt-1 inline-block rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                            Next
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-2 py-3">
+                      <p className="flex items-center gap-1.5 text-xs text-primary">
+                        <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {formatRequestDate(student.marksheet_verification_requested_at)}
+                      </p>
+                    </td>
+                    <td className="px-2 py-3">
+                      {isIssued ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Issued
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                          <Clock className="h-3.5 w-3.5" /> Pending
+                        </span>
+                      )}
                     </td>
                     <td className="px-2 py-3">
                       {marksheet ? (
@@ -473,37 +554,60 @@ export function FacultyPage() {
                       />
                     </td>
                     <td className="px-2 py-3 text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-nowrap items-center justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => void handleOpenPreview(student)}
                           disabled={busyStudentId === student.id}
-                          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 transition-colors px-2 py-1 text-xs font-semibold text-white disabled:opacity-60 shadow-sm"
+                          className="inline-flex h-7 w-[4.75rem] shrink-0 items-center justify-center gap-1 rounded-md bg-emerald-600 px-1.5 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:opacity-60"
                         >
-                          <Eye className="h-3.5 w-3.5" /> Preview
+                          <Eye className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Preview</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setIssueModal({ student, marksheet, legacyCourseCount })}
-                          disabled={busyStudentId === student.id || unresolvedReports.has(student.id)}
-                          title={unresolvedReports.has(student.id) ? "Waiting for COE to resolve report" : ""}
-                          className="inline-flex items-center gap-1 rounded-md border border-border bg-cream px-2 py-1 text-xs text-primary hover:bg-secondary disabled:opacity-60 disabled:cursor-not-allowed"
+                          disabled={issueDisabled}
+                          title={
+                            isIssued
+                              ? "Grade card already issued"
+                              : !previewConfirmed
+                                ? "Open preview and confirm before issuing"
+                                : unresolvedReports.has(student.id)
+                                  ? "Waiting for COE to resolve correction"
+                                  : "Issue grade card"
+                          }
+                          className={`inline-flex h-7 w-[4.75rem] shrink-0 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
+                            isIssued
+                              ? "border border-emerald-300 bg-emerald-100 text-emerald-800"
+                              : "border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-500"
+                          }`}
                         >
-                          <ShieldCheck className="h-3.5 w-3.5" /> Issue grade card
+                          <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{isIssued ? "Issued" : "Issue"}</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => void reportIssue(student)}
-                          disabled={busyStudentId === student.id}
-                          className="inline-flex items-center gap-1 rounded-md border border-border bg-cream px-2 py-1 text-xs text-primary hover:bg-secondary disabled:opacity-60"
+                          disabled={correctionDisabled}
+                          title={
+                            isIssued
+                              ? "Correction unavailable after grade card is issued"
+                              : unresolvedReports.has(student.id)
+                                ? "Correction already sent — waiting for COE"
+                                : "Send correction to COE"
+                          }
+                          className="inline-flex h-7 w-[5.5rem] shrink-0 items-center justify-center gap-1 rounded-md border border-red-600 bg-red-600 px-1.5 text-[11px] font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <MessageSquareWarning className="h-3.5 w-3.5" /> Report
+                          <MessageSquareWarning className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Correction</span>
                         </button>
                         <Link
                           to={`/admin/students/${student.id}`}
-                          className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:opacity-90"
+                          className="inline-flex h-7 w-[4.25rem] shrink-0 items-center justify-center gap-1 rounded-md bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground hover:opacity-90"
                         >
-                          <Eye className="h-3.5 w-3.5" /> View
+                          <Eye className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">View</span>
                         </Link>
                       </div>
                     </td>
@@ -570,19 +674,37 @@ export function FacultyPage() {
           </DialogHeader>
 
           {previewStudent && (
-            <GradeCardPreviewViewer
-              studentId={previewStudent.id}
-              activeSheet={previewMarksheet}
-              allSheets={previewAllSheets}
-              photoUrl={previewPhotoUrl}
-              showAllSemesters={showAllSemesters}
-              loading={previewLoading}
-              darkTheme
-              showDownloadButton
-              onSelectSemester={(sheet) => void handleSelectPreviewSemester(sheet)}
-              onShowAllSemesters={() => setShowAllSemesters(true)}
-              emptyMessage="No marksheet data found for this student."
-            />
+            <>
+              <GradeCardPreviewViewer
+                studentId={previewStudent.id}
+                activeSheet={previewMarksheet}
+                allSheets={previewAllSheets}
+                photoUrl={previewPhotoUrl}
+                showAllSemesters={showAllSemesters}
+                loading={previewLoading}
+                darkTheme
+                showDownloadButton={false}
+                onSelectSemester={(sheet) => void handleSelectPreviewSemester(sheet)}
+                onShowAllSemesters={() => setShowAllSemesters(true)}
+                emptyMessage="No marksheet data found for this student."
+              />
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 pt-4">
+                <p className="text-sm text-slate-300">
+                  {previewConfirmedIds.has(previewStudent.id)
+                    ? "Preview confirmed — you may issue the grade card from the queue."
+                    : "Review the grade card, then confirm to unlock Issue grade card."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmPreview()}
+                  disabled={previewLoading || previewConfirmedIds.has(previewStudent.id)}
+                  className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {previewConfirmedIds.has(previewStudent.id) ? "Confirmed" : "Confirm preview"}
+                </button>
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
