@@ -23,27 +23,39 @@ const RED: [number, number, number] = [122, 17, 17] as const;
 const DARK: [number, number, number] = [20, 20, 20] as const;
 const BORDER: [number, number, number] = [55, 55, 55] as const;
 
-/** Paper fill used to cover baked-in template signatures on the back page. */
-const BACK_PAGE_PAPER: [number, number, number] = [253, 252, 247];
-
 /**
  * Back-page footer on template `file_00000000f02871f897434ec5582a144c.png` (1049×1500 px → A4 pt).
- * The template bakes in static signatures + "Checked by" / "Verified by" labels — wipe the whole band.
+ * Wipe baked-in signature ink only; "Checked by" / "Verified by" labels remain from the template PNG.
  */
-const BACK_PAGE_FOOTER_WIPE = { x: 0, y: 702, w: 595.28, h: 140 } as const;
-
-const BACK_PAGE_SIGNATURE_SLOTS = {
-  checkedBy: {
-    labelX: 118,
-    labelY: 822,
-    image: { x: 72, y: 752, w: 92, h: 58 },
-  },
-  verifiedBy: {
-    labelX: 478,
-    labelY: 822,
-    image: { x: 432, y: 752, w: 92, h: 58 },
+const BACK_PAGE_LAYOUT_REF = {
+  tableBottom: 755,
+  pageBorderBottom: 830,
+  borderClearance: 10,
+  paperColor: [253, 252, 247] as [number, number, number],
+  slots: {
+    checkedBy: {
+      centerX: 107,
+      signatureTop: 758,
+      image: { w: 110, h: 42 },
+      label: { fontSize: 14, gapAbove: 6 },
+      wipe: { w: 112 },
+    },
+    verifiedBy: {
+      centerX: 466,
+      signatureTop: 758,
+      image: { w: 110, h: 42 },
+      label: { fontSize: 14, gapAbove: 6 },
+      wipe: { w: 112 },
+    },
   },
 } as const;
+
+function getBackPageWipeHeightRef(slot: (typeof BACK_PAGE_LAYOUT_REF)["slots"]["checkedBy"]) {
+  const wipeTop = slot.signatureTop - 2;
+  const footerBottom = slot.signatureTop + slot.image.h + slot.label.gapAbove + slot.label.fontSize;
+  const maxWipeBottom = BACK_PAGE_LAYOUT_REF.pageBorderBottom - BACK_PAGE_LAYOUT_REF.borderClearance;
+  return Math.min(footerBottom - wipeTop + 2, maxWipeBottom - wipeTop);
+}
 
 export type BackPageSignatureOptions = {
   checkedByUrl?: string | null;
@@ -84,143 +96,50 @@ export async function drawBackPageSignatures(
   doc: jsPDF,
   signatures: BackPageSignatureOptions,
 ) {
-  doc.setFillColor(...BACK_PAGE_PAPER);
-  doc.rect(
-    BACK_PAGE_FOOTER_WIPE.x,
-    BACK_PAGE_FOOTER_WIPE.y,
-    BACK_PAGE_FOOTER_WIPE.w,
-    BACK_PAGE_FOOTER_WIPE.h,
-    "F",
-  );
+  doc.setFillColor(...BACK_PAGE_LAYOUT_REF.paperColor);
 
   async function drawSlot(
     url: string | null | undefined,
-    slot: (typeof BACK_PAGE_SIGNATURE_SLOTS)["checkedBy"],
+    slot: (typeof BACK_PAGE_LAYOUT_REF)["slots"]["checkedBy"],
+    label: string,
   ) {
     if (!url) return false;
+    const wipeTop = slot.signatureTop - 2;
+    const wipeLeft = slot.centerX - slot.wipe.w / 2;
+    const wipeHeight = getBackPageWipeHeightRef(slot);
+    doc.rect(wipeLeft, wipeTop, slot.wipe.w, wipeHeight, "F");
     const loaded = await loadDataUrl(url, { dropLightBackground: true });
     if (!loaded) return false;
-    const { x, y, w, h } = slot.image;
+    const { w, h } = slot.image;
+    const x = slot.centerX - w / 2;
+    const y = slot.signatureTop;
     doc.addImage(loaded.dataUrl, loaded.type, x, y, w, h);
+    doc.setFont("times", "normal");
+    doc.setFontSize(slot.label.fontSize);
+    setText(doc, DARK);
+    const labelY = slot.signatureTop + h + slot.label.gapAbove + slot.label.fontSize * 0.85;
+    doc.text(label, slot.centerX, labelY, { align: "center" });
     return true;
   }
 
-  doc.setFont("times", "normal");
-  doc.setFontSize(11);
-  setText(doc, DARK);
-
-  if (await drawSlot(signatures.checkedByUrl, BACK_PAGE_SIGNATURE_SLOTS.checkedBy)) {
-    doc.text("Checked by", BACK_PAGE_SIGNATURE_SLOTS.checkedBy.labelX, BACK_PAGE_SIGNATURE_SLOTS.checkedBy.labelY, {
-      align: "center",
-    });
-  }
-
-  if (await drawSlot(signatures.verifiedByUrl, BACK_PAGE_SIGNATURE_SLOTS.verifiedBy)) {
-    doc.text("Verified by", BACK_PAGE_SIGNATURE_SLOTS.verifiedBy.labelX, BACK_PAGE_SIGNATURE_SLOTS.verifiedBy.labelY, {
-      align: "center",
-    });
-  }
+  await drawSlot(signatures.checkedByUrl, BACK_PAGE_LAYOUT_REF.slots.checkedBy, "Checked by");
+  await drawSlot(signatures.verifiedByUrl, BACK_PAGE_LAYOUT_REF.slots.verifiedBy, "Verified by");
 }
 
 export async function generateMarksheetPdf(
   marksheet: StudentMarksheet,
   options: MarksheetDocumentOptions = {},
 ) {
-  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-  const qr = await generateDynamicQrDataUrl(marksheet);
-  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] = await Promise.all([
-    loadDataUrl(ASSET_PATHS.background),
-    loadDataUrl(ASSET_PATHS.logo),
-    loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
-    loadDataUrl(ASSET_PATHS.embossedSeal),
-    loadDataUrl(ASSET_PATHS.rightSignatureOld, { dropLightBackground: true }),
-    loadDataUrl(ASSET_PATHS.rightSignatureNew, { dropLightBackground: true }),
-    loadDataUrl(ASSET_PATHS.backPage),
-    options.photoUrl
-      ? loadDataUrl(options.photoUrl, { dropLightBackground: true, trimEdges: 18 })
-      : Promise.resolve(null),
-  ]);
-
-  const rightSignature = isMarksheetAfterJuly2024(marksheet) ? rightSignatureNew : rightSignatureOld;
-
-  drawMarksheetPage(doc, marksheet, {
-    background,
-    logo,
-    qr,
-    seal,
-    embossedSeal,
-    rightSignature,
-    photo,
-  }, options);
-
-  if (backPage) {
-    doc.addPage();
-    doc.addImage(
-      backPage.dataUrl,
-      backPage.type,
-      0,
-      0,
-      doc.internal.pageSize.getWidth(),
-      doc.internal.pageSize.getHeight(),
-    );
-    await drawBackPageSignatures(doc, options.backPageSignatures ?? {});
-  }
-
-  return doc.output("blob");
+  const { generateMarksheetPdfFromTemplate } = await import("@/lib/grade-card-pdf");
+  return generateMarksheetPdfFromTemplate(marksheet, options);
 }
 
 export async function generateAllSemestersPdf(
   marksheets: StudentMarksheet[],
   options: MarksheetDocumentOptions = {},
 ) {
-  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-
-  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] = await Promise.all([
-    loadDataUrl(ASSET_PATHS.background),
-    loadDataUrl(ASSET_PATHS.logo),
-    loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
-    loadDataUrl(ASSET_PATHS.embossedSeal),
-    loadDataUrl(ASSET_PATHS.rightSignatureOld, { dropLightBackground: true }),
-    loadDataUrl(ASSET_PATHS.rightSignatureNew, { dropLightBackground: true }),
-    loadDataUrl(ASSET_PATHS.backPage),
-    options.photoUrl
-      ? loadDataUrl(options.photoUrl, { dropLightBackground: true, trimEdges: 18 })
-      : Promise.resolve(null),
-  ]);
-
-  for (let i = 0; i < marksheets.length; i++) {
-    const marksheet = marksheets[i];
-    if (i > 0) doc.addPage();
-
-    const qr = await generateDynamicQrDataUrl(marksheet);
-    const rightSignature = isMarksheetAfterJuly2024(marksheet) ? rightSignatureNew : rightSignatureOld;
-    drawMarksheetPage(doc, marksheet, {
-      background,
-      logo,
-      qr,
-      seal,
-      embossedSeal,
-      rightSignature,
-      photo,
-    }, { ...options, allMarksheets: marksheets });
-  }
-
-  if (backPage && marksheets.length > 0) {
-    doc.addPage();
-    doc.addImage(
-      backPage.dataUrl,
-      backPage.type,
-      0,
-      0,
-      doc.internal.pageSize.getWidth(),
-      doc.internal.pageSize.getHeight(),
-    );
-    // Draw the signatures dynamically on the back page of the generated PDF
-    const latestMarksheet = marksheets[marksheets.length - 1];
-    await drawBackPageSignatures(doc, options.backPageSignatures ?? {});
-  }
-
-  return doc.output("blob");
+  const { generateAllSemestersPdfFromTemplate } = await import("@/lib/grade-card-pdf");
+  return generateAllSemestersPdfFromTemplate(marksheets, options);
 }
 
 export function downloadMarksheetBlob(marksheet: StudentMarksheet, extension: "pdf", blob: Blob) {
