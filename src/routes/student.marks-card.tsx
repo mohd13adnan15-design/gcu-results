@@ -41,7 +41,7 @@ function setOtpSession(studentId: string) {
 }
 
 export function StudentMarksCardPage() {
-  return <StudentLayout title="Grade Card">{() => <MarksCard />}</StudentLayout>;
+  return <StudentLayout title="Grade & Marks Cards">{() => <MarksCard />}</StudentLayout>;
 }
 
 function MarksCard() {
@@ -410,7 +410,7 @@ function MarksCard() {
             </div>
             <div className="space-y-3">
               <div>
-                <h2 className="text-2xl font-bold text-primary">Download Your Grade Card</h2>
+                <h2 className="text-2xl font-bold text-primary">Download Grade & Marks Cards</h2>
               </div>
               <div className="flex flex-col gap-4 pt-2">
                 <h3 className="font-bold text-primary">Download Grade Cards</h3>
@@ -443,7 +443,7 @@ function MarksCard() {
                       className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-5 py-2.5 text-primary hover:bg-muted"
                     >
                       <FileText className="h-4 w-4" />
-                      MARKs CARD
+                      MARKS CARD
                     </button>
                   </div>
                   {showSemesterSelection && allMarksheets.length > 0 && (

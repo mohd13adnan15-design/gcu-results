@@ -27,6 +27,7 @@ import {
   missingReasonLabel,
   studentRequestedMarksheetVerification,
 } from "@/lib/marksheet-verification";
+import { notifyAdminGradeCardRequested } from "@/lib/grade-card-request-notifications";
 import type { Student } from "@/lib/types";
 
 type LocationState = { autoStartCertificate?: boolean } | null;
@@ -178,13 +179,7 @@ function CertificateFlow() {
           .eq("id", student.id);
         if (error) throw error;
 
-        await supabase.from("portal_notifications").insert({
-          recipient_portal: "admin_2",
-          sender_portal: "fees",
-          student_id: student.id,
-          title: "Grade card requested",
-          message: `${student.full_name} (${student.student_id}) requested a grade card. Review in the Admin Queue.`,
-        });
+        await notifyAdminGradeCardRequested(supabase, student);
 
         if (!opts?.silent) {
           toast.success("Your Grade Card Under Verification");

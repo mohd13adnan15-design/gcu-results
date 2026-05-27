@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock, Eye, Loader2, MessageSquareWarning, ShieldCheck, X } from "lucide-react";
+import { CheckCircle2, Clock, Eye, Loader2, MessageSquareWarning, ShieldCheck, X, Bell } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +19,17 @@ import {
 } from "@/lib/marksheet-verification";
 import { syncStudentGradeAndMarksheet } from "@/lib/marks-sync";
 import { hasRecentDuplicateSuperAdminReport } from "@/lib/portal-report-dedupe";
+import { GRADE_CARD_REQUEST_NOTIFICATION_TITLE } from "@/lib/grade-card-request-notifications";
 import type { Student } from "@/lib/types";
+
+type GradeCardRequestNotification = {
+  id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  student_id: string | null;
+};
 
 export function FacultyPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -31,6 +41,9 @@ export function FacultyPage() {
   const [sortKey, setSortKey] = useState<"request" | "roll" | "name" | "dept">("request");
   const [verifiedFilter, setVerifiedFilter] = useState<"all" | "pending" | "done">("all");
   const [unresolvedReports, setUnresolvedReports] = useState<Set<string>>(new Set());
+  const [gradeCardRequestNotifications, setGradeCardRequestNotifications] = useState<
+    GradeCardRequestNotification[]
+  >([]);
   const [previewConfirmedIds, setPreviewConfirmedIds] = useState<Set<string>>(new Set());
   const [issueModal, setIssueModal] = useState<{
     student: Student;
@@ -124,6 +137,7 @@ export function FacultyPage() {
       { data: marksheetRows, error: marksheetError },
       { data: markRows, error: markErr },
       { data: notificationRows, error: notificationErr },
+      { data: gradeCardRequestRows, error: gradeCardRequestErr },
     ] = await Promise.all([
       supabase.from("students").select("*").order("student_id", { ascending: true }),
       supabase.from("student_marksheets").select("*").order("updated_at", { ascending: false }),
@@ -133,12 +147,20 @@ export function FacultyPage() {
         .select("student_id")
         .eq("recipient_portal", "head_of_coe")
         .eq("is_resolved", false),
+      supabase
+        .from("portal_notifications")
+        .select("id, title, message, is_read, created_at, student_id")
+        .eq("recipient_portal", "admin_2")
+        .eq("title", GRADE_CARD_REQUEST_NOTIFICATION_TITLE)
+        .order("created_at", { ascending: false })
+        .limit(15),
     ]);
 
     if (studentError) toast.error(studentError.message);
     if (marksheetError) toast.error(marksheetError.message);
     if (markErr) toast.error(markErr.message);
     if (notificationErr) toast.error(notificationErr.message);
+    if (gradeCardRequestErr) toast.error(gradeCardRequestErr.message);
 
     setStudents((studentRows as Student[]) ?? []);
     setMarksheets(
@@ -156,8 +178,29 @@ export function FacultyPage() {
       ),
     );
 
+    setGradeCardRequestNotifications((gradeCardRequestRows as GradeCardRequestNotification[]) ?? []);
+
     setLoading(false);
   }
+
+  async function dismissGradeCardRequestNotifications() {
+    const unreadIds = gradeCardRequestNotifications.filter((row) => !row.is_read).map((row) => row.id);
+    if (unreadIds.length === 0) return;
+    const { error } = await supabase
+      .from("portal_notifications")
+      .update({ is_read: true })
+      .in("id", unreadIds);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await load();
+  }
+
+  const unreadGradeCardRequests = useMemo(
+    () => gradeCardRequestNotifications.filter((row) => !row.is_read),
+    [gradeCardRequestNotifications],
+  );
 
   useEffect(() => {
     void load();
@@ -396,6 +439,37 @@ export function FacultyPage() {
   return (
     <div className="card-elevated rounded-2xl p-6">
       <h2 className="text-xl font-bold text-primary">Admin Queue</h2>
+
+      {unreadGradeCardRequests.length > 0 && (
+        <section className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2">
+              <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <Bell className="h-4 w-4" aria-hidden />
+                {unreadGradeCardRequests.length} new grade card request
+                {unreadGradeCardRequests.length === 1 ? "" : "s"}
+              </p>
+              <ul className="space-y-1 text-sm text-primary/90">
+                {unreadGradeCardRequests.slice(0, 5).map((row) => (
+                  <li key={row.id}>{row.message}</li>
+                ))}
+              </ul>
+              {unreadGradeCardRequests.length > 5 && (
+                <p className="text-xs text-muted-foreground">
+                  +{unreadGradeCardRequests.length - 5} more in the notification bell
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => void dismissGradeCardRequestNotifications()}
+              className="shrink-0 rounded-md border border-primary/30 bg-cream px-3 py-1.5 text-xs font-medium text-primary hover:bg-secondary"
+            >
+              Mark all read
+            </button>
+          </div>
+        </section>
+      )}
 
       <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
         <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-medium text-muted-foreground">

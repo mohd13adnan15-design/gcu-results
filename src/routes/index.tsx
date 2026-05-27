@@ -64,7 +64,7 @@ export function Landing() {
               <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
                 Garden City University
               </p>
-              <h1 className="text-xl font-bold text-primary">Grade Card Portal</h1>
+              <h1 className="text-xl font-bold text-primary">Grade & Marks Card Portal</h1>
             </div>
           </div>
         </div>
@@ -211,7 +211,7 @@ export function Landing() {
           />
           <p className="text-sm font-semibold text-primary">Garden City University</p>
           <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-            Grade Card Portal · Bengaluru, India
+            Grade & Marks Card Portal · Bengaluru, India
           </p>
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} Garden City University. All rights reserved.
