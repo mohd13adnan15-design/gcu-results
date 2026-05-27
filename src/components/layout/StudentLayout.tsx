@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { setStudentSession, signOutEverywhere, type StudentSession } from "@/lib/auth";
-import { LogOut } from "lucide-react";
+import { LogOut, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -83,7 +83,7 @@ export function StudentLayout({ title = "Student Portal", tagline, children }: P
   if (!ready || !session) return null;
 
   return (
-    <div className="min-h-screen bg-grain">
+    <div className="flex min-h-screen flex-col bg-grain">
       <header className="border-b border-border bg-cream">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/student/dashboard" className="flex items-center gap-3">
@@ -94,7 +94,7 @@ export function StudentLayout({ title = "Student Portal", tagline, children }: P
             />
             <div>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Garden City University · Grade Card Portal
+                Garden City University · Grade & Marks Card Portal
               </p>
               <h1 className="text-lg font-bold text-primary">{title}</h1>
               {tagline && <p className="mt-1 text-xs text-muted-foreground">{tagline}</p>}
@@ -118,7 +118,16 @@ export function StudentLayout({ title = "Student Portal", tagline, children }: P
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children(session)}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children(session)}</main>
+      <div className="border-t border-border bg-cream/70">
+        <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 px-6 py-4 text-center text-sm text-muted-foreground">
+          <MessageCircle className="h-4 w-4 shrink-0 text-primary/70" aria-hidden />
+          <p>
+            If you have any queries, please write to{" "}
+            <span className="font-semibold text-primary">pro.edu.gcu.in</span>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

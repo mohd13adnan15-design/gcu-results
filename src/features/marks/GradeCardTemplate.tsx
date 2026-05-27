@@ -6,16 +6,21 @@ import {
   A4_HEIGHT,
   A4_WIDTH,
   BACK_PAGE_LAYOUT,
+  getFrontPageHeaderLayout,
   formatGradeCardDate,
   formatGradeCardNumber,
+  formatSemesterDisplay,
+  formatSgpa,
   FRONT_PAGE_FOOTER,
+  FRONT_PAGE_HEADER,
   getBackPageWipeHeight,
   getControllerSignatureAsset,
   GRADE_CARD_ASSETS,
   GRADE_CARD_COLORS,
   isMarksheetAfterJuly2024,
+  resolveGradeCardDisplayId,
 } from "@/lib/grade-card-constants";
-import { loadTransparentAsset } from "@/lib/grade-card-image-processing";
+import { loadTransparentAsset, prepareGradeCardLogo } from "@/lib/grade-card-image-processing";
 
 export type GradeCardTemplateProps = {
   marksheet: StudentMarksheet;
@@ -24,10 +29,8 @@ export type GradeCardTemplateProps = {
 };
 
 const TABLE_COL_WIDTHS = [32, 72, 202, 55, 55, 56, 59.28] as const;
-const CONTENT_X = 32;
+const CONTENT_X = FRONT_PAGE_HEADER.contentX;
 const CONTENT_WIDTH = A4_WIDTH - CONTENT_X * 2;
-const QR_LEFT = CONTENT_X + 12;
-const QR_SIZE = 42;
 
 export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplateProps>(
   function GradeCardTemplate({ marksheet, photoUrl, className = "" }, ref) {
@@ -36,6 +39,20 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
     const [sealSrc, setSealSrc] = useState<string | null>(null);
     const [embossedSealSrc, setEmbossedSealSrc] = useState<string | null>(null);
     const [signatureSrc, setSignatureSrc] = useState<string | null>(null);
+    const [logoSrc, setLogoSrc] = useState<string | null>(null);
+    const headerLayout = getFrontPageHeaderLayout();
+
+    useEffect(() => {
+      let cancelled = false;
+      void (async () => {
+        const prepared = await prepareGradeCardLogo(GRADE_CARD_ASSETS.logo);
+        if (cancelled || !prepared) return;
+        setLogoSrc(prepared.dataUrl);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, []);
 
     useEffect(() => {
       setPhotoSrc(photoUrl ?? null);
@@ -55,7 +72,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
             errorCorrectionLevel: "M",
             margin: 1,
             color: { dark: "#1a1a1a", light: "#f6f1e4" },
-            width: 180,
+            width: 220,
           });
           if (!cancelled) setQrDataUrl(dataUrl);
         } catch {
@@ -86,8 +103,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
       };
     }, [marksheet.exam_month_year]);
 
-    const uniqueId =
-      (marksheet.student_id || "").split("-")[0].toUpperCase() || marksheet.grade_card_no;
+    const uniqueId = resolveGradeCardDisplayId(marksheet);
     const signatureAsset = getControllerSignatureAsset(marksheet);
     const isNewSig = isMarksheetAfterJuly2024(marksheet);
     const sigLayout = isNewSig ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
@@ -146,39 +162,42 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           }}
         />
 
-        {/* Header: unique id stacked above QR */}
+        {/* Header row: unique id + QR (left), logo (centre), photo (right) */}
         <div
           style={{
             position: "absolute",
-            left: QR_LEFT,
-            top: 48,
-            width: QR_SIZE,
+            left: headerLayout.uniqueId.left,
+            top: headerLayout.uniqueId.top,
+            width: headerLayout.uniqueId.width,
             textAlign: "center",
+            fontSize: FRONT_PAGE_HEADER.uniqueIdFontSize,
+            fontWeight: "bold",
+            lineHeight: 1,
+            whiteSpace: "nowrap",
           }}
         >
-          <div
-            style={{
-              fontSize: 7.5,
-              fontWeight: "bold",
-              lineHeight: 1,
-              marginBottom: 3,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {uniqueId}
-          </div>
+          {uniqueId}
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            left: headerLayout.qr.left,
+            top: headerLayout.qr.top,
+            width: headerLayout.qr.size,
+            height: headerLayout.qr.size,
+          }}
+        >
           {qrDataUrl ? (
             <img
               src={qrDataUrl}
               alt="QR code"
-              style={{ width: QR_SIZE, height: QR_SIZE, display: "block", margin: "0 auto" }}
+              style={{ width: "100%", height: "100%", display: "block" }}
             />
           ) : (
             <div
               style={{
-                width: QR_SIZE,
-                height: QR_SIZE,
-                margin: "0 auto",
+                width: "100%",
+                height: "100%",
                 background: "#f6f1e4",
                 border: "1px solid #ccc",
               }}
@@ -186,31 +205,33 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           )}
         </div>
 
-        {/* University logo — centered */}
+        {/* University logo — hardcoded 292×74 pt */}
         <img
-          src={GRADE_CARD_ASSETS.logo}
+          src={logoSrc ?? GRADE_CARD_ASSETS.logo}
           alt="Garden City University"
           style={{
             position: "absolute",
-            left: (A4_WIDTH - 310) / 2,
-            top: 8,
-            width: 310,
-            height: 155,
-            objectFit: "contain",
+            left: headerLayout.logo.left,
+            top: headerLayout.logo.top,
+            width: headerLayout.logo.width,
+            height: headerLayout.logo.height,
+            objectFit: "fill",
+            zIndex: 2,
           }}
         />
 
-        {/* Student photo */}
+        {/* Student photo — same row, vertically centred with logo & QR */}
         <div
           style={{
             position: "absolute",
-            right: CONTENT_X + 14,
-            top: 51,
-            width: 68,
-            height: 84,
+            left: headerLayout.photo.left,
+            top: headerLayout.photo.top,
+            width: headerLayout.photo.width,
+            height: headerLayout.photo.height,
             border: `0.45px solid ${GRADE_CARD_COLORS.border}`,
             overflow: "hidden",
             background: "#f6f3eb",
+            zIndex: 3,
           }}
         >
           {photoSrc ? (
@@ -243,7 +264,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           style={{
             position: "absolute",
             left: CONTENT_X,
-            top: 168,
+            top: FRONT_PAGE_HEADER.schoolNameTop,
             width: CONTENT_WIDTH,
             textAlign: "center",
             fontSize: 14.5,
@@ -256,7 +277,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         </div>
 
         {/* Student details rows */}
-        <div style={{ position: "absolute", left: CONTENT_X, top: 196, width: CONTENT_WIDTH, fontSize: 11.5 }}>
+        <div style={{ position: "absolute", left: CONTENT_X, top: FRONT_PAGE_HEADER.detailsTop, width: CONTENT_WIDTH, fontSize: 11.5 }}>
           <DetailRow
             leftLabel="PROGRAMME TITLE"
             leftValue={marksheet.programme_title}
@@ -272,7 +293,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           />
           <DetailRow
             leftLabel="SEMESTER"
-            leftValue={marksheet.semester_label}
+            leftValue={formatSemesterDisplay(marksheet.semester_label)}
             rightLabel="MONTH & YEAR OF THE EXAMINATION"
             rightValue={marksheet.exam_month_year}
             top={32}
@@ -284,7 +305,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           style={{
             position: "absolute",
             left: CONTENT_X,
-            top: 268,
+            top: FRONT_PAGE_HEADER.gradeCardTitleTop,
             width: CONTENT_WIDTH,
             height: 18,
             border: `0.45px solid ${GRADE_CARD_COLORS.border}`,
@@ -300,7 +321,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         </div>
 
         {/* Marks table */}
-        <div style={{ position: "absolute", left: CONTENT_X, top: 286, width: CONTENT_WIDTH }}>
+        <div style={{ position: "absolute", left: CONTENT_X, top: FRONT_PAGE_HEADER.tableTop, width: CONTENT_WIDTH }}>
           <table
             style={{
               width: "100%",
@@ -434,7 +455,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
                 <span>
                   {formatGradeCardNumber(marksheet.total_credit_points)} /{" "}
                   {formatGradeCardNumber(marksheet.total_credits)} ={" "}
-                  {formatGradeCardNumber(marksheet.sgpa)}
+                  {formatSgpa(marksheet.sgpa)}
                 </span>
               </div>
               <div

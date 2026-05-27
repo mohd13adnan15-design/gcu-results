@@ -24,7 +24,7 @@ export function GradeCardApplicationPage() {
     <AdminLayout
       requirePortal={["admin_1", "head_of_coe"]}
       title="Grade card application"
-      subtitle="Garden City University · Grade Card Portal"
+      subtitle="Garden City University · Grade & Marks Card Portal"
     >
       {() => (
         <div className="mx-auto max-w-5xl space-y-6 pb-16">

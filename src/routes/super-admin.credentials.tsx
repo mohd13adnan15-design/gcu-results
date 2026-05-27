@@ -19,7 +19,7 @@ export function CredentialsPage() {
     <AdminLayout
       requirePortal={["admin_1", "head_of_coe"]}
       title="Manage access"
-      subtitle="Garden City University · Grade Card Portal"
+      subtitle="Garden City University · Grade & Marks Card Portal"
     >
       {() => (
         <div className="space-y-6">

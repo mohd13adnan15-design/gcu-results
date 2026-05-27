@@ -87,7 +87,7 @@ export function AdminLayout({ requirePortal, title, subtitle, tagline, children 
             />
             <div>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                {subtitle ?? "Garden City University · Grade Card Portal"}
+                {subtitle ?? "Garden City University · Grade & Marks Card Portal"}
               </p>
               <h1 className="text-lg font-bold text-primary">{title}</h1>
               {tagline && <p className="mt-1 text-xs text-muted-foreground">{tagline}</p>}

@@ -1,6 +1,8 @@
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 
+import { formatSemesterDisplay, formatSgpa, FRONT_PAGE_FOOTER, FRONT_PAGE_HEADER, getFrontPageHeaderLayout, resolveGradeCardDisplayId } from "./grade-card-constants";
+import { trimLogoToContentBounds } from "./grade-card-image-processing";
 import {
   buildMarksheetFileName,
   groupCoursesBySection,
@@ -71,6 +73,8 @@ export type MarksheetDocumentOptions = {
 type LoadedDataUrl = {
   dataUrl: string;
   type: "JPEG" | "PNG" | "WEBP";
+  width?: number;
+  height?: number;
 };
 
 export function downloadBlob(blob: Blob, filename: string) {
@@ -127,7 +131,7 @@ export async function drawBackPageSignatures(
 }
 
 async function loadMarksheetPdfAssets(photoUrl?: string | null) {
-  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] =
+  const [background, logoRaw, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] =
     await Promise.all([
       loadDataUrl(ASSET_PATHS.background),
       loadDataUrl(ASSET_PATHS.logo),
@@ -140,6 +144,17 @@ async function loadMarksheetPdfAssets(photoUrl?: string | null) {
         ? loadDataUrl(photoUrl, { dropLightBackground: true, trimEdges: 18 })
         : Promise.resolve(null),
     ]);
+
+  let logo = logoRaw;
+  if (logoRaw) {
+    const trimmed = await trimLogoToContentBounds(logoRaw.dataUrl);
+    logo = {
+      ...logoRaw,
+      dataUrl: trimmed.dataUrl,
+      width: trimmed.width || logoRaw.width,
+      height: trimmed.height || logoRaw.height,
+    };
+  }
 
   return {
     background,
@@ -325,25 +340,24 @@ function drawMarksheetPage(
   setStroke(doc);
   drawHeader(doc, marksheet, images, x, y, width);
 
-  y += 120;
+  y = FRONT_PAGE_HEADER.schoolNameTop;
   doc.setFont("times", "bold");
   doc.setFontSize(14.5);
   setText(doc, RED);
   drawCenteredTextFit(doc, marksheet.school_name, pageWidth / 2, y, width - 20, 14.5, 11);
 
-  y += 28;
+  y = FRONT_PAGE_HEADER.detailsTop;
   y = drawDetailsTable(doc, marksheet, x, y, width);
-  y += 12;
 
-  // GRADE CARD Header integrated into the flow
+  y = FRONT_PAGE_HEADER.gradeCardTitleTop;
   setStroke(doc);
   doc.rect(x, y, width, 18, "S");
   doc.setFont("times", "bold");
   doc.setFontSize(14);
   setText(doc, RED);
   doc.text("GRADE CARD", pageWidth / 2, y + 13, { align: "center" });
-  y += 18;
 
+  y = FRONT_PAGE_HEADER.tableTop;
   y = drawMarksTable(doc, marksheet, x, y, width);
   y = drawTotals(doc, marksheet, x, y, width);
 
@@ -367,35 +381,56 @@ function drawHeader(
     qr: LoadedDataUrl | null;
     photo: LoadedDataUrl | null;
   },
-  x: number,
-  y: number,
-  width: number,
+  _x: number,
+  _y: number,
+  _width: number,
 ) {
-  const leftWidth = 100;
-  const rightWidth = 100;
+  const headerLayout = getFrontPageHeaderLayout(doc.internal.pageSize.getWidth());
 
   doc.setFont("times", "bold");
-  doc.setFontSize(7.5);
+  doc.setFontSize(FRONT_PAGE_HEADER.uniqueIdFontSize);
   setText(doc, DARK);
-  const uniqueId = marksheet.student_id?.split("-")[0].toUpperCase() || marksheet.grade_card_no;
-  doc.text(uniqueId, x + 32, y + 12, { align: "center" });
+  const uniqueId = resolveGradeCardDisplayId(marksheet);
+  doc.text(
+    uniqueId,
+    headerLayout.qr.left + headerLayout.qr.size / 2,
+    headerLayout.uniqueId.top + FRONT_PAGE_HEADER.uniqueIdFontSize,
+    { align: "center" },
+  );
   if (images.qr) {
-    doc.addImage(images.qr.dataUrl, images.qr.type, x + 12, y + 18, 42, 42);
+    doc.addImage(
+      images.qr.dataUrl,
+      images.qr.type,
+      headerLayout.qr.left,
+      headerLayout.qr.top,
+      headerLayout.qr.size,
+      headerLayout.qr.size,
+    );
   }
 
   if (images.logo) {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const logoWidth = 310;
-    const logoHeight = 155;
-    const logoX = (pageWidth - logoWidth) / 2;
-    doc.addImage(images.logo.dataUrl, images.logo.type, logoX, y - 40, logoWidth, logoHeight);
+    const { logo } = headerLayout;
+    doc.addImage(images.logo.dataUrl, images.logo.type, logo.left, logo.top, logo.width, logo.height);
   }
 
-  const photoX = x + width - rightWidth + 14;
   if (images.photo) {
-    doc.addImage(images.photo.dataUrl, images.photo.type, photoX + 2, y + 3, 68, 84);
+    const { photo } = headerLayout;
+    doc.addImage(
+      images.photo.dataUrl,
+      images.photo.type,
+      photo.left,
+      photo.top,
+      photo.width,
+      photo.height,
+    );
   } else {
-    drawPhotoBox(doc, photoX + 2, y + 3, 68, 84);
+    drawPhotoBox(
+      doc,
+      headerLayout.photo.left,
+      headerLayout.photo.top,
+      headerLayout.photo.width,
+      headerLayout.photo.height,
+    );
   }
 }
 
@@ -412,7 +447,7 @@ function drawDetailsTable(
   const rows = [
     ["PROGRAMME TITLE", marksheet.programme_title, "PROGRAMME CODE", marksheet.programme_code],
     ["NAME OF THE STUDENT", marksheet.student_name, "REGISTRATION NO", marksheet.registration_no],
-    ["SEMESTER", marksheet.semester_label, "MONTH & YEAR OF THE EXAMINATION", marksheet.exam_month_year],
+    ["SEMESTER", formatSemesterDisplay(marksheet.semester_label), "MONTH & YEAR OF THE EXAMINATION", marksheet.exam_month_year],
   ];
 
   doc.setFontSize(11.5);
@@ -580,7 +615,7 @@ function drawTotals(doc: jsPDF, marksheet: StudentMarksheet, x: number, y: numbe
   const label2 = "SEMESTER GRADE POINT AVERAGE = ";
   doc.text(label2, x + 7, y + 36);
   setText(doc, DARK);
-  const val2 = `${formatNumber(marksheet.total_credit_points)} / ${formatNumber(marksheet.total_credits)} = ${formatNumber(marksheet.sgpa)}`;
+  const val2 = `${formatNumber(marksheet.total_credit_points)} / ${formatNumber(marksheet.total_credits)} = ${formatSgpa(marksheet.sgpa)}`;
   doc.text(val2, x + 7 + doc.getTextWidth(label2), y + 36);
 
   // GRADE (Aligned with Row 2 only)
