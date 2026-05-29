@@ -70,6 +70,11 @@ export function formatSemesterDisplay(label: string) {
   return clean;
 }
 
+/** Normalise programme title for display (comma spacing, trim). */
+export function formatProgrammeTitleDisplay(title: string) {
+  return (title || "").trim().replace(/,\s*/g, ", ");
+}
+
 /** Front-page header — QR, logo, and photo on one row (official GCU grade card). */
 export const FRONT_PAGE_HEADER = {
   contentX: 32,

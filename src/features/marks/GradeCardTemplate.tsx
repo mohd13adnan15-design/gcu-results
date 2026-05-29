@@ -9,6 +9,7 @@ import {
   getFrontPageHeaderLayout,
   formatGradeCardDate,
   formatGradeCardNumber,
+  formatProgrammeTitleDisplay,
   formatSemesterDisplay,
   formatSgpa,
   FRONT_PAGE_FOOTER,
@@ -20,7 +21,11 @@ import {
   isMarksheetAfterJuly2024,
   resolveGradeCardDisplayId,
 } from "@/lib/grade-card-constants";
-import { loadTransparentAsset, prepareGradeCardLogo } from "@/lib/grade-card-image-processing";
+import {
+  loadTransparentAsset,
+  prepareGradeCardLogo,
+  prepareGradeCardStudentPhoto,
+} from "@/lib/grade-card-image-processing";
 
 export type GradeCardTemplateProps = {
   marksheet: StudentMarksheet;
@@ -55,7 +60,18 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
     }, []);
 
     useEffect(() => {
-      setPhotoSrc(photoUrl ?? null);
+      if (!photoUrl) {
+        setPhotoSrc(null);
+        return;
+      }
+      let cancelled = false;
+      void (async () => {
+        const prepared = await prepareGradeCardStudentPhoto(photoUrl);
+        if (!cancelled) setPhotoSrc(prepared ?? photoUrl);
+      })();
+      return () => {
+        cancelled = true;
+      };
     }, [photoUrl]);
 
     useEffect(() => {
@@ -220,7 +236,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           }}
         />
 
-        {/* Student photo — same row, vertically centred with logo & QR */}
+        {/* Student photo — borderless, blends with certificate background */}
         <div
           style={{
             position: "absolute",
@@ -228,9 +244,8 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
             top: headerLayout.photo.top,
             width: headerLayout.photo.width,
             height: headerLayout.photo.height,
-            border: `0.45px solid ${GRADE_CARD_COLORS.border}`,
             overflow: "hidden",
-            background: "#f6f3eb",
+            background: "transparent",
             zIndex: 3,
           }}
         >
@@ -238,7 +253,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
             <img
               src={photoSrc}
               alt="Student"
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
               onError={() => setPhotoSrc(null)}
             />
           ) : (
@@ -259,69 +274,49 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           )}
         </div>
 
-        {/* School name */}
+        {/* School name + details + grade card + table — vertical flow (avoids overlap on long titles) */}
         <div
           style={{
             position: "absolute",
             left: CONTENT_X,
             top: FRONT_PAGE_HEADER.schoolNameTop,
             width: CONTENT_WIDTH,
-            textAlign: "center",
-            fontSize: 14.5,
-            fontWeight: "bold",
-            color: GRADE_CARD_COLORS.red,
-            lineHeight: 1.2,
-          }}
-        >
-          {marksheet.school_name}
-        </div>
-
-        {/* Student details rows */}
-        <div style={{ position: "absolute", left: CONTENT_X, top: FRONT_PAGE_HEADER.detailsTop, width: CONTENT_WIDTH, fontSize: 11.5 }}>
-          <DetailRow
-            leftLabel="PROGRAMME TITLE"
-            leftValue={marksheet.programme_title}
-            rightLabel="PROGRAMME CODE"
-            rightValue={marksheet.programme_code}
-          />
-          <DetailRow
-            leftLabel="NAME OF THE STUDENT"
-            leftValue={marksheet.student_name}
-            rightLabel="REGISTRATION NO"
-            rightValue={marksheet.registration_no}
-            top={16}
-          />
-          <DetailRow
-            leftLabel="SEMESTER"
-            leftValue={formatSemesterDisplay(marksheet.semester_label)}
-            rightLabel="MONTH & YEAR OF THE EXAMINATION"
-            rightValue={marksheet.exam_month_year}
-            top={32}
-          />
-        </div>
-
-        {/* GRADE CARD title box */}
-        <div
-          style={{
-            position: "absolute",
-            left: CONTENT_X,
-            top: FRONT_PAGE_HEADER.gradeCardTitleTop,
-            width: CONTENT_WIDTH,
-            height: 18,
-            border: `0.45px solid ${GRADE_CARD_COLORS.border}`,
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 14,
-            fontWeight: "bold",
-            color: GRADE_CARD_COLORS.red,
+            flexDirection: "column",
           }}
         >
-          GRADE CARD
-        </div>
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: 14.5,
+              fontWeight: "bold",
+              color: GRADE_CARD_COLORS.red,
+              lineHeight: 1.2,
+              marginBottom: 8,
+            }}
+          >
+            {marksheet.school_name}
+          </div>
 
-        {/* Marks table */}
-        <div style={{ position: "absolute", left: CONTENT_X, top: FRONT_PAGE_HEADER.tableTop, width: CONTENT_WIDTH }}>
+          <StudentDetailsSection marksheet={marksheet} />
+
+          <div
+            style={{
+              marginTop: 10,
+              height: 18,
+              border: `0.45px solid ${GRADE_CARD_COLORS.border}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              fontWeight: "bold",
+              color: GRADE_CARD_COLORS.red,
+            }}
+          >
+            GRADE CARD
+          </div>
+
+          <div style={{ width: "100%" }}>
           <table
             style={{
               width: "100%",
@@ -488,6 +483,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           >
             Date : {formatGradeCardDate(marksheet.issue_date || new Date().toISOString())}
           </div>
+          </div>
         </div>
 
         {/* Footer — seal, embossed seal, controller signature (PDF coordinates) */}
@@ -541,40 +537,103 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
   },
 );
 
+const DETAILS_ROW_GAP = 8;
+
+function StudentDetailsSection({ marksheet }: { marksheet: StudentMarksheet }) {
+  const rows = [
+    {
+      leftLabel: "PROGRAMME TITLE",
+      leftValue: formatProgrammeTitleDisplay(marksheet.programme_title),
+      rightLabel: "PROGRAMME CODE",
+      rightValue: marksheet.programme_code,
+      leftMaxLines: 2 as const,
+    },
+    {
+      leftLabel: "NAME OF THE STUDENT",
+      leftValue: marksheet.student_name,
+      rightLabel: "REGISTRATION NO",
+      rightValue: marksheet.registration_no,
+    },
+    {
+      leftLabel: "SEMESTER",
+      leftValue: formatSemesterDisplay(marksheet.semester_label),
+      rightLabel: "MONTH & YEAR OF THE EXAMINATION",
+      rightValue: marksheet.exam_month_year,
+    },
+  ] as const;
+
+  return (
+    <div style={{ fontSize: 11.5, lineHeight: 1.15, marginBottom: 4 }}>
+      {rows.map((row) => (
+        <DetailRow key={row.leftLabel} {...row} />
+      ))}
+    </div>
+  );
+}
+
 function DetailRow({
   leftLabel,
   leftValue,
   rightLabel,
   rightValue,
-  top = 0,
+  leftMaxLines,
 }: {
   leftLabel: string;
   leftValue: string;
   rightLabel: string;
   rightValue: string;
-  top?: number;
+  leftMaxLines?: number;
 }) {
   return (
     <div
       style={{
-        position: "absolute",
-        top,
-        left: 0,
-        right: 0,
         display: "flex",
-        justifyContent: "space-between",
         alignItems: "flex-start",
-        lineHeight: 1.2,
+        gap: 10,
+        marginBottom: DETAILS_ROW_GAP,
       }}
     >
-      <div style={{ display: "flex", flex: 1, minWidth: 0, paddingRight: 8 }}>
-        <span style={{ fontWeight: "normal", flexShrink: 0 }}>{leftLabel}</span>
-        <span style={{ margin: "0 8px" }}>:</span>
-        <span style={{ fontWeight: "bold", wordBreak: "break-word" }}>{leftValue}</span>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
+        <span style={{ fontWeight: "normal", whiteSpace: "nowrap", flexShrink: 0 }}>{leftLabel}</span>
+        <span style={{ flexShrink: 0, margin: "0 6px 0 4px" }}>:</span>
+        <span
+          style={{
+            fontWeight: "bold",
+            flex: 1,
+            minWidth: 0,
+            lineHeight: 1.15,
+            wordBreak: "break-word",
+            overflowWrap: "break-word",
+            ...(leftMaxLines
+              ? {
+                  display: "-webkit-box",
+                  WebkitLineClamp: leftMaxLines,
+                  WebkitBoxOrient: "vertical" as const,
+                  overflow: "hidden",
+                }
+              : {}),
+          }}
+        >
+          {leftValue}
+        </span>
       </div>
-      <div style={{ display: "flex", flexShrink: 0, maxWidth: "48%", textAlign: "right" }}>
+      <div
+        style={{
+          flexShrink: 0,
+          textAlign: "right",
+          lineHeight: 1.15,
+          whiteSpace: "nowrap",
+        }}
+      >
         <span style={{ fontWeight: "normal" }}>{rightLabel} : </span>
-        <span style={{ fontWeight: "bold", marginLeft: 2 }}>{rightValue}</span>
+        <span style={{ fontWeight: "bold" }}>{rightValue}</span>
       </div>
     </div>
   );
@@ -598,15 +657,11 @@ export type GradeCardBackPageTemplateProps = {
 
 type BackPageSignatureSlot = (typeof BACK_PAGE_LAYOUT)["slots"]["checkedBy"];
 
-function BackPageSignatureColumn({
+function BackPageSlotWipe({
   slot,
-  src,
-  label,
   paperColor,
 }: {
   slot: BackPageSignatureSlot;
-  src: string;
-  label: string;
   paperColor: string;
 }) {
   const wipeTop = slot.signatureTop - 2;
@@ -614,58 +669,71 @@ function BackPageSignatureColumn({
   const wipeHeight = getBackPageWipeHeight(slot);
 
   return (
-    <>
-      <div
-        style={{
-          position: "absolute",
-          left: wipeLeft,
-          top: wipeTop,
-          width: slot.wipe.w,
-          height: wipeHeight,
-          backgroundColor: paperColor,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          left: slot.centerX,
-          top: slot.signatureTop,
-          transform: "translateX(-50%)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          width: slot.image.w,
-        }}
-      >
-        <img
-          src={src}
-          alt=""
-          aria-hidden
-          style={{
-            width: slot.image.w,
-            height: slot.image.h,
-            objectFit: "contain",
-            objectPosition: "bottom center",
-            display: "block",
-          }}
-        />
-        <span
-          style={{
-            marginTop: slot.label.gapAbove,
-            fontFamily: '"Times New Roman", Times, serif',
-            fontSize: slot.label.fontSize,
-            fontWeight: "normal",
-            lineHeight: 1,
-            color: GRADE_CARD_COLORS.dark,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {label}
-        </span>
-      </div>
-    </>
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        left: wipeLeft,
+        top: wipeTop,
+        width: slot.wipe.w,
+        height: wipeHeight,
+        backgroundColor: paperColor,
+      }}
+    />
   );
 }
+
+function BackPageSignatureOverlay({
+  slot,
+  src,
+  label,
+}: {
+  slot: BackPageSignatureSlot;
+  src: string;
+  label: string;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: slot.centerX,
+        top: slot.signatureTop,
+        transform: "translateX(-50%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        width: slot.image.w,
+      }}
+    >
+      <img
+        src={src}
+        alt=""
+        aria-hidden
+        style={{
+          width: slot.image.w,
+          height: slot.image.h,
+          objectFit: "contain",
+          objectPosition: "bottom center",
+          display: "block",
+        }}
+      />
+      <span
+        style={{
+          marginTop: slot.label.gapAbove,
+          fontFamily: '"Times New Roman", Times, serif',
+          fontSize: slot.label.fontSize,
+          fontWeight: "normal",
+          lineHeight: 1,
+          color: GRADE_CARD_COLORS.dark,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 
 export const GradeCardBackPageTemplate = forwardRef<HTMLDivElement, GradeCardBackPageTemplateProps>(
   function GradeCardBackPageTemplate({ checkedByUrl, verifiedByUrl, className = "" }, ref) {
@@ -716,20 +784,20 @@ export const GradeCardBackPageTemplate = forwardRef<HTMLDivElement, GradeCardBac
             display: "block",
           }}
         />
+        <BackPageSlotWipe slot={slots.checkedBy} paperColor={paperColor} />
+        <BackPageSlotWipe slot={slots.verifiedBy} paperColor={paperColor} />
         {checkedBySrc && (
-          <BackPageSignatureColumn
+          <BackPageSignatureOverlay
             slot={slots.checkedBy}
             src={checkedBySrc}
             label="Checked by"
-            paperColor={paperColor}
           />
         )}
         {verifiedBySrc && (
-          <BackPageSignatureColumn
+          <BackPageSignatureOverlay
             slot={slots.verifiedBy}
             src={verifiedBySrc}
             label="Verified by"
-            paperColor={paperColor}
           />
         )}
       </div>
