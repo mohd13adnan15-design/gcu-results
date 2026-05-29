@@ -142,3 +142,46 @@ export async function prepareGradeCardLogo(url: string) {
     return null;
   }
 }
+
+async function trimImageEdges(source: string, trimPx: number): Promise<string> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(source);
+        return;
+      }
+      const t = Math.min(trimPx, Math.floor(img.width / 6), Math.floor(img.height / 6));
+      const sw = Math.max(1, img.width - t * 2);
+      const sh = Math.max(1, img.height - t * 2);
+      ctx.drawImage(img, t, t, sw, sh, 0, 0, img.width, img.height);
+      const edgeClear = 2;
+      ctx.clearRect(0, 0, img.width, edgeClear);
+      ctx.clearRect(0, img.height - edgeClear, img.width, edgeClear);
+      ctx.clearRect(0, 0, edgeClear, img.height);
+      ctx.clearRect(img.width - edgeClear, 0, edgeClear, img.height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(source);
+    img.src = source;
+  });
+}
+
+/** Match PDF student photo processing: trim scan margins and drop light backgrounds. */
+export async function prepareGradeCardStudentPhoto(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    let dataUrl = await blobToDataUrl(await response.blob());
+    dataUrl = await trimImageEdges(dataUrl, 18);
+    dataUrl = await removeLightBackground(dataUrl);
+    return dataUrl;
+  } catch {
+    return null;
+  }
+}

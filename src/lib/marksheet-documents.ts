@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 
-import { formatSemesterDisplay, formatSgpa, FRONT_PAGE_FOOTER, FRONT_PAGE_HEADER, getFrontPageHeaderLayout, resolveGradeCardDisplayId } from "./grade-card-constants";
+import { formatProgrammeTitleDisplay, formatSemesterDisplay, formatSgpa, FRONT_PAGE_FOOTER, FRONT_PAGE_HEADER, getFrontPageHeaderLayout, resolveGradeCardDisplayId } from "./grade-card-constants";
 import { trimLogoToContentBounds } from "./grade-card-image-processing";
 import {
   buildMarksheetFileName,
@@ -102,16 +102,19 @@ export async function drawBackPageSignatures(
 ) {
   doc.setFillColor(...BACK_PAGE_LAYOUT_REF.paperColor);
 
+  function wipeSlot(slot: (typeof BACK_PAGE_LAYOUT_REF)["slots"]["checkedBy"]) {
+    const wipeTop = slot.signatureTop - 2;
+    const wipeLeft = slot.centerX - slot.wipe.w / 2;
+    const wipeHeight = getBackPageWipeHeightRef(slot);
+    doc.rect(wipeLeft, wipeTop, slot.wipe.w, wipeHeight, "F");
+  }
+
   async function drawSlot(
     url: string | null | undefined,
     slot: (typeof BACK_PAGE_LAYOUT_REF)["slots"]["checkedBy"],
     label: string,
   ) {
     if (!url) return false;
-    const wipeTop = slot.signatureTop - 2;
-    const wipeLeft = slot.centerX - slot.wipe.w / 2;
-    const wipeHeight = getBackPageWipeHeightRef(slot);
-    doc.rect(wipeLeft, wipeTop, slot.wipe.w, wipeHeight, "F");
     const loaded = await loadDataUrl(url, { dropLightBackground: true });
     if (!loaded) return false;
     const { w, h } = slot.image;
@@ -125,6 +128,9 @@ export async function drawBackPageSignatures(
     doc.text(label, slot.centerX, labelY, { align: "center" });
     return true;
   }
+
+  wipeSlot(BACK_PAGE_LAYOUT_REF.slots.checkedBy);
+  wipeSlot(BACK_PAGE_LAYOUT_REF.slots.verifiedBy);
 
   await drawSlot(signatures.checkedByUrl, BACK_PAGE_LAYOUT_REF.slots.checkedBy, "Checked by");
   await drawSlot(signatures.verifiedByUrl, BACK_PAGE_LAYOUT_REF.slots.verifiedBy, "Verified by");
@@ -445,7 +451,7 @@ function drawDetailsTable(
   const col1X = x;
 
   const rows = [
-    ["PROGRAMME TITLE", marksheet.programme_title, "PROGRAMME CODE", marksheet.programme_code],
+    ["PROGRAMME TITLE", formatProgrammeTitleDisplay(marksheet.programme_title), "PROGRAMME CODE", marksheet.programme_code],
     ["NAME OF THE STUDENT", marksheet.student_name, "REGISTRATION NO", marksheet.registration_no],
     ["SEMESTER", formatSemesterDisplay(marksheet.semester_label), "MONTH & YEAR OF THE EXAMINATION", marksheet.exam_month_year],
   ];
@@ -474,7 +480,7 @@ function drawDetailsTable(
     const maxV1Width = (x + width) - rightValueWidth - rightLabelWidth - col1ValueX - 10;
 
     doc.setFont("times", "bold");
-    const v1Lines = fitLines(doc, v1, maxV1Width, 3);
+    const v1Lines = fitLines(doc, v1, maxV1Width, i === 0 ? 2 : 3);
 
     // Left Column
     doc.setFont("times", "normal");

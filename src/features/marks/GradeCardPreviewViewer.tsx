@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,10 +12,8 @@ import {
 } from "@/features/marks/GradeCardESignaturePanel";
 import { buildGradeCardFrontPages, getSemesterNumber } from "@/lib/grade-card-filter";
 import { generateGradeCardPdfFromDocument } from "@/lib/grade-card-pdf";
-import { fetchApprovedBackPageSignatures } from "@/lib/grade-card-e-signature";
 import { downloadMarksheetBlob } from "@/lib/marksheet-documents";
 import type { StudentMarksheet } from "@/lib/marksheet";
-import { supabase } from "@/integrations/supabase/client";
 import { A4_HEIGHT, A4_WIDTH } from "@/lib/grade-card-constants";
 
 type ZoomMode = 0.5 | 0.75 | 1 | "fit";
@@ -54,12 +52,8 @@ export function GradeCardPreviewViewer({
   const [zoom, setZoom] = useState<ZoomMode>(0.75);
   const [fitScale, setFitScale] = useState(0.75);
   const [downloading, setDownloading] = useState(false);
-  const [backSigs, setBackSigs] = useState<{ checkedByUrl: string | null; verifiedByUrl: string | null }>({
-    checkedByUrl: null,
-    verifiedByUrl: null,
-  });
 
-  const { approved, refresh: refreshSignatures } = useGradeCardSignatureApproved(studentId);
+  const { approved, previewUrls, refresh: refreshSignatures } = useGradeCardSignatureApproved(studentId);
 
   const frontPages = buildGradeCardFrontPages(activeSheet, allSheets, showAllSemesters);
   const totalPages = frontPages.length + 1;
@@ -67,22 +61,6 @@ export function GradeCardPreviewViewer({
   useEffect(() => {
     setPageIndex(0);
   }, [activeSheet?.semester_label, showAllSemesters, frontPages.length]);
-
-  const loadBackSignatures = useCallback(async () => {
-    try {
-      const sigs = await fetchApprovedBackPageSignatures(supabase, studentId);
-      setBackSigs({
-        checkedByUrl: sigs.checkedByUrl,
-        verifiedByUrl: sigs.verifiedByUrl,
-      });
-    } catch {
-      setBackSigs({ checkedByUrl: null, verifiedByUrl: null });
-    }
-  }, [studentId]);
-
-  useEffect(() => {
-    void loadBackSignatures();
-  }, [loadBackSignatures, approved]);
 
   useEffect(() => {
     function updateFitScale() {
@@ -129,7 +107,6 @@ export function GradeCardPreviewViewer({
         darkTheme={darkTheme}
         onApprovalChange={() => {
           void refreshSignatures();
-          void loadBackSignatures();
         }}
       />
 
@@ -264,7 +241,7 @@ export function GradeCardPreviewViewer({
                 ref={documentRef}
                 frontPages={frontPages}
                 photoUrl={photoUrl}
-                backPageSignatures={backSigs}
+                backPageSignatures={previewUrls}
                 visiblePageIndex={pageIndex}
               />
             </div>
