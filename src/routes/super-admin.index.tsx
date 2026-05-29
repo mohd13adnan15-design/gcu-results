@@ -13,6 +13,9 @@ import {
   Loader2,
   MessageSquareWarning,
   Trash2,
+  IndianRupee,
+  Home,
+  Library,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -55,7 +58,27 @@ export function SuperAdminPage() {
 function SuperAdminContent() {
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-3">
+          <Link
+            to="/fees"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-cream px-4 py-2 text-sm font-medium text-primary hover:bg-secondary"
+          >
+            <IndianRupee className="h-4 w-4" /> Fee
+          </Link>
+          <Link
+            to="/hostel"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-cream px-4 py-2 text-sm font-medium text-primary hover:bg-secondary"
+          >
+            <Home className="h-4 w-4" /> Hostel
+          </Link>
+          <Link
+            to="/library"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-cream px-4 py-2 text-sm font-medium text-primary hover:bg-secondary"
+          >
+            <Library className="h-4 w-4" /> Library
+          </Link>
+        </div>
         <Link
           to="/coe/credentials"
           className="inline-flex items-center gap-2 rounded-md border border-border bg-cream px-4 py-2 text-sm font-medium text-primary hover:bg-secondary"
