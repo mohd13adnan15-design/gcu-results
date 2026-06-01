@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 import type { PortalType } from "@/lib/types";
 
 interface NotificationRow {
@@ -27,17 +28,11 @@ export function PortalNotificationsBell({ portal }: { portal: PortalType }) {
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel(`notifications:${portal}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "portal_notifications" },
-        () => void load(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return subscribePostgresChanges(
+      `notifications:${portal}`,
+      [{ event: "*", schema: "public", table: "portal_notifications" }],
+      () => void load(),
+    );
   }, [portal, load]);
 
   const unread = useMemo(() => rows.filter((row) => !row.is_read).length, [rows]);

@@ -4,6 +4,7 @@ import { Eye, Loader2, MessageSquareWarning } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 import type { StudentMarksheet } from "@/lib/marksheet";
 import {
   normalizeMarksheet,
@@ -124,18 +125,16 @@ export function AdminPage() {
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel("admin:students-and-marksheets")
-      .on("postgres_changes", { event: "*", schema: "public", table: "students" }, () => {
+    return subscribePostgresChanges(
+      "admin:students-and-marksheets",
+      [
+        { event: "*", schema: "public", table: "students" },
+        { event: "*", schema: "public", table: "student_marksheets" },
+      ],
+      () => {
         void load();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "student_marksheets" }, () => {
-        void load();
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      },
+    );
   }, []);
 
   const marksheetByStudentId = useMemo(

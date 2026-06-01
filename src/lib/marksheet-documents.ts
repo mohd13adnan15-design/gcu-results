@@ -1,8 +1,22 @@
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 
-import { formatProgrammeTitleDisplay, formatSemesterDisplay, formatSgpa, FRONT_PAGE_FOOTER, FRONT_PAGE_HEADER, getFrontPageHeaderLayout, resolveGradeCardDisplayId } from "./grade-card-constants";
+import {
+  formatGradeCardNumber,
+  formatProgrammeTitleDisplay,
+  formatSemesterDisplay,
+  formatSgpa,
+  FRONT_PAGE_FOOTER,
+  FRONT_PAGE_HEADER,
+  getFrontPageHeaderLayout,
+  resolveGradeCardDisplayId,
+} from "./grade-card-constants";
 import { trimLogoToContentBounds } from "./grade-card-image-processing";
+import {
+  calculateMarksCardTotals,
+  getMarksCardCourseValues,
+  marksCardResultLabel,
+} from "./marks-card-helpers";
 import {
   buildMarksheetFileName,
   groupCoursesBySection,
@@ -118,13 +132,16 @@ export async function drawBackPageSignatures(
     const loaded = await loadDataUrl(url, { dropLightBackground: true });
     if (!loaded) return false;
     const { w, h } = slot.image;
-    const x = slot.centerX - w / 2;
-    const y = slot.signatureTop;
-    doc.addImage(loaded.dataUrl, loaded.type, x, y, w, h);
+    const boxX = slot.centerX - w / 2;
+    const boxY = slot.signatureTop;
+    const naturalW = loaded.width ?? w;
+    const naturalH = loaded.height ?? h;
+    const fitted = fitImageInBox(naturalW, naturalH, boxX, boxY, w, h);
+    doc.addImage(loaded.dataUrl, loaded.type, fitted.x, fitted.y, fitted.w, fitted.h);
     doc.setFont("times", "normal");
     doc.setFontSize(slot.label.fontSize);
     setText(doc, DARK);
-    const labelY = slot.signatureTop + h + slot.label.gapAbove + slot.label.fontSize * 0.85;
+    const labelY = fitted.y + fitted.h + slot.label.gapAbove + slot.label.fontSize * 0.85;
     doc.text(label, slot.centerX, labelY, { align: "center" });
     return true;
   }
@@ -658,11 +675,18 @@ function drawFirstPageFooter(
   }
   if (images.rightSignature) {
     const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
-    const sigX = isAfterJuly24 ? 375 : 390;
-    const sigY = isAfterJuly24 ? 735 : 742;
-    const sigW = isAfterJuly24 ? 210 : 180;
-    const sigH = isAfterJuly24 ? 93 : 80;
-    doc.addImage(images.rightSignature.dataUrl, images.rightSignature.type, sigX, sigY, sigW, sigH);
+    const sig = isAfterJuly24 ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
+    const naturalW = images.rightSignature.width ?? sig.w;
+    const naturalH = images.rightSignature.height ?? sig.h;
+    const fitted = fitImageInBox(naturalW, naturalH, sig.x, sig.y, sig.w, sig.h);
+    doc.addImage(
+      images.rightSignature.dataUrl,
+      images.rightSignature.type,
+      fitted.x,
+      fitted.y,
+      fitted.w,
+      fitted.h,
+    );
   }
 }
 
@@ -693,6 +717,8 @@ function drawTableRow(
     redIndexes?: number[];
     alignments?: Array<"left" | "center" | "right">;
     maxLines?: number[];
+    /** Marks-card cells use tighter vertical centring (grade card unchanged). */
+    marksCardLayout?: boolean;
   },
 ) {
   let cursorX = x;
@@ -709,8 +735,11 @@ function drawTableRow(
     const align = options.alignments?.[index] ?? "center";
     const maxLines = options.maxLines?.[index] ?? 2;
     const lines = fitLines(doc, value, width - 7, maxLines);
-    const lineHeight = options.fontSize + 1.4;
-    const textY = y + height / 2 - ((lines.length - 1) * lineHeight) / 2 + options.fontSize / 3;
+    const lineHeight = options.marksCardLayout ? options.fontSize * 1.15 : options.fontSize + 1.4;
+    const blockHeight = lines.length * lineHeight;
+    const textY = options.marksCardLayout
+      ? y + (height - blockHeight) / 2 + options.fontSize * 0.78
+      : y + height / 2 - ((lines.length - 1) * lineHeight) / 2 + options.fontSize / 3;
     const textX =
       align === "left" ? cursorX + 4 : align === "right" ? cursorX + width - 4 : cursorX + width / 2;
     doc.text(lines, textX, textY, { align });
@@ -813,10 +842,44 @@ async function loadDataUrl(
     if (options.dropLightBackground) {
       dataUrl = await removeLightBackground(dataUrl);
     }
-    return { dataUrl, type: pdfImageType(blob.type, url) };
+    const size = await measureDataUrlSize(dataUrl);
+    return {
+      dataUrl,
+      type: pdfImageType(blob.type, url),
+      width: size.width,
+      height: size.height,
+    };
   } catch {
     return null;
   }
+}
+
+function measureDataUrlSize(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth || 1, height: img.naturalHeight || 1 });
+    img.onerror = () => resolve({ width: 1, height: 1 });
+    img.src = dataUrl;
+  });
+}
+
+function fitImageInBox(
+  naturalW: number,
+  naturalH: number,
+  boxX: number,
+  boxY: number,
+  boxW: number,
+  boxH: number,
+) {
+  const scale = Math.min(boxW / naturalW, boxH / naturalH);
+  const drawW = naturalW * scale;
+  const drawH = naturalH * scale;
+  return {
+    x: boxX + (boxW - drawW) / 2,
+    y: boxY + (boxH - drawH) / 2,
+    w: drawW,
+    h: drawH,
+  };
 }
 
 async function generateDynamicQrDataUrl(marksheet: StudentMarksheet): Promise<LoadedDataUrl | null> {
@@ -923,4 +986,683 @@ function setText(doc: jsPDF, color: readonly [number, number, number]) {
 function setStroke(doc: jsPDF) {
   doc.setDrawColor(BORDER[0], BORDER[1], BORDER[2]);
   doc.setLineWidth(0.45);
+}
+
+/** Column weights from official marks card template (scaled to content width). */
+const MARKS_CARD_COL_RATIOS = [24, 50, 118, 46, 28, 28, 28, 28, 28, 28, 34] as const;
+
+/** Marks-card-only layout — vertical gaps matched to official sample PDF (grade card unchanged). */
+const MARKS_CARD_LAYOUT = {
+  headerBandBottom: FRONT_PAGE_HEADER.rowTop + FRONT_PAGE_HEADER.rowHeight,
+  /** QR/photo row → school name (~40–50pt in sample). */
+  schoolNameGapAbove: 20,
+  /** School name → student details (largest gap in sample, ~60–70pt). */
+  schoolNameGapBelow: 56,
+  schoolNameFontSize: 14.5,
+  schoolNameBaselineOffset: 0.85,
+  detailsFontSize: 11.5,
+  detailsLineHeight: 1.15,
+  detailsRowGap: 8,
+  /** Student details → MARKS CARD table (~one line height in sample). */
+  beforeTitleGap: 10,
+  /** Table title row — smaller than school name (official sample ~11pt). */
+  titleBarHeight: 13,
+  titleFontSize: 11,
+  tableHeaderRow1: 18,
+  tableHeaderRow2: 15,
+  tableBodyRow: 14,
+  tableBodyRowWrap: 17,
+  tableSummaryRow: 14,
+  tableHeaderFont: 7.1,
+  tableBodyFont: 7.4,
+  tableSummaryFont: 7.4,
+  /** Table bottom → centred date (~22pt in sample). */
+  afterTableGap: 22,
+  dateFontSize: 11.5,
+  /** Date → abbreviation legend (~30pt in sample). */
+  dateToLegendGap: 22,
+  legendFontSize: 9.5,
+  /** Vertical gap between CIA/ESE row and RA/P row in legend. */
+  legendRowGap: 18,
+  legendPadX: 4,
+  /** Left edge of ESE / P column (aligned with each other, official sample). */
+  legendRightColRatio: 0.52,
+  sealLabelFontSize: 10,
+  /** Nudge seal graphic right so it centres over the "SEAL" label. */
+  sealImageOffsetX: 12,
+  /** Gap from bottom of seal image to top of "SEAL" label (~½ seal height in sample). */
+  sealLabelGap: 14,
+} as const;
+
+function marksCardColumnWidths(contentWidth: number) {
+  const total = MARKS_CARD_COL_RATIOS.reduce((sum, value) => sum + value, 0);
+  return MARKS_CARD_COL_RATIOS.map((value) => (value / total) * contentWidth);
+}
+
+export async function generateMarksCardPdf(
+  marksheet: StudentMarksheet,
+  options: Pick<MarksheetDocumentOptions, "photoUrl"> = {},
+) {
+  if (!marksheet?.courses?.length) {
+    throw new Error("No marks card data to generate.");
+  }
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const qr = await generateDynamicQrDataUrl(marksheet);
+  const assets = await loadMarksheetPdfAssets(options.photoUrl);
+  const rightSignature = isMarksheetAfterJuly2024(marksheet)
+    ? assets.rightSignatureNew
+    : assets.rightSignatureOld;
+
+  drawMarksCardPage(doc, marksheet, {
+    background: assets.background,
+    logo: assets.logo,
+    qr,
+    seal: assets.seal,
+    rightSignature,
+    photo: assets.photo,
+  });
+
+  return doc.output("blob");
+}
+
+export async function generateAllMarksCardsPdf(
+  marksheets: StudentMarksheet[],
+  options: Pick<MarksheetDocumentOptions, "photoUrl"> = {},
+) {
+  const withCourses = marksheets.filter((sheet) => (sheet.courses?.length ?? 0) > 0);
+  if (withCourses.length === 0) {
+    throw new Error("No marks card data to generate.");
+  }
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const assets = await loadMarksheetPdfAssets(options.photoUrl);
+  const sorted = sortMarksheetsBySemester(withCourses);
+
+  for (let i = 0; i < sorted.length; i++) {
+    const marksheet = sorted[i]!;
+    if (i > 0) doc.addPage();
+
+    const qr = await generateDynamicQrDataUrl(marksheet);
+    const rightSignature = isMarksheetAfterJuly2024(marksheet)
+      ? assets.rightSignatureNew
+      : assets.rightSignatureOld;
+
+    drawMarksCardPage(doc, marksheet, {
+      background: assets.background,
+      logo: assets.logo,
+      qr,
+      seal: assets.seal,
+      rightSignature,
+      photo: assets.photo,
+    });
+  }
+
+  return doc.output("blob");
+}
+
+export function downloadMarksCardBlob(marksheet: StudentMarksheet, blob: Blob) {
+  const studentSlug = marksheet.student_name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const semSlug = String(marksheet.semester_label || "semester")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
+  downloadBlob(blob, `MarksCard_${studentSlug}_${semSlug}.pdf`);
+}
+
+export function downloadAllMarksCardsBlob(blob: Blob, rollNo: string) {
+  downloadBlob(blob, `MarksCard_AllSemesters_${rollNo}.pdf`);
+}
+
+/** Plain white page — marks card only (grade card keeps themed background). */
+function drawMarksCardWhiteBackground(doc: jsPDF, pageWidth: number, pageHeight: number) {
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+}
+
+/** QR, grade-card id, and student photo — no university logo (marks card only). */
+function drawMarksCardHeader(
+  doc: jsPDF,
+  marksheet: StudentMarksheet,
+  images: {
+    qr: LoadedDataUrl | null;
+    photo: LoadedDataUrl | null;
+  },
+) {
+  const headerLayout = getFrontPageHeaderLayout(doc.internal.pageSize.getWidth());
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(FRONT_PAGE_HEADER.uniqueIdFontSize);
+  setText(doc, DARK);
+  const uniqueId = resolveGradeCardDisplayId(marksheet);
+  doc.text(
+    uniqueId,
+    headerLayout.qr.left + headerLayout.qr.size / 2,
+    headerLayout.uniqueId.top + FRONT_PAGE_HEADER.uniqueIdFontSize,
+    { align: "center" },
+  );
+  if (images.qr) {
+    doc.addImage(
+      images.qr.dataUrl,
+      images.qr.type,
+      headerLayout.qr.left,
+      headerLayout.qr.top,
+      headerLayout.qr.size,
+      headerLayout.qr.size,
+    );
+  }
+
+  const { photo } = headerLayout;
+  if (images.photo) {
+    doc.addImage(
+      images.photo.dataUrl,
+      images.photo.type,
+      photo.left,
+      photo.top,
+      photo.width,
+      photo.height,
+    );
+  } else {
+    drawPhotoBox(doc, photo.left, photo.top, photo.width, photo.height);
+  }
+  setStroke(doc);
+  doc.rect(photo.left, photo.top, photo.width, photo.height, "S");
+}
+
+function drawMarksCardPage(
+  doc: jsPDF,
+  marksheet: StudentMarksheet,
+  images: {
+    background: LoadedDataUrl | null;
+    logo: LoadedDataUrl | null;
+    qr: LoadedDataUrl | null;
+    seal: LoadedDataUrl | null;
+    rightSignature: LoadedDataUrl | null;
+    photo: LoadedDataUrl | null;
+  },
+) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const x = FRONT_PAGE_HEADER.contentX;
+  const width = pageWidth - x * 2;
+
+  drawMarksCardWhiteBackground(doc, pageWidth, pageHeight);
+  setStroke(doc);
+  drawMarksCardHeader(doc, marksheet, { qr: images.qr, photo: images.photo });
+
+  const schoolBaseline =
+    MARKS_CARD_LAYOUT.headerBandBottom +
+    MARKS_CARD_LAYOUT.schoolNameGapAbove +
+    MARKS_CARD_LAYOUT.schoolNameFontSize * MARKS_CARD_LAYOUT.schoolNameBaselineOffset;
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(MARKS_CARD_LAYOUT.schoolNameFontSize);
+  setText(doc, RED);
+  drawCenteredTextFit(
+    doc,
+    marksheet.school_name,
+    pageWidth / 2,
+    schoolBaseline,
+    width - 20,
+    MARKS_CARD_LAYOUT.schoolNameFontSize,
+    11,
+  );
+
+  let y =
+    schoolBaseline +
+    MARKS_CARD_LAYOUT.schoolNameFontSize +
+    MARKS_CARD_LAYOUT.schoolNameGapBelow;
+  y = drawMarksCardDetailsTable(doc, marksheet, x, y, width);
+  y += MARKS_CARD_LAYOUT.beforeTitleGap;
+
+  y = drawMarksCardTable(doc, marksheet, x, y, width, pageWidth);
+  y = drawMarksCardPostTableSection(doc, marksheet, x, y, width, pageWidth);
+  drawMarksCardFooter(doc, marksheet, images);
+}
+
+/** Student block — colons aligned, spacing matches official marks card sample. */
+function drawMarksCardDetailsTable(
+  doc: jsPDF,
+  marksheet: StudentMarksheet,
+  x: number,
+  y: number,
+  width: number,
+) {
+  const fontSize = MARKS_CARD_LAYOUT.detailsFontSize;
+  const lineHeight = fontSize * MARKS_CARD_LAYOUT.detailsLineHeight;
+  const rowGap = MARKS_CARD_LAYOUT.detailsRowGap;
+
+  const rows = [
+    [
+      "PROGRAMME TITLE",
+      formatProgrammeTitleDisplay(marksheet.programme_title),
+      "PROGRAMME CODE",
+      marksheet.programme_code,
+      2,
+    ],
+    ["NAME OF THE STUDENT", marksheet.student_name, "REGISTRATION NO", marksheet.registration_no, 3],
+    [
+      "SEMESTER",
+      formatSemesterDisplay(marksheet.semester_label),
+      "MONTH & YEAR OF THE EXAMINATION",
+      marksheet.exam_month_year,
+      3,
+    ],
+  ] as const;
+
+  doc.setFontSize(fontSize);
+  doc.setFont("times", "normal");
+  let maxLeftLabelW = 0;
+  for (const [leftLabel] of rows) {
+    maxLeftLabelW = Math.max(maxLeftLabelW, doc.getTextWidth(leftLabel));
+  }
+
+  const leftColonX = x + maxLeftLabelW + 4;
+  const leftValueX = leftColonX + doc.getTextWidth(": ") + 2;
+  let currentY = y;
+
+  for (const [leftLabel, leftValue, rightLabel, rightValue, maxLines] of rows) {
+    const rightLabelColon = `${rightLabel} : `;
+    doc.setFont("times", "bold");
+    const rightValueWidth = doc.getTextWidth(rightValue);
+    doc.setFont("times", "normal");
+    const rightLabelColonWidth = doc.getTextWidth(rightLabelColon);
+    const maxLeftValueWidth = x + width - rightValueWidth - rightLabelColonWidth - leftValueX - 12;
+
+    doc.setFont("times", "bold");
+    const leftValueLines = fitLines(doc, leftValue, maxLeftValueWidth, maxLines);
+
+    doc.setFont("times", "normal");
+    setText(doc, DARK);
+    doc.text(leftLabel, x, currentY);
+    doc.text(":", leftColonX, currentY);
+    doc.setFont("times", "bold");
+    doc.text(leftValueLines, leftValueX, currentY);
+
+    const rightStartX = x + width - rightLabelColonWidth - rightValueWidth;
+    doc.setFont("times", "normal");
+    doc.text(rightLabelColon, rightStartX, currentY);
+    doc.setFont("times", "bold");
+    doc.text(rightValue, rightStartX + rightLabelColonWidth, currentY);
+
+    currentY += lineHeight + (leftValueLines.length - 1) * lineHeight + rowGap;
+  }
+
+  return currentY - rowGap;
+}
+
+function drawMarksCardTable(
+  doc: jsPDF,
+  marksheet: StudentMarksheet,
+  x: number,
+  y: number,
+  width: number,
+  pageWidth: number,
+) {
+  const widths = marksCardColumnWidths(width);
+  const titleH = MARKS_CARD_LAYOUT.titleBarHeight;
+
+  setStroke(doc);
+  doc.rect(x, y, width, titleH, "S");
+  doc.setFont("times", "bold");
+  doc.setFontSize(MARKS_CARD_LAYOUT.titleFontSize);
+  setText(doc, RED);
+  doc.text("MARKS CARD", pageWidth / 2, y + titleH - 4, { align: "center" });
+  y += titleH;
+
+  const headerRow1Height = MARKS_CARD_LAYOUT.tableHeaderRow1;
+  const headerRow2Height = MARKS_CARD_LAYOUT.tableHeaderRow2;
+  drawMarksCardTableHeader(doc, x, y, widths, headerRow1Height, headerRow2Height);
+  y += headerRow1Height + headerRow2Height;
+
+  for (const course of marksheet.courses) {
+    const values = getMarksCardCourseValues(course);
+    const titleLines = fitLines(doc, course.course_title, widths[2]! - 8, 2);
+    const rowHeight =
+      titleLines.length > 1 ? MARKS_CARD_LAYOUT.tableBodyRowWrap : MARKS_CARD_LAYOUT.tableBodyRow;
+
+    drawTableRow(
+      doc,
+      x,
+      y,
+      widths,
+      [
+        String(course.sl_no),
+        course.course_code,
+        course.course_title.toUpperCase(),
+        values.courseType,
+        formatGradeCardNumber(values.ciaMax),
+        formatGradeCardNumber(values.ciaMin),
+        formatGradeCardNumber(values.ciaScored),
+        formatGradeCardNumber(values.eseMax),
+        formatGradeCardNumber(values.eseMin),
+        formatGradeCardNumber(values.eseScored),
+        values.status,
+      ],
+      rowHeight,
+      {
+        fontSize: MARKS_CARD_LAYOUT.tableBodyFont,
+        marksCardLayout: true,
+        alignments: ["center", "center", "left", "center", "center", "center", "center", "center", "center", "center", "center"],
+        maxLines: [1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1],
+      },
+    );
+    y += rowHeight;
+  }
+
+  const totals = calculateMarksCardTotals(marksheet.courses);
+  const resultLabel = marksCardResultLabel(totals.obtained, totals.maxTotal);
+  const grandTotalText = `${formatGradeCardNumber(totals.obtained)}/${formatGradeCardNumber(totals.maxTotal)}`;
+  const firstFourWidth = widths.slice(0, 4).reduce((sum, value) => sum + value, 0);
+  const middleSixWidth = widths.slice(4, 10).reduce((sum, value) => sum + value, 0);
+  const statusWidth = widths[10]!;
+  const summaryH = MARKS_CARD_LAYOUT.tableSummaryRow;
+
+  drawMarksCardSummaryRow(
+    doc,
+    x,
+    y,
+    firstFourWidth,
+    middleSixWidth,
+    statusWidth,
+    summaryH,
+    "Grand Total",
+    grandTotalText,
+    true,
+  );
+  y += summaryH;
+
+  drawMarksCardSummaryRow(
+    doc,
+    x,
+    y,
+    firstFourWidth,
+    middleSixWidth,
+    statusWidth,
+    summaryH,
+    "Result",
+    resultLabel,
+    true,
+  );
+
+  return y + summaryH;
+}
+
+function drawMarksCardTableHeader(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  widths: number[],
+  row1Height: number,
+  row2Height: number,
+) {
+  const totalHeight = row1Height + row2Height;
+  const colX = (index: number) => x + widths.slice(0, index).reduce((sum, value) => sum + value, 0);
+  const colW = (start: number, count: number) =>
+    widths.slice(start, start + count).reduce((sum, value) => sum + value, 0);
+
+  const row1Main = ["Sl\nNo.", "Course\nCode", "Course Title", "Course Type"];
+  for (let i = 0; i < 4; i++) {
+    setStroke(doc);
+    doc.rect(colX(i), y, widths[i]!, totalHeight, "S");
+    drawMultilineCellText(
+      doc,
+      row1Main[i]!,
+      colX(i),
+      y,
+      widths[i]!,
+      totalHeight,
+      MARKS_CARD_LAYOUT.tableHeaderFont,
+      true,
+    );
+  }
+
+  const ciaX = colX(4);
+  const ciaW = colW(4, 3);
+  setStroke(doc);
+  doc.rect(ciaX, y, ciaW, row1Height, "S");
+  drawMultilineCellText(doc, "CIA", ciaX, y, ciaW, row1Height, MARKS_CARD_LAYOUT.tableHeaderFont, true);
+
+  const eseX = colX(7);
+  const eseW = colW(7, 3);
+  setStroke(doc);
+  doc.rect(eseX, y, eseW, row1Height, "S");
+  drawMultilineCellText(doc, "ESE", eseX, y, eseW, row1Height, MARKS_CARD_LAYOUT.tableHeaderFont, true);
+
+  const statusX = colX(10);
+  setStroke(doc);
+  doc.rect(statusX, y, widths[10]!, totalHeight, "S");
+  drawMultilineCellText(
+    doc,
+    "Status",
+    statusX,
+    y,
+    widths[10]!,
+    totalHeight,
+    MARKS_CARD_LAYOUT.tableHeaderFont,
+    true,
+  );
+
+  const subLabels = ["Max\nMarks", "Min\nMarks", "Marks\nScored", "Max\nMarks", "Min\nMarks", "Marks\nScored"];
+  for (let i = 0; i < subLabels.length; i++) {
+    const colIndex = 4 + i;
+    setStroke(doc);
+    doc.rect(colX(colIndex), y + row1Height, widths[colIndex]!, row2Height, "S");
+    drawMultilineCellText(
+      doc,
+      subLabels[i]!,
+      colX(colIndex),
+      y + row1Height,
+      widths[colIndex]!,
+      row2Height,
+      MARKS_CARD_LAYOUT.tableHeaderFont,
+      true,
+    );
+  }
+}
+
+/** Grand Total / Result rows — black labels (right in first 4 cols), value centred in marks cols. */
+function drawMarksCardSummaryRow(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  labelWidth: number,
+  marksWidth: number,
+  statusWidth: number,
+  height: number,
+  label: string,
+  value: string,
+  includeStatusCell: boolean,
+) {
+  const fontSize = MARKS_CARD_LAYOUT.tableSummaryFont;
+  const textY = y + height / 2 + fontSize / 3;
+
+  setStroke(doc);
+  doc.rect(x, y, labelWidth, height, "S");
+  doc.setFont("times", "bold");
+  doc.setFontSize(fontSize);
+  setText(doc, DARK);
+  doc.text(label, x + labelWidth - 4, textY, { align: "right" });
+
+  const valueWidth = includeStatusCell ? marksWidth : marksWidth + statusWidth;
+  const valueX = x + labelWidth;
+  doc.rect(valueX, y, valueWidth, height, "S");
+  doc.setFont("times", "bold");
+  doc.text(value, valueX + valueWidth / 2, textY, { align: "center" });
+
+  if (includeStatusCell) {
+    doc.rect(valueX + valueWidth, y, statusWidth, height, "S");
+  }
+}
+
+function drawMergedTableRow(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  cells: Array<{
+    width: number;
+    text: string;
+    align: "left" | "center" | "right";
+    bold?: boolean;
+    red?: boolean;
+  }>,
+  height: number,
+  fontSize: number,
+) {
+  let cursorX = x;
+  for (const cell of cells) {
+    setStroke(doc);
+    doc.rect(cursorX, y, cell.width, height, "S");
+    doc.setFont("times", cell.bold ? "bold" : "normal");
+    doc.setFontSize(fontSize);
+    setText(doc, cell.red ? RED : DARK);
+    const textX =
+      cell.align === "left"
+        ? cursorX + 4
+        : cell.align === "right"
+          ? cursorX + cell.width - 4
+          : cursorX + cell.width / 2;
+    doc.text(cell.text, textX, y + height / 2 + fontSize / 3, { align: cell.align });
+    cursorX += cell.width;
+  }
+}
+
+function drawMultilineCellText(
+  doc: jsPDF,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  fontSize: number,
+  bold = false,
+) {
+  doc.setFont("times", bold ? "bold" : "normal");
+  doc.setFontSize(fontSize);
+  setText(doc, DARK);
+  const lines = text.split("\n");
+  const lineHeight = fontSize * 1.15;
+  const blockHeight = lines.length * lineHeight;
+  let textY = y + (height - blockHeight) / 2 + fontSize * 0.78;
+  for (const line of lines) {
+    doc.text(line, x + width / 2, textY, { align: "center" });
+    textY += lineHeight;
+  }
+}
+
+/** One legend line: bold abbreviation + normal " – description" (official sample). */
+function drawMarksCardLegendLine(
+  doc: jsPDF,
+  y: number,
+  abbrev: string,
+  description: string,
+  fontSize: number,
+  startX: number,
+) {
+  doc.setFontSize(fontSize);
+  doc.setFont("times", "bold");
+  const abbrevW = doc.getTextWidth(abbrev);
+  doc.setFont("times", "normal");
+  const suffix = ` – ${description}`;
+
+  doc.setFont("times", "bold");
+  setText(doc, DARK);
+  doc.text(abbrev, startX, y);
+  doc.setFont("times", "normal");
+  doc.text(suffix, startX + abbrevW, y);
+}
+
+/** Centered date, then legend: left CIA/RA, right ESE/P (official marks card sample). */
+function drawMarksCardPostTableSection(
+  doc: jsPDF,
+  marksheet: StudentMarksheet,
+  x: number,
+  y: number,
+  width: number,
+  pageWidth: number,
+) {
+  y += MARKS_CARD_LAYOUT.afterTableGap;
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(MARKS_CARD_LAYOUT.dateFontSize);
+  setText(doc, DARK);
+  doc.text(
+    `Date : ${formatDate(marksheet.issue_date || new Date().toISOString())}`,
+    pageWidth / 2,
+    y,
+    { align: "center" },
+  );
+
+  y += MARKS_CARD_LAYOUT.dateToLegendGap + MARKS_CARD_LAYOUT.dateFontSize * 0.35;
+  const fontSize = MARKS_CARD_LAYOUT.legendFontSize;
+  const rowGap = MARKS_CARD_LAYOUT.legendRowGap;
+  const leftX = x + MARKS_CARD_LAYOUT.legendPadX;
+  const rightColX = x + width * MARKS_CARD_LAYOUT.legendRightColRatio;
+  const legendTop = y;
+
+  drawMarksCardLegendLine(doc, legendTop, "CIA", "Continuous Internal Assessment", fontSize, leftX);
+  drawMarksCardLegendLine(doc, legendTop, "ESE", "End Semester Examination", fontSize, rightColX);
+
+  const row2Y = legendTop + rowGap;
+  drawMarksCardLegendLine(doc, row2Y, "RA", "Re-appear", fontSize, leftX);
+  drawMarksCardLegendLine(doc, row2Y, "P", "Pass", fontSize, rightColX);
+
+  return row2Y + fontSize;
+}
+
+/** Seal graphic with "SEAL" centred on the seal bounding box (marks card only). */
+function drawMarksCardSealWithLabel(doc: jsPDF, sealImage: LoadedDataUrl | null) {
+  const seal = FRONT_PAGE_FOOTER.seal;
+  const sealCenterX = seal.x + seal.w / 2;
+
+  if (sealImage) {
+    doc.addImage(
+      sealImage.dataUrl,
+      sealImage.type,
+      seal.x + MARKS_CARD_LAYOUT.sealImageOffsetX,
+      seal.y,
+      seal.w,
+      seal.h,
+    );
+  }
+
+  const label = "SEAL";
+  const fontSize = MARKS_CARD_LAYOUT.sealLabelFontSize;
+  const labelY = seal.y + seal.h + MARKS_CARD_LAYOUT.sealLabelGap;
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(fontSize);
+  setText(doc, DARK);
+  const labelWidth = doc.getTextWidth(label);
+  const labelBaseline = labelY + fontSize * 0.75;
+  doc.text(label, sealCenterX - labelWidth / 2, labelBaseline);
+}
+
+function drawMarksCardFooter(
+  doc: jsPDF,
+  marksheet: StudentMarksheet,
+  images: {
+    seal: LoadedDataUrl | null;
+    rightSignature: LoadedDataUrl | null;
+  },
+) {
+  drawMarksCardSealWithLabel(doc, images.seal);
+
+  if (images.rightSignature) {
+    const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
+    const sig = isAfterJuly24 ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
+    const naturalW = images.rightSignature.width ?? sig.w;
+    const naturalH = images.rightSignature.height ?? sig.h;
+    const fitted = fitImageInBox(naturalW, naturalH, sig.x, sig.y, sig.w, sig.h);
+    doc.addImage(
+      images.rightSignature.dataUrl,
+      images.rightSignature.type,
+      fitted.x,
+      fitted.y,
+      fitted.w,
+      fitted.h,
+    );
+  }
 }

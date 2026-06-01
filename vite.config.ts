@@ -9,7 +9,12 @@ export default defineConfig(({ mode }) => {
   // Mirror non-VITE_ Supabase keys onto VITE_ ones so the existing client
   // (which reads import.meta.env.VITE_SUPABASE_*) keeps working in the browser.
   const supabaseUrl = env.VITE_SUPABASE_URL ?? env.SUPABASE_URL;
-  const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_PUBLISHABLE_KEY;
+  // Prefer legacy anon JWT for Realtime WebSocket auth (publishable keys can fail on Realtime).
+  const supabaseKey =
+    env.VITE_SUPABASE_ANON_KEY ??
+    env.SUPABASE_ANON_KEY ??
+    env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+    env.SUPABASE_PUBLISHABLE_KEY;
 
   const libraryUrl = env.VITE_LIBRARY_SUPABASE_URL ?? env.LIBRARY_SUPABASE_URL ?? "";
   const libraryAnonKey = env.VITE_LIBRARY_SUPABASE_ANON_KEY ?? env.LIBRARY_SUPABASE_ANON_KEY ?? "";
@@ -18,6 +23,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss(), tsconfigPaths()],
     define: {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl ?? ""),
+      "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(
+        env.VITE_SUPABASE_ANON_KEY ?? env.SUPABASE_ANON_KEY ?? "",
+      ),
       "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey ?? ""),
       "import.meta.env.VITE_LIBRARY_SUPABASE_URL": JSON.stringify(libraryUrl),
       "import.meta.env.VITE_LIBRARY_SUPABASE_ANON_KEY": JSON.stringify(libraryAnonKey),

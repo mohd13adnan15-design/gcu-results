@@ -1,4 +1,5 @@
 import { TEJASHVI_MARKSHEET_SEED } from "@/lib/marksheet";
+import { defaultMinMarks, resolveCourseStatus } from "@/lib/marks-card-helpers";
 
 export function toRoman(num: number | string): string {
   const n = typeof num === 'number' ? num : parseInt(String(num), 10);
@@ -26,6 +27,38 @@ export function romanToNum(roman: string | number | null | undefined): number {
   return map[clean] || 0;
 }
 
+
+export const GCU_MARKS_TEMPLATE_HEADERS_LEGACY = [
+  "Sl No", "Email", "Student Name", "Department", "University", "School Name",
+  "Programme Title", "Programme Code", "Registration No", "Exam Month & Year",
+  "Issue Date", "Semester Label", "Grade Card No", "Course Category", "Course Type",
+  "Course Priority", "Course Code", "Course Title", "Course Credits", "Credits Earned",
+  "CIA Max Marks Theory", "CIA Max Marks Practical", "CIA Marks Obtained Theory", "CIA Marks Obtained Practical",
+  "ESE Max Marks Theory", "ESE Max Marks Practical", "ESE Marks Obtained Theory", "ESE Marks Obtained Practical",
+  "Total Marks Theory", "Total Marks Practical", "Grade Obtained", "Grade Points", "Image Path",
+] as const;
+
+/** Extended template with CIA/ESE minimum marks and per-course status for marks cards. */
+export const GCU_MARKS_TEMPLATE_HEADERS = [
+  "Sl No", "Email", "Student Name", "Department", "University", "School Name",
+  "Programme Title", "Programme Code", "Registration No", "Exam Month & Year",
+  "Issue Date", "Semester Label", "Grade Card No", "Course Category", "Course Type",
+  "Course Priority", "Course Code", "Course Title", "Course Credits", "Credits Earned",
+  "CIA Max Marks Theory", "CIA Max Marks Practical", "CIA Min Marks Theory", "CIA Min Marks Practical",
+  "CIA Marks Obtained Theory", "CIA Marks Obtained Practical",
+  "ESE Max Marks Theory", "ESE Max Marks Practical", "ESE Min Marks Theory", "ESE Min Marks Practical",
+  "ESE Marks Obtained Theory", "ESE Marks Obtained Practical",
+  "Total Marks Theory", "Total Marks Practical", "Status", "Grade Obtained", "Grade Points", "Image Path",
+] as const;
+
+export function detectGcuMarksTemplateHeaders(aoa: unknown[][]): readonly string[] {
+  const rowText = (aoa[0] ?? []).map((c) => String(c ?? "").toLowerCase()).join("|");
+  const maxCols = Math.max(...aoa.slice(0, 6).map((row) => (row ?? []).length), 0);
+  if (rowText.includes("cia min") || rowText.includes("status") || maxCols >= 36) {
+    return GCU_MARKS_TEMPLATE_HEADERS;
+  }
+  return GCU_MARKS_TEMPLATE_HEADERS_LEGACY;
+}
 
 /** Full template - one row per course; repeat student/header columns on every row (same as typical Excel marks uploads). */
 export const MARKS_TEMPLATE_HEADERS_FULL = [
@@ -135,16 +168,22 @@ export type ParsedMarksCourseRow = {
   credits_earned: number;
   cia_max_marks_theory: number;
   cia_max_marks_practical: number;
+  cia_min_marks_theory: number;
+  cia_min_marks_practical: number;
   cia_marks_obtained_theory: number;
   cia_marks_obtained_practical: number;
   ese_max_marks_theory: number;
   ese_max_marks_practical: number;
+  ese_min_marks_theory: number;
+  ese_min_marks_practical: number;
   ese_marks_obtained_theory: number;
   ese_marks_obtained_practical: number;
   total_marks_theory: number;
   total_marks_practical: number;
   marks_obtained: number;
   max_marks: number;
+  course_type: string;
+  course_status: string;
   grade: string;
   grade_points: number;
   image_path?: string;
@@ -226,17 +265,56 @@ export function parseMarksTemplateRow(nc: Record<string, unknown>): ParsedMarksC
   const courseType = cell(nc, "Course Type", "coursetype") || "";
   const isPractical = courseType.toUpperCase().includes("PRACTICAL") || String(course_category).toUpperCase().includes("PRACTICAL");
 
-  const cia_max_raw = cellNum(nc, "cia max marks theory", "ciamaxmarkstheory") || cellNum(nc, "cia max marks practical", "ciamaxmarkspractical") || cellNum(nc, "CIA Max Marks", "ciamaxmarks") || 0;
-  const cia_obt_raw = cellNum(nc, "cia marks obtained theory", "ciamarksobtainedtheory") || cellNum(nc, "cia marks obtained practical", "ciamarksobtainedpractical") || cellNum(nc, "CIA Marks Obtained", "ciamarksobtained") || 0;
-  const ese_max_raw = cellNum(nc, "ese max marks theory", "esemaxmarkstheory") || cellNum(nc, "ese max marks practical", "esemaxmarkspractical") || cellNum(nc, "ESE Max Marks", "esemaxmarks") || 0;
-  const ese_obt_raw = cellNum(nc, "ese marks obtained theory", "esemarksobtainedtheory") || cellNum(nc, "ese marks obtained practical", "esemarksobtainedpractical") || cellNum(nc, "ESE Marks Obtained", "esemarksobtained") || 0;
+  const cia_max_theory_raw = cellNum(nc, "CIA Max Marks Theory", "ciamaxmarkstheory");
+  const cia_max_practical_raw = cellNum(nc, "CIA Max Marks Practical", "ciamaxmarkspractical");
+  const cia_max_raw =
+    (isPractical ? cia_max_practical_raw : cia_max_theory_raw) ||
+    cellNum(nc, "CIA Max Marks", "ciamaxmarks") ||
+    0;
+
+  const cia_min_theory_raw = cellNum(nc, "CIA Min Marks Theory", "ciaminmarkstheory");
+  const cia_min_practical_raw = cellNum(nc, "CIA Min Marks Practical", "ciaminmarkspractical");
+  const cia_obt_theory_raw = cellNum(nc, "CIA Marks Obtained Theory", "ciamarksobtainedtheory");
+  const cia_obt_practical_raw = cellNum(nc, "CIA Marks Obtained Practical", "ciamarksobtainedpractical");
+  const cia_obt_raw =
+    (isPractical ? cia_obt_practical_raw : cia_obt_theory_raw) ||
+    cellNum(nc, "CIA Marks Obtained", "ciamarksobtained") ||
+    0;
+
+  const ese_max_theory_raw = cellNum(nc, "ESE Max Marks Theory", "esemaxmarkstheory");
+  const ese_max_practical_raw = cellNum(nc, "ESE Max Marks Practical", "esemaxmarkspractical");
+  const ese_max_raw =
+    (isPractical ? ese_max_practical_raw : ese_max_theory_raw) ||
+    cellNum(nc, "ESE Max Marks", "esemaxmarks") ||
+    0;
+
+  const ese_min_theory_raw = cellNum(nc, "ESE Min Marks Theory", "eseminmarkstheory");
+  const ese_min_practical_raw = cellNum(nc, "ESE Min Marks Practical", "eseminmarkspractical");
+  const ese_obt_theory_raw = cellNum(nc, "ESE Marks Obtained Theory", "esemarksobtainedtheory");
+  const ese_obt_practical_raw = cellNum(nc, "ESE Marks Obtained Practical", "esemarksobtainedpractical");
+  const ese_obt_raw =
+    (isPractical ? ese_obt_practical_raw : ese_obt_theory_raw) ||
+    cellNum(nc, "ESE Marks Obtained", "esemarksobtained") ||
+    0;
 
   const cia_max_marks_theory = isPractical ? 0 : cia_max_raw;
   const cia_max_marks_practical = isPractical ? cia_max_raw : 0;
+  const cia_min_marks_theory = isPractical
+    ? 0
+    : (Number.isFinite(cia_min_theory_raw) ? cia_min_theory_raw : defaultMinMarks(cia_max_marks_theory));
+  const cia_min_marks_practical = isPractical
+    ? (Number.isFinite(cia_min_practical_raw) ? cia_min_practical_raw : defaultMinMarks(cia_max_marks_practical, true))
+    : 0;
   const cia_marks_obtained_theory = isPractical ? 0 : cia_obt_raw;
   const cia_marks_obtained_practical = isPractical ? cia_obt_raw : 0;
   const ese_max_marks_theory = isPractical ? 0 : ese_max_raw;
   const ese_max_marks_practical = isPractical ? ese_max_raw : 0;
+  const ese_min_marks_theory = isPractical
+    ? 0
+    : (Number.isFinite(ese_min_theory_raw) ? ese_min_theory_raw : defaultMinMarks(ese_max_marks_theory));
+  const ese_min_marks_practical = isPractical
+    ? (Number.isFinite(ese_min_practical_raw) ? ese_min_practical_raw : defaultMinMarks(ese_max_marks_practical))
+    : 0;
   const ese_marks_obtained_theory = isPractical ? 0 : ese_obt_raw;
   const ese_marks_obtained_practical = isPractical ? ese_obt_raw : 0;
 
@@ -254,6 +332,8 @@ export function parseMarksTemplateRow(nc: Record<string, unknown>): ParsedMarksC
   const grade =
     gradeRaw ||
     (Number.isFinite(marks_obtained) ? autoGradeFromPct(marks_obtained, max_marks) : "RA");
+  const statusRaw = cell(nc, "Status", "status", "Pass/Fail", "passfail");
+  const course_status = resolveCourseStatus(statusRaw, grade);
   const credits_earned =
     Number(cell(nc, "Credits Earned", "credits earned")) || (grade === "RA" ? 0 : credits);
   const gpStr = cell(nc, "Grade Points", "grade points");
@@ -287,16 +367,22 @@ export function parseMarksTemplateRow(nc: Record<string, unknown>): ParsedMarksC
     credits_earned,
     cia_max_marks_theory,
     cia_max_marks_practical,
+    cia_min_marks_theory,
+    cia_min_marks_practical,
     cia_marks_obtained_theory,
     cia_marks_obtained_practical,
     ese_max_marks_theory,
     ese_max_marks_practical,
+    ese_min_marks_theory,
+    ese_min_marks_practical,
     ese_marks_obtained_theory,
     ese_marks_obtained_practical,
     total_marks_theory,
     total_marks_practical,
     marks_obtained: Number.isFinite(marks_obtained) ? marks_obtained : 0,
     max_marks,
+    course_type: courseType || (isPractical ? "PRACTICAL" : "THEORY"),
+    course_status,
     grade,
     grade_points,
     image_path: image_path || undefined,
@@ -374,14 +460,19 @@ export function buildTejashviTemplateExampleRows(): (string | number)[][] {
       c.credits_earned,
       40, // CIA Max Theory
       0, // CIA Max Practical
+      16, // CIA Min Theory
+      0, // CIA Min Practical
       approxMarks * 0.4, // CIA Obtained Theory
       0, // CIA Obtained Practical
       60, // ESE Max Theory
       0, // ESE Max Practical
+      24, // ESE Min Theory
+      0, // ESE Min Practical
       approxMarks * 0.6, // ESE Obtained Theory
       0, // ESE Obtained Practical
       100, // Total Max Theory
       0, // Total Max Practical
+      "PASS",
       c.grade_obtained,
       c.grade_points,
     ];

@@ -6,21 +6,28 @@ function createSupabaseClient() {
   // Browser bundles must not reference `process` - it is not defined in Vite client code.
   // Keys are injected via import.meta.env (see vite.config.ts define + .env).
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
   const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as
     | string
     | undefined;
+  const SUPABASE_KEY = SUPABASE_ANON_KEY || SUPABASE_PUBLISHABLE_KEY;
 
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
     throw new Error(
-      "Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in gcu-results-main/.env (see .env.example), then restart the dev server.",
+      "Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (recommended for Realtime) or VITE_SUPABASE_PUBLISHABLE_KEY in .env, then restart the dev server.",
     );
   }
 
-  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  return createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
       storage: typeof window !== "undefined" ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
     },
   });
 }
