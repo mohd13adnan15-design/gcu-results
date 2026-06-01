@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 import type { Student } from "@/lib/types";
 import { DEPARTMENTS, SEMESTERS, YEARS } from "@/lib/types";
 import { toRoman, romanToNum } from "@/lib/marks-excel-template";
@@ -334,17 +335,11 @@ export function ClearanceAdminPage({ kind }: Props) {
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel(`clearance:${kind}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "students" },
-        () => void load(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return subscribePostgresChanges(
+      `clearance:${kind}`,
+      [{ event: "*", schema: "public", table: "students" }],
+      () => void load(),
+    );
   }, [kind, load]);
 
   const filtered = students.filter((s) => {

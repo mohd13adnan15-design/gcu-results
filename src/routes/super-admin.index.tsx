@@ -22,6 +22,7 @@ import * as XLSX from "xlsx";
 import {
   MARKS_TEMPLATE_HEADERS_FULL,
   buildTejashviTemplateExampleRows,
+  detectGcuMarksTemplateHeaders,
   normalizeExcelRowKeys,
   parseMarksTemplateRow,
   validateMarksTemplateColumns,
@@ -42,6 +43,7 @@ import {
   type ExtractedStudentPhoto,
 } from "@/lib/student-photo-zip";
 import { notificationPortalLabel } from "@/lib/portal";
+import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 
 export function SuperAdminPage() {
   return (
@@ -87,8 +89,8 @@ function SuperAdminContent() {
         </Link>
       </div>
 
-      <SuperAdminIssueReports />
       <MarksUploader />
+      <SuperAdminIssueReports />
       <SuperAdminStudentsDashboard />
     </div>
   );
@@ -131,17 +133,11 @@ function SuperAdminIssueReports() {
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel("head-of-coe:issue-reports")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "portal_notifications" },
-        () => void load(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return subscribePostgresChanges(
+      "head-of-coe:issue-reports",
+      [{ event: "*", schema: "public", table: "portal_notifications" }],
+      () => void load(),
+    );
   }, [load]);
 
   async function markRead(id: string) {
@@ -409,32 +405,16 @@ function SuperAdminStudentsDashboard() {
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel("head-of-coe:students-dashboard")
-      .on(
-        "postgres_changes",
+    return subscribePostgresChanges(
+      "head-of-coe:students-dashboard",
+      [
         { event: "*", schema: "public", table: "students" },
-        () => void load(),
-      )
-      .on(
-        "postgres_changes",
         { event: "*", schema: "public", table: "grade_card_details" },
-        () => void load(),
-      )
-      .on(
-        "postgres_changes",
         { event: "*", schema: "public", table: "student_marks" },
-        () => void load(),
-      )
-      .on(
-        "postgres_changes",
         { event: "*", schema: "public", table: "student_marksheets" },
-        () => void load(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ],
+      () => void load(),
+    );
   }, [load]);
 
   const filtered = useMemo(() => {
@@ -625,15 +605,7 @@ function MarksUploader() {
         const isGCUFormat = String(row0[0] || '').trim() === 'Sl No' && String(row0[1] || '').trim() === 'Email' && String(row0[16] || '').trim() === 'Course Code';
         
         if (isGCUFormat) {
-          finalHeaders = [
-            "Sl No", "Email", "Student Name", "Department", "University", "School Name", 
-            "Programme Title", "Programme Code", "Registration No", "Exam Month & Year", 
-            "Issue Date", "Semester Label", "Grade Card No", "Course Category", "Course Type", 
-            "Course Priority", "Course Code", "Course Title", "Course Credits", "Credits Earned", 
-            "CIA Max Marks Theory", "CIA Max Marks Practical", "CIA Marks Obtained Theory", "CIA Marks Obtained Practical", 
-            "ESE Max Marks Theory", "ESE Max Marks Practical", "ESE Marks Obtained Theory", "ESE Marks Obtained Practical", 
-            "Total Marks Theory", "Total Marks Practical", "Grade Obtained", "Grade Points", "Image Path"
-          ];
+          finalHeaders = [...detectGcuMarksTemplateHeaders(aoa)];
         } else {
           let lastMainHeader = "";
           for (let i = 0; i < Math.max(row0.length, row1.length); i++) {
@@ -852,6 +824,7 @@ function MarksUploader() {
         marksToInsert.push({
           student_id: uuid,
           course_category: row.course_category || "CORE COURSE",
+          course_type: row.course_type,
           subject: row.subject,
           subject_code: row.subject_code,
           course_priority: row.course_priority,
@@ -859,16 +832,21 @@ function MarksUploader() {
           credits_earned: row.credits_earned,
           cia_max_marks_theory: row.cia_max_marks_theory,
           cia_max_marks_practical: row.cia_max_marks_practical,
+          cia_min_marks_theory: row.cia_min_marks_theory,
+          cia_min_marks_practical: row.cia_min_marks_practical,
           cia_marks_obtained_theory: row.cia_marks_obtained_theory,
           cia_marks_obtained_practical: row.cia_marks_obtained_practical,
           ese_max_marks_theory: row.ese_max_marks_theory,
           ese_max_marks_practical: row.ese_max_marks_practical,
+          ese_min_marks_theory: row.ese_min_marks_theory,
+          ese_min_marks_practical: row.ese_min_marks_practical,
           ese_marks_obtained_theory: row.ese_marks_obtained_theory,
           ese_marks_obtained_practical: row.ese_marks_obtained_practical,
           total_marks_theory: row.total_marks_theory,
           total_marks_practical: row.total_marks_practical,
           marks_obtained: row.marks_obtained,
           max_marks: row.max_marks,
+          course_status: row.course_status,
           grade: row.grade,
           grade_points: row.grade_points,
         });

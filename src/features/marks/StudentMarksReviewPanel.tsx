@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, MessageSquareWarning, ShieldCheck } from "luci
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 import type { StudentMarksheet } from "@/lib/marksheet";
 import { fetchStudentMarksheet, fetchAllStudentMarksheets, calculateMarksheetTotals } from "@/lib/marksheet";
 import { MarksheetSavedPreview } from "@/features/marks/MarksheetDisplay";
@@ -174,47 +175,31 @@ export function StudentMarksReviewPanel({
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel(`${portal}:student-marksheet:${studentId}`)
-      .on(
-        "postgres_changes",
+    return subscribePostgresChanges(
+      `${portal}:student-marksheet:${studentId}`,
+      [
         { event: "*", schema: "public", table: "students", filter: `id=eq.${studentId}` },
-        () => void load(),
-      )
-      .on(
-        "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "student_marksheets",
           filter: `student_id=eq.${studentId}`,
         },
-        () => void load(),
-      )
-      .on(
-        "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "student_marks",
           filter: `student_id=eq.${studentId}`,
         },
-        () => void load(),
-      )
-      .on(
-        "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "grade_card_details",
           filter: `student_id=eq.${studentId}`,
         },
-        () => void load(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ],
+      () => void load(),
+    );
   }, [load, portal, studentId]);
 
   const eligibility = useMemo(() => {

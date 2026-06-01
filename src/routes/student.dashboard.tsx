@@ -2,6 +2,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 import { isLibraryRemoteConfigured } from "@/integrations/supabase/library-remote-client";
 import { StudentLayout } from "@/components/layout/StudentLayout";
 import type { Student } from "@/lib/types";
@@ -105,27 +106,19 @@ function Dashboard() {
       }
     };
     load();
-    const channel = supabase
-      .channel(`student-dashboard:${s.id}`)
-      .on(
-        "postgres_changes",
+    return subscribePostgresChanges(
+      `student-dashboard:${s.id}`,
+      [
         { event: "*", schema: "public", table: "students", filter: `id=eq.${s.id}` },
-        () => load(),
-      )
-      .on(
-        "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "student_marksheets",
           filter: `student_id=eq.${s.id}`,
         },
-        () => load(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ],
+      () => load(),
+    );
   }, []);
 
   if (loading || !student) {

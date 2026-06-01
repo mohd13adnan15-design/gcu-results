@@ -8,10 +8,17 @@ import { toast } from "sonner";
 interface Props {
   title?: string;
   tagline?: string;
+  /** Show support contact footer (download page only). */
+  showQueriesFooter?: boolean;
   children: (s: StudentSession) => ReactNode;
 }
 
-export function StudentLayout({ title = "Student Portal", tagline, children }: Props) {
+export function StudentLayout({
+  title = "Student Portal",
+  tagline,
+  showQueriesFooter = false,
+  children,
+}: Props) {
   const navigate = useNavigate();
   const [session, setSession] = useState<StudentSession | null>(null);
   const [ready, setReady] = useState(false);
@@ -119,15 +126,17 @@ export function StudentLayout({ title = "Student Portal", tagline, children }: P
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children(session)}</main>
-      <div className="border-t border-border bg-cream/70">
-        <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 px-6 py-4 text-center text-sm text-muted-foreground">
-          <MessageCircle className="h-4 w-4 shrink-0 text-primary/70" aria-hidden />
-          <p>
-            If you have any queries, please write to{" "}
-            <span className="font-semibold text-primary">pro.edu.gcu.in</span>
-          </p>
+      {showQueriesFooter && (
+        <div className="border-t border-border bg-cream/70">
+          <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 px-6 py-4 text-center text-sm text-muted-foreground">
+            <MessageCircle className="h-4 w-4 shrink-0 text-primary/70" aria-hidden />
+            <p>
+              If you have any queries, please write to{" "}
+              <span className="font-semibold text-primary">pro.edu.gcu.in</span>
+            </p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

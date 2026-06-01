@@ -4,6 +4,7 @@ import { CheckCircle2, Clock, Eye, Loader2, MessageSquareWarning, ShieldCheck, X
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 import type { StudentMarksheet } from "@/lib/marksheet";
 import {
   normalizeMarksheet,
@@ -204,21 +205,17 @@ export function FacultyPage() {
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel("faculty:students-and-marksheets")
-      .on("postgres_changes", { event: "*", schema: "public", table: "students" }, () => {
+    return subscribePostgresChanges(
+      "faculty:students-and-marksheets",
+      [
+        { event: "*", schema: "public", table: "students" },
+        { event: "*", schema: "public", table: "student_marksheets" },
+        { event: "*", schema: "public", table: "portal_notifications" },
+      ],
+      () => {
         void load();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "student_marksheets" }, () => {
-        void load();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "portal_notifications" }, () => {
-        void load();
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      },
+    );
   }, []);
 
   const marksheetByStudentId = useMemo(

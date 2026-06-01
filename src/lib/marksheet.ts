@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { defaultMinMarks } from "@/lib/marks-card-helpers";
+
 import { studentPhotoCandidatePaths } from "@/lib/student-photo-zip";
 import type { Student } from "@/lib/types";
 
@@ -8,21 +10,27 @@ export type MarksheetCourse = {
   section: string;
   course_code: string;
   course_title: string;
+  course_type?: string;
   course_priority?: number;
   course_credits: number;
   credits_earned: number;
   cia_max_marks_theory?: number;
   cia_max_marks_practical?: number;
+  cia_min_marks_theory?: number;
+  cia_min_marks_practical?: number;
   cia_marks_obtained_theory?: number;
   cia_marks_obtained_practical?: number;
   ese_max_marks_theory?: number;
   ese_max_marks_practical?: number;
+  ese_min_marks_theory?: number;
+  ese_min_marks_practical?: number;
   ese_marks_obtained_theory?: number;
   ese_marks_obtained_practical?: number;
   total_marks_theory?: number;
   total_marks_practical?: number;
   marks_obtained?: number;
   max_marks?: number;
+  course_status?: string;
   grade_obtained: string;
   grade_points: number;
 };
@@ -685,14 +693,20 @@ export type LegacyMarkRow = {
   credits_earned?: number | null;
   cia_max_marks_theory?: number | null;
   cia_max_marks_practical?: number | null;
+  cia_min_marks_theory?: number | null;
+  cia_min_marks_practical?: number | null;
   cia_marks_obtained_theory?: number | null;
   cia_marks_obtained_practical?: number | null;
   ese_max_marks_theory?: number | null;
   ese_max_marks_practical?: number | null;
+  ese_min_marks_theory?: number | null;
+  ese_min_marks_practical?: number | null;
   ese_marks_obtained_theory?: number | null;
   ese_marks_obtained_practical?: number | null;
   total_marks_theory?: number | null;
   total_marks_practical?: number | null;
+  course_type?: string | null;
+  course_status?: string | null;
   marks_obtained?: number | null;
   max_marks?: number | null;
   grade?: string | null;
@@ -703,27 +717,44 @@ export type LegacyMarkRow = {
 export function legacyMarkRowsToMarksheetCourses(marks: LegacyMarkRow[]): MarksheetCourse[] {
   return marks.map((m, index) => {
     const section = String(m.course_category ?? "CORE COURSE").trim() || "CORE COURSE";
-    const max_marks = section.toUpperCase().includes("PRACTICAL") ? 50 : (Number(m.max_marks) || 100);
+    const isPractical = section.toUpperCase().includes("PRACTICAL") || String(m.course_type ?? "").toUpperCase().includes("PRACTICAL");
+    const max_marks = isPractical ? 50 : (Number(m.max_marks) || 100);
+    const ciaMaxTheory = Number(m.cia_max_marks_theory ?? 0) || 0;
+    const ciaMaxPractical = Number(m.cia_max_marks_practical ?? 0) || 0;
+    const eseMaxTheory = Number(m.ese_max_marks_theory ?? 0) || 0;
+    const eseMaxPractical = Number(m.ese_max_marks_practical ?? 0) || 0;
     return {
       sl_no: index + 1,
       section,
       course_code: String(m.subject_code ?? "").trim(),
       course_title: String(m.subject ?? "").trim(),
+      course_type: String(m.course_type ?? (isPractical ? "PRACTICAL" : "THEORY")).trim(),
       course_priority: Number(m.course_priority ?? 1) || 1,
       course_credits: Number(m.credits ?? 0) || 0,
       credits_earned: Number(m.credits_earned ?? 0) || 0,
-      cia_max_marks_theory: Number(m.cia_max_marks_theory ?? 0) || 0,
-      cia_max_marks_practical: Number(m.cia_max_marks_practical ?? 0) || 0,
+      cia_max_marks_theory: ciaMaxTheory,
+      cia_max_marks_practical: ciaMaxPractical,
+      cia_min_marks_theory:
+        m.cia_min_marks_theory != null ? Number(m.cia_min_marks_theory) : defaultMinMarks(ciaMaxTheory),
+      cia_min_marks_practical:
+        m.cia_min_marks_practical != null
+          ? Number(m.cia_min_marks_practical)
+          : defaultMinMarks(ciaMaxPractical, true),
       cia_marks_obtained_theory: Number(m.cia_marks_obtained_theory ?? 0) || 0,
       cia_marks_obtained_practical: Number(m.cia_marks_obtained_practical ?? 0) || 0,
-      ese_max_marks_theory: Number(m.ese_max_marks_theory ?? 0) || 0,
-      ese_max_marks_practical: Number(m.ese_max_marks_practical ?? 0) || 0,
+      ese_max_marks_theory: eseMaxTheory,
+      ese_max_marks_practical: eseMaxPractical,
+      ese_min_marks_theory:
+        m.ese_min_marks_theory != null ? Number(m.ese_min_marks_theory) : defaultMinMarks(eseMaxTheory),
+      ese_min_marks_practical:
+        m.ese_min_marks_practical != null ? Number(m.ese_min_marks_practical) : defaultMinMarks(eseMaxPractical),
       ese_marks_obtained_theory: Number(m.ese_marks_obtained_theory ?? 0) || 0,
       ese_marks_obtained_practical: Number(m.ese_marks_obtained_practical ?? 0) || 0,
       total_marks_theory: Number(m.total_marks_theory ?? 0) || 0,
       total_marks_practical: Number(m.total_marks_practical ?? 0) || 0,
       marks_obtained: Number(m.marks_obtained ?? 0) || 0,
       max_marks,
+      course_status: String(m.course_status ?? "").trim() || undefined,
       grade_obtained: String(m.grade ?? "").trim(),
       grade_points: Number(m.grade_points ?? 0) || 0,
     };
@@ -744,21 +775,27 @@ export function marksheetCoursesToStudentMarkInserts(
       course_category: c.section,
       subject: c.course_title,
       subject_code: c.course_code,
+      course_type: c.course_type ?? (isPractical ? "PRACTICAL" : "THEORY"),
       course_priority: c.course_priority ?? 1,
       credits: c.course_credits,
       credits_earned: c.credits_earned,
       cia_max_marks_theory: c.cia_max_marks_theory ?? 0,
       cia_max_marks_practical: c.cia_max_marks_practical ?? 0,
+      cia_min_marks_theory: c.cia_min_marks_theory ?? defaultMinMarks(c.cia_max_marks_theory ?? 0),
+      cia_min_marks_practical: c.cia_min_marks_practical ?? defaultMinMarks(c.cia_max_marks_practical ?? 0, true),
       cia_marks_obtained_theory: c.cia_marks_obtained_theory ?? 0,
       cia_marks_obtained_practical: c.cia_marks_obtained_practical ?? 0,
       ese_max_marks_theory: c.ese_max_marks_theory ?? 0,
       ese_max_marks_practical: c.ese_max_marks_practical ?? 0,
+      ese_min_marks_theory: c.ese_min_marks_theory ?? defaultMinMarks(c.ese_max_marks_theory ?? 0),
+      ese_min_marks_practical: c.ese_min_marks_practical ?? defaultMinMarks(c.ese_max_marks_practical ?? 0),
       ese_marks_obtained_theory: c.ese_marks_obtained_theory ?? 0,
       ese_marks_obtained_practical: c.ese_marks_obtained_practical ?? 0,
       total_marks_theory: c.total_marks_theory ?? 0,
       total_marks_practical: c.total_marks_practical ?? 0,
       marks_obtained: c.marks_obtained ?? 0,
       max_marks,
+      course_status: c.course_status ?? "",
       grade: c.grade_obtained || "RA",
       grade_points: c.grade_points,
       semester_label: semesterLabel || "",
@@ -843,7 +880,7 @@ export async function fetchStudentMarksSafe(
   const hasSemCol = await checkSemesterLabelColumnExists(supabase);
   const queryStr =
     selectStr ||
-    "id,subject,subject_code,course_category,credits,credits_earned,marks_obtained,max_marks,grade,grade_points,course_priority,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,semester_label";
+    "id,subject,subject_code,course_category,course_type,credits,credits_earned,marks_obtained,max_marks,grade,grade_points,course_priority,cia_max_marks_theory,cia_max_marks_practical,cia_min_marks_theory,cia_min_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_min_marks_theory,ese_min_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,course_status,semester_label";
 
   let finalQueryStr = queryStr;
   if (!hasSemCol) {
@@ -920,7 +957,7 @@ export async function fetchStudentMarksheet(supabase: SupabaseClient, studentId:
     marksData = await fetchStudentMarksSafe(
       supabase,
       studentId,
-      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
+      "subject,subject_code,course_category,course_type,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_min_marks_theory,cia_min_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_min_marks_theory,ese_min_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,course_status,grade,grade_points,semester_label",
     );
   } catch (err) {
     throw err;
@@ -997,7 +1034,7 @@ export async function fetchAllStudentMarksheets(supabase: SupabaseClient, studen
     marksData = await fetchStudentMarksSafe(
       supabase,
       studentId,
-      "subject,subject_code,course_category,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,grade,grade_points,semester_label",
+      "subject,subject_code,course_category,course_type,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_min_marks_theory,cia_min_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_min_marks_theory,ese_min_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,course_status,grade,grade_points,semester_label",
     );
   } catch (err) {
     return [];
@@ -1101,21 +1138,27 @@ function normalizeCourse(course: Record<string, unknown>): MarksheetCourse {
     section,
     course_code: text(course.course_code),
     course_title: text(course.course_title),
+    course_type: text(course.course_type) || undefined,
     course_priority: numberOr(course.course_priority, 1),
     course_credits: numberOr(course.course_credits, 0),
     credits_earned: numberOr(course.credits_earned, 0),
     cia_max_marks_theory: numberOr(course.cia_max_marks_theory, 0),
     cia_max_marks_practical: numberOr(course.cia_max_marks_practical, 0),
+    cia_min_marks_theory: numberOr(course.cia_min_marks_theory, 0),
+    cia_min_marks_practical: numberOr(course.cia_min_marks_practical, 0),
     cia_marks_obtained_theory: numberOr(course.cia_marks_obtained_theory, 0),
     cia_marks_obtained_practical: numberOr(course.cia_marks_obtained_practical, 0),
     ese_max_marks_theory: numberOr(course.ese_max_marks_theory, 0),
     ese_max_marks_practical: numberOr(course.ese_max_marks_practical, 0),
+    ese_min_marks_theory: numberOr(course.ese_min_marks_theory, 0),
+    ese_min_marks_practical: numberOr(course.ese_min_marks_practical, 0),
     ese_marks_obtained_theory: numberOr(course.ese_marks_obtained_theory, 0),
     ese_marks_obtained_practical: numberOr(course.ese_marks_obtained_practical, 0),
     total_marks_theory: numberOr(course.total_marks_theory, 0),
     total_marks_practical: numberOr(course.total_marks_practical, 0),
     marks_obtained: numberOr(course.marks_obtained, 0),
     max_marks,
+    course_status: text(course.course_status) || undefined,
     grade_obtained: text(course.grade_obtained),
     grade_points: numberOr(course.grade_points, 0),
   };

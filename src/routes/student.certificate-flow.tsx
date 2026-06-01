@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { StudentLayout } from "@/components/layout/StudentLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 import { isLibraryRemoteConfigured } from "@/integrations/supabase/library-remote-client";
 import { getStudentSession } from "@/lib/auth";
 import {
@@ -102,31 +103,24 @@ function CertificateFlow() {
     const session = getStudentSession();
     if (!session) return;
 
-    const channel = supabase
-      .channel(`student-cert-flow:${session.id}`)
-      .on(
-        "postgres_changes",
+    const unsubscribe = subscribePostgresChanges(
+      `student-cert-flow:${session.id}`,
+      [
         { event: "*", schema: "public", table: "students", filter: `id=eq.${session.id}` },
-        () => {
-          void load();
-        },
-      )
-      .on(
-        "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "student_marksheets",
           filter: `student_id=eq.${session.id}`,
         },
-        () => {
-          void load();
-        },
-      )
-      .subscribe();
+      ],
+      () => {
+        void load();
+      },
+    );
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [load]);
 

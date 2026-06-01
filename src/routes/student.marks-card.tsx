@@ -13,6 +13,7 @@ import {
 import type { Student } from "@/lib/types";
 import { isLibraryRemoteConfigured } from "@/integrations/supabase/library-remote-client";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 import {
   fetchStudentMarksheet,
   fetchAllStudentMarksheets,
@@ -41,7 +42,11 @@ function setOtpSession(studentId: string) {
 }
 
 export function StudentMarksCardPage() {
-  return <StudentLayout title="Grade & Marks Cards">{() => <MarksCard />}</StudentLayout>;
+  return (
+    <StudentLayout title="Grade & Marks Cards" showQueriesFooter>
+      {() => <MarksCard />}
+    </StudentLayout>
+  );
 }
 
 function MarksCard() {
@@ -57,6 +62,7 @@ function MarksCard() {
   const [busy, setBusy] = useState(false);
   const [downloadBusy, setDownloadBusy] = useState<string | null>(null);
   const [showSemesterSelection, setShowSemesterSelection] = useState(false);
+  const [showMarksCardSelection, setShowMarksCardSelection] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
@@ -113,32 +119,25 @@ function MarksCard() {
 
     void load();
 
-    const channel = supabase
-      .channel(`student-marks:${session.id}`)
-      .on(
-        "postgres_changes",
+    const unsubscribe = subscribePostgresChanges(
+      `student-marks:${session.id}`,
+      [
         { event: "*", schema: "public", table: "students", filter: `id=eq.${session.id}` },
-        () => {
-          void load();
-        },
-      )
-      .on(
-        "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "student_marksheets",
           filter: `student_id=eq.${session.id}`,
         },
-        () => {
-          void load();
-        },
-      )
-      .subscribe();
+      ],
+      () => {
+        void load();
+      },
+    );
 
     return () => {
       active = false;
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, []);
 
@@ -315,6 +314,72 @@ function MarksCard() {
     }
   }
 
+  async function downloadMarksCard(targetMarksheet: StudentMarksheet) {
+    if (!targetMarksheet?.courses?.length) {
+      toast.error("No marks card data is saved for this student yet.");
+      return;
+    }
+    if (!student) return;
+    const eligibility = getMarksheetEligibility({
+      student,
+      hasMarksheet: true,
+      hasLibraryPenalty,
+    });
+    if (!eligibility.eligible) {
+      toast.error(eligibility.missing.map(missingReasonLabel).join(", "));
+      return;
+    }
+
+    setDownloadBusy(`marks-${targetMarksheet.id ?? "current"}`);
+    try {
+      const [documents, photoUrl] = await Promise.all([
+        import("@/lib/marksheet-documents"),
+        resolveStudentPhotoUrl(supabase, targetMarksheet),
+      ]);
+      const blob = await documents.generateMarksCardPdf(targetMarksheet, { photoUrl });
+      documents.downloadMarksCardBlob(targetMarksheet, blob);
+      toast.success("Marks card PDF generated");
+    } catch (error) {
+      console.error("Marks card PDF generation failed:", error);
+      toast.error(error instanceof Error ? error.message : "Could not generate marks card");
+    } finally {
+      setDownloadBusy(null);
+    }
+  }
+
+  async function downloadAllMarksCards() {
+    if (allMarksheets.length === 0) {
+      toast.error("No marks card data found for this student.");
+      return;
+    }
+    if (!student) return;
+    const eligibility = getMarksheetEligibility({
+      student,
+      hasMarksheet: true,
+      hasLibraryPenalty,
+    });
+    if (!eligibility.eligible) {
+      toast.error(eligibility.missing.map(missingReasonLabel).join(", "));
+      return;
+    }
+
+    setDownloadBusy("marks-all");
+    try {
+      const [documents, photoUrl] = await Promise.all([
+        import("@/lib/marksheet-documents"),
+        resolveStudentPhotoUrl(supabase, marksheet || allMarksheets[0]),
+      ]);
+      const blob = await documents.generateAllMarksCardsPdf(allMarksheets, { photoUrl });
+      documents.downloadAllMarksCardsBlob(blob, (marksheet || allMarksheets[0]).student_roll_no);
+      toast.success("Marks card PDF with all semesters generated");
+    } catch (error) {
+      console.error("All marks cards PDF generation failed:", error);
+      toast.error(error instanceof Error ? error.message : "Could not generate marks cards");
+    } finally {
+      setDownloadBusy(null);
+    }
+  }
+
   if (pageLoading || !student) {
     return <p className="text-muted-foreground">Loading…</p>;
   }
@@ -418,7 +483,10 @@ function MarksCard() {
                   <div className="flex flex-wrap gap-3">
                     <button
                       type="button"
-                      onClick={() => setShowSemesterSelection(!showSemesterSelection)}
+                      onClick={() => {
+                        setShowSemesterSelection(!showSemesterSelection);
+                        if (!showSemesterSelection) setShowMarksCardSelection(false);
+                      }}
                       className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-60"
                     >
                       <FileText className="h-4 w-4" />
@@ -435,20 +503,10 @@ function MarksCard() {
                         {downloadBusy === "all" ? "Generating..." : "Download All Semesters"}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        toast.info("Marks Card feature coming soon");
-                      }}
-                      className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-5 py-2.5 text-primary hover:bg-muted"
-                    >
-                      <FileText className="h-4 w-4" />
-                      MARKS CARD
-                    </button>
                   </div>
                   {showSemesterSelection && allMarksheets.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-3 p-4 rounded-lg border border-primary/20 bg-primary/5">
-                      <p className="w-full text-sm font-medium text-primary mb-1">Select Semester:</p>
+                    <div className="mt-2 flex flex-wrap gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <p className="mb-1 w-full text-sm font-medium text-primary">Select Semester:</p>
                       {allMarksheets.map((m) => {
                         const semName = (m.semester_label || "").toLowerCase().startsWith("sem")
                           ? m.semester_label
@@ -459,10 +517,61 @@ function MarksCard() {
                             type="button"
                             onClick={() => void downloadMarksheet(m)}
                             disabled={Boolean(downloadBusy)}
-                            className="inline-flex items-center gap-2 rounded-md bg-white border border-primary/30 px-4 py-2 text-sm text-primary hover:bg-primary/10 disabled:opacity-60"
+                            className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-white px-4 py-2 text-sm text-primary hover:bg-primary/10 disabled:opacity-60"
                           >
                             <FileText className="h-4 w-4" />
                             {downloadBusy === (m.id ?? "current") ? "Generating..." : semName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <h3 className="pt-4 font-bold text-primary">Download Marks Cards</h3>
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMarksCardSelection(!showMarksCardSelection);
+                        if (!showMarksCardSelection) setShowSemesterSelection(false);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-5 py-2.5 text-primary hover:bg-muted disabled:opacity-60"
+                    >
+                      <FileText className="h-4 w-4" />
+                      MARKS CARD
+                    </button>
+                    {allMarksheets.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => void downloadAllMarksCards()}
+                        disabled={Boolean(downloadBusy)}
+                        className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-5 py-2.5 text-primary hover:bg-muted disabled:opacity-60"
+                      >
+                        <FileText className="h-4 w-4" />
+                        {downloadBusy === "marks-all" ? "Generating..." : "All Semesters Marks Card"}
+                      </button>
+                    )}
+                  </div>
+                  {showMarksCardSelection && allMarksheets.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <p className="mb-1 w-full text-sm font-medium text-primary">Select Semester:</p>
+                      {allMarksheets.map((m) => {
+                        const semName = (m.semester_label || "").toLowerCase().startsWith("sem")
+                          ? m.semester_label
+                          : `Sem ${m.semester_label}`;
+                        const busyKey = `marks-${m.id ?? "current"}`;
+                        return (
+                          <button
+                            key={`marks-${m.id || m.semester_label}`}
+                            type="button"
+                            onClick={() => void downloadMarksCard(m)}
+                            disabled={Boolean(downloadBusy)}
+                            className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-white px-4 py-2 text-sm text-primary hover:bg-primary/10 disabled:opacity-60"
+                          >
+                            <FileText className="h-4 w-4" />
+                            {downloadBusy === busyKey ? "Generating..." : semName}
                           </button>
                         );
                       })}
