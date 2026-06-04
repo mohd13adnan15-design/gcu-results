@@ -559,11 +559,6 @@ export function FacultyPage() {
                       <div>
                         <p className="font-medium text-primary">{student.full_name}</p>
                         <p className="text-xs text-muted-foreground">{student.student_id}</p>
-                        {isFirstInQueue && (
-                          <span className="mt-1 inline-block rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                            Next
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="px-2 py-3">

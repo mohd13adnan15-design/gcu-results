@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { supabase } from "@/integrations/supabase/client";
 import { buildMainGradeCardRows } from "@/lib/main-grade-card";
 import { syncStudentGradeAndMarksheet } from "@/lib/marks-sync";
+import { propagateStudentProfileToRelatedTables } from "@/lib/student-profile-sync";
 import { gradePointsFromGradeLetter } from "@/lib/marks-excel-template";
 import {
   fetchStudentMarksheet,
@@ -314,6 +315,22 @@ export function StudentMarksAdminEditor({
         { onConflict: "student_id" },
       );
       if (error) throw error;
+
+      const displayName = header.card_student_name.trim() || student.full_name;
+      if (displayName !== student.full_name) {
+        const { error: nameErr } = await supabase
+          .from("students")
+          .update({ full_name: displayName })
+          .eq("id", student.id);
+        if (nameErr) throw nameErr;
+        const { error: propagateErr } = await propagateStudentProfileToRelatedTables(
+          supabase,
+          student.id,
+          { full_name: displayName },
+        );
+        if (propagateErr) throw new Error(propagateErr);
+      }
+
       await runSync();
       toast.success("Header saved; CGPA and student marksheet record updated from subject rows.");
       await load();

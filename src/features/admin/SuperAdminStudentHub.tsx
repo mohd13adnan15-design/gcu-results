@@ -6,6 +6,7 @@ import { DEPARTMENTS, SEMESTERS, YEARS } from "@/lib/types";
 import { fetchDepartments, insertDepartment } from "@/lib/departments-db";
 import { cn } from "@/lib/utils";
 import { StudentMarksAdminEditor } from "@/features/marks/StudentMarksAdminEditor";
+import { propagateStudentProfileToRelatedTables } from "@/lib/student-profile-sync";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -108,7 +109,17 @@ export function SuperAdminStudentHub({ studentId }: Props) {
       toast.error(error.message);
       return;
     }
-    toast.success("Profile saved.");
+    const { error: propagateErr } = await propagateStudentProfileToRelatedTables(
+      supabase,
+      student.id,
+      { full_name, email, department },
+    );
+    if (propagateErr) {
+      toast.error(`Profile saved but sync failed: ${propagateErr}`);
+      void load();
+      return;
+    }
+    toast.success("Profile saved and updated across all portals.");
     void load();
   };
 

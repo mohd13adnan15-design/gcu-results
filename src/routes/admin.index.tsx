@@ -31,7 +31,7 @@ export function AdminPage() {
   const [busyStudentId, setBusyStudentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortKey, setSortKey] = useState<"roll" | "name" | "dept">("roll");
+  const [sortKey, setSortKey] = useState<"request" | "roll" | "name" | "dept">("request");
   const [verificationFilter, setVerificationFilter] = useState<
     "all" | "pending_faculty" | "pending_admin" | "admin_done"
   >("all");
@@ -195,6 +195,12 @@ export function AdminPage() {
     }
 
     const sorted = [...list].sort((a, b) => {
+      if (sortKey === "request") {
+        const aReq = a.student.marksheet_verification_requested_at ?? "";
+        const bReq = b.student.marksheet_verification_requested_at ?? "";
+        if (aReq !== bReq) return aReq.localeCompare(bReq);
+        return a.student.student_id.localeCompare(b.student.student_id);
+      }
       if (sortKey === "name") {
         return a.student.full_name.localeCompare(b.student.full_name);
       }
@@ -316,9 +322,10 @@ export function AdminPage() {
           Sort by
           <select
             value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as "roll" | "name" | "dept")}
+            onChange={(e) => setSortKey(e.target.value as "request" | "roll" | "name" | "dept")}
             className="rounded-md border border-border bg-cream px-3 py-2 text-sm text-primary"
           >
+            <option value="request">Request Date</option>
             <option value="roll">Roll number</option>
             <option value="name">Name</option>
             <option value="dept">Department</option>

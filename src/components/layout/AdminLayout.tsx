@@ -96,7 +96,7 @@ export function AdminLayout({ requirePortal, title, subtitle, tagline, children 
           <div className="flex items-center gap-3">
             <PortalNotificationsBell portal={session.portal} />
             <span className="hidden sm:inline text-sm text-muted-foreground">
-              {session.email} · {portalDisplayLabel(session.portal)}
+              {portalDisplayLabel(session.portal)}
             </span>
             <button
               onClick={() => {

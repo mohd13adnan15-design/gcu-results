@@ -1,4 +1,3 @@
-import { TEJASHVI_MARKSHEET_SEED } from "@/lib/marksheet";
 import { defaultMinMarks, resolveCourseStatus } from "@/lib/marks-card-helpers";
 
 export function toRoman(num: number | string): string {
@@ -35,7 +34,7 @@ export const GCU_MARKS_TEMPLATE_HEADERS_LEGACY = [
   "Course Priority", "Course Code", "Course Title", "Course Credits", "Credits Earned",
   "CIA Max Marks Theory", "CIA Max Marks Practical", "CIA Marks Obtained Theory", "CIA Marks Obtained Practical",
   "ESE Max Marks Theory", "ESE Max Marks Practical", "ESE Marks Obtained Theory", "ESE Marks Obtained Practical",
-  "Total Marks Theory", "Total Marks Practical", "Grade Obtained", "Grade Points", "Image Path",
+  "Total Marks Theory", "Total Marks Practical", "Grade Obtained", "Grade Points",
 ] as const;
 
 /** Extended template with CIA/ESE minimum marks and per-course status for marks cards. */
@@ -48,7 +47,7 @@ export const GCU_MARKS_TEMPLATE_HEADERS = [
   "CIA Marks Obtained Theory", "CIA Marks Obtained Practical",
   "ESE Max Marks Theory", "ESE Max Marks Practical", "ESE Min Marks Theory", "ESE Min Marks Practical",
   "ESE Marks Obtained Theory", "ESE Marks Obtained Practical",
-  "Total Marks Theory", "Total Marks Practical", "Status", "Grade Obtained", "Grade Points", "Image Path",
+  "Total Marks Theory", "Total Marks Practical", "Status", "Grade Obtained", "Grade Points",
 ] as const;
 
 export function detectGcuMarksTemplateHeaders(aoa: unknown[][]): readonly string[] {
@@ -228,8 +227,6 @@ export function parseMarksTemplateRow(nc: Record<string, unknown>): ParsedMarksC
   const full_name = cell(nc, "Student Name", "student name");
   const subject_code = cell(nc, "Course Code", "course code");
   const subject = cell(nc, "Course Title", "course title");
-  const image_path = cell(nc, "Image Path", "image path", "image_path");
-
   if (!student_id || !full_name || !subject_code || !subject) {
     return null;
   }
@@ -385,7 +382,6 @@ export function parseMarksTemplateRow(nc: Record<string, unknown>): ParsedMarksC
     course_status,
     grade,
     grade_points,
-    image_path: image_path || undefined,
   };
 }
 
@@ -417,74 +413,116 @@ export function validateMarksTemplateColumns(sampleRow: Record<string, unknown>)
   }
 }
 
+const TEMPLATE_SAMPLE_COURSES = [
+  { code: "SUB101", title: "Introduction to Subject One", type: "THEORY", grade: "A", points: 8 },
+  { code: "SUB102", title: "Introduction to Subject Two", type: "THEORY", grade: "A+", points: 9 },
+  { code: "SUB103P", title: "Practical Lab One", type: "PRACTICAL", grade: "O", points: 10 },
+  { code: "SUB104", title: "Advanced Subject Four", type: "THEORY", grade: "B+", points: 7 },
+] as const;
+
+function buildTemplateCourseRow(
+  student: {
+    slStart: number;
+    roll: string;
+    email: string;
+    name: string;
+    dept: string;
+    programmeTitle: string;
+    programmeCode: string;
+    gradeCardNo: string;
+  },
+  course: (typeof TEMPLATE_SAMPLE_COURSES)[number],
+  rowIndex: number,
+  semLabel: string,
+  examMonth: string,
+): (string | number)[] {
+  const approxMarks = course.grade === "O" ? 95 : course.grade === "A+" ? 88 : course.grade === "A" ? 75 : 68;
+  const isPractical = course.type === "PRACTICAL";
+  return [
+    student.slStart + rowIndex,
+    student.email,
+    student.name,
+    student.dept,
+    "Garden City University",
+    "SCHOOL OF SCIENCES",
+    student.programmeTitle,
+    student.programmeCode,
+    student.roll,
+    examMonth,
+    "2026-05-04",
+    semLabel,
+    student.gradeCardNo,
+    "CORE COURSE",
+    course.type,
+    1,
+    course.code,
+    course.title,
+    4,
+    4,
+    isPractical ? 0 : 40,
+    isPractical ? 40 : 0,
+    isPractical ? 0 : 16,
+    isPractical ? 16 : 0,
+    isPractical ? 0 : approxMarks * 0.4,
+    isPractical ? approxMarks * 0.4 : 0,
+    isPractical ? 0 : 60,
+    isPractical ? 60 : 0,
+    isPractical ? 0 : 24,
+    isPractical ? 24 : 0,
+    isPractical ? 0 : approxMarks * 0.6,
+    isPractical ? approxMarks * 0.6 : 0,
+    100,
+    0,
+    "PASS",
+    course.grade,
+    course.points,
+  ];
+}
+
+/** Two sample students × 2 semesters × 4 courses (16 example rows). COE may add unlimited rows. */
 export function buildTejashviTemplateExampleRows(): (string | number)[][] {
-  const m = TEJASHVI_MARKSHEET_SEED;
-  const roll = m.student_roll_no;
-  const email = `${roll.toLowerCase()}@gcu.edu.in`;
+  const students = [
+    {
+      roll: "23BSFT101",
+      email: "23bsft101@gcu.edu.in",
+      name: "Abigail Albert Anbudurai",
+      dept: "BSFT",
+      programmeTitle: "Bachelor of Science Food Science and Technology",
+      programmeCode: "BSFT",
+      gradeCardNo: "GCBSFT00001",
+      slStart: 1,
+    },
+    {
+      roll: "23BSFT102",
+      email: "23bsft102@gcu.edu.in",
+      name: "Rahul Krishnan",
+      dept: "BSFT",
+      programmeTitle: "Bachelor of Science Food Science and Technology",
+      programmeCode: "BSFT",
+      gradeCardNo: "GCBSFT00002",
+      slStart: 9,
+    },
+  ];
 
-  // Helper to map a course to an excel row
-  const mapCourse = (c: any, index: number, semLabel: string, examMonth: string) => {
-    const approxMarks =
-      c.grade_obtained === "O"
-        ? 95
-        : c.grade_obtained === "A+"
-          ? 88
-          : c.grade_obtained === "A"
-            ? 75
-            : c.grade_obtained === "C"
-              ? 45
-              : 55;
-    return [
-      index + 1,
-      roll,
-      email,
-      "student123",
-      m.student_name,
-      "SET",
-      toRoman(parseInt(semLabel.replace(/\D/g, "") || "1", 10)),
-      1,
-      m.university,
-      m.school_name,
-      m.programme_title,
-      m.programme_code,
-      m.registration_no,
-      examMonth,
-      m.issue_date,
-      semLabel,
-      m.grade_card_no,
-      c.section,
-      1, // Priority
-      c.course_code,
-      c.course_title,
-      c.course_credits,
-      c.credits_earned,
-      40, // CIA Max Theory
-      0, // CIA Max Practical
-      16, // CIA Min Theory
-      0, // CIA Min Practical
-      approxMarks * 0.4, // CIA Obtained Theory
-      0, // CIA Obtained Practical
-      60, // ESE Max Theory
-      0, // ESE Max Practical
-      24, // ESE Min Theory
-      0, // ESE Min Practical
-      approxMarks * 0.6, // ESE Obtained Theory
-      0, // ESE Obtained Practical
-      100, // Total Max Theory
-      0, // Total Max Practical
-      "PASS",
-      c.grade_obtained,
-      c.grade_points,
-    ];
-  };
-
-  // Generate Semester 4 rows
-  const sem4Rows = m.courses.map((c, index) => mapCourse(c, index, "4", "April - 2026"));
-
-  // Generate Semester 5 rows (just duplicate with different codes and semester label for example)
-  const sem5Rows = m.courses.slice(0, 5).map((c, index) =>
-    mapCourse({ ...c, course_code: c.course_code.replace("241", "351"), grade_obtained: "O", grade_points: 10 }, index, "5", "December - 2026")
-  );
-
-  return [...sem4Rows, ...sem5Rows];
+  const rows: (string | number)[][] = [];
+  for (const student of students) {
+    const semesters = [
+      ["IV", "April - 2026"],
+      ["V", "December - 2026"],
+    ] as const;
+    semesters.forEach(([semLabel, examMonth], semIndex) => {
+      TEMPLATE_SAMPLE_COURSES.forEach((course, courseIndex) => {
+        rows.push(
+          buildTemplateCourseRow(
+            student,
+            course,
+            semIndex * TEMPLATE_SAMPLE_COURSES.length + courseIndex,
+            semLabel,
+            examMonth,
+          ),
+        );
+      });
+    });
+  }
+  return rows;
 }
