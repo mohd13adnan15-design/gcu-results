@@ -698,7 +698,6 @@ function MarksUploader() {
             in_fees: true,
             in_hostel: false,
             in_library: false,
-            image_path: row.image_path || null,
           });
         } else {
           const existing = studentsMap.get(sid)!;
@@ -916,6 +915,8 @@ function MarksUploader() {
           .from("main_grade_card")
           .delete()
           .in("student_id", studentUuids);
+
+        await supabase.from("student_marksheets").delete().in("student_id", studentUuids);
       }
 
       // Insert Marks

@@ -69,6 +69,15 @@ const PAID_ALIASES = [
   "amountreceived",
 ];
 
+const LIBRARY_RETURNED_ALIASES = [
+  "allbooksreturned",
+  "booksreturned",
+  "allreturned",
+  "librarystatus",
+  "bookstatus",
+  "returned",
+];
+
 const TOTAL_ALIASES = [
   "total",
   "totalfee",
@@ -93,6 +102,21 @@ function findColumn(row: Record<string, unknown>, aliases: readonly string[]): s
     if (aliases.includes(normalizeKey(k))) return k;
   }
   return null;
+}
+
+/** Library Excel: Returned / Not Returned (and common yes-no variants). */
+function parseLibraryReturnedStatus(raw: unknown): boolean {
+  const s = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (!s) return false;
+  if (/not\s*returned|notreturned|pending|unreturned|^no$|^n$|^false$|^0$/.test(s)) {
+    return false;
+  }
+  if (/returned|^yes$|^y$|^true$|^1$|^cleared$|^done$/.test(s)) {
+    return true;
+  }
+  return false;
 }
 
 function parseAmount(raw: unknown): number | null {
@@ -450,7 +474,7 @@ export function ClearanceAdminPage({ kind }: Props) {
             ]
           : [
               ["24btre148", "Aarav Sharma", "Robotics", "Returned"],
-              ["24btre149", "Priya Patel", "Robotics", "Returned"],
+              ["24btre149", "Priya Patel", "Robotics", "Not Returned"],
             ];
     const ws = XLSX.utils.aoa_to_sheet([headers, ...sample]);
     XLSX.utils.book_append_sheet(wb, ws, "Data");
@@ -480,6 +504,11 @@ export function ClearanceAdminPage({ kind }: Props) {
       const deptKey = findColumn(sample, ["department", "dept", "branch", "course"]);
       const semKey = findColumn(sample, ["sem", "semester"]);
       const yearKey = findColumn(sample, ["year", "yr"]);
+      const libraryReturnedKey =
+        kind === "library"
+          ? findColumn(sample, LIBRARY_RETURNED_ALIASES) ??
+            findColumn(sample, [normalizeKey(cfg.label)])
+          : null;
 
       if (!idKey || (money && !paidKey)) {
         const missing = [!idKey ? "Student ID" : null, money && !paidKey ? "Paid" : null]
@@ -519,8 +548,10 @@ export function ClearanceAdminPage({ kind }: Props) {
           }
           updates.set(sid, { paid, total, name, dept, sem, yearNum });
         } else {
-          // Library case: just mark as cleared if row exists
-          updates.set(sid, { cleared: true, name, dept, sem, yearNum });
+          const cleared = libraryReturnedKey
+            ? parseLibraryReturnedStatus(row[libraryReturnedKey])
+            : false;
+          updates.set(sid, { cleared, name, dept, sem, yearNum });
         }
       }
 

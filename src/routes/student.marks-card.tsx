@@ -490,7 +490,7 @@ function MarksCard() {
                       className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-primary-foreground hover:opacity-90 disabled:opacity-60"
                     >
                       <FileText className="h-4 w-4" />
-                      Download semester wise
+                      Download Semester Wise
                     </button>
                     {allMarksheets.length > 0 && (
                       <button
@@ -540,7 +540,7 @@ function MarksCard() {
                       className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-5 py-2.5 text-primary hover:bg-muted disabled:opacity-60"
                     >
                       <FileText className="h-4 w-4" />
-                      MARKS CARD
+                      Marks Card
                     </button>
                     {allMarksheets.length > 0 && (
                       <button
