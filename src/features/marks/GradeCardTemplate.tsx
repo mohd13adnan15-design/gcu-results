@@ -221,7 +221,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           )}
         </div>
 
-        {/* University logo — hardcoded 292×74 pt */}
+        {/* University logo — gold on transparent, centered in header slot */}
         <img
           src={logoSrc ?? GRADE_CARD_ASSETS.logo}
           alt="Garden City University"
@@ -231,7 +231,8 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
             top: headerLayout.logo.top,
             width: headerLayout.logo.width,
             height: headerLayout.logo.height,
-            objectFit: "fill",
+            objectFit: "contain",
+            objectPosition: "center",
             zIndex: 2,
           }}
         />

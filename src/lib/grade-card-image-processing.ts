@@ -1,11 +1,94 @@
 /** Canvas helpers for grade-card PNG assets (seal, signatures). */
 
+/** Encode path segments so fetch/img work with spaces in public asset filenames. */
+export function encodePublicAssetUrl(path: string): string {
+  const queryIndex = path.indexOf("?");
+  const base = queryIndex >= 0 ? path.slice(0, queryIndex) : path;
+  const query = queryIndex >= 0 ? path.slice(queryIndex) : "";
+  return (
+    base
+      .split("/")
+      .map((segment, index) => (index === 0 || segment === "" ? segment : encodeURIComponent(segment)))
+      .join("/") + query
+  );
+}
+
 export async function blobToDataUrl(blob: Blob): Promise<string> {
   return await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
+  });
+}
+
+function isGoldLogoPixel(r: number, g: number, b: number): boolean {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max < 95) return false;
+  if (min > 210 && max - min < 30) return false;
+  if (max - min < 15 && max > 170 && max < 230) return false;
+  return r > 105 && g > 75 && b < 195 && r >= g - 15;
+}
+
+function shouldDropLogoMattePixel(r: number, g: number, b: number, a: number): boolean {
+  if (a < 40) return true;
+  if (isGoldLogoPixel(r, g, b)) return false;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const diff = max - min;
+  const isNearWhite = max > 235 && min > 225;
+  const isLightGray = diff < 20 && max > 160 && max < 230;
+  const isCheckerGray = diff < 12 && max > 180 && max < 210;
+  const isNeutralMatte =
+    diff < 18 &&
+    max > 110 &&
+    max < 250 &&
+    Math.abs(r - g) < 20 &&
+    Math.abs(g - b) < 20;
+  return isNearWhite || isLightGray || isCheckerGray || isNeutralMatte;
+}
+
+function clearTransparentPixel(data: Uint8ClampedArray, index: number) {
+  data[index] = 0;
+  data[index + 1] = 0;
+  data[index + 2] = 0;
+  data[index + 3] = 0;
+}
+
+/** Remove gray/white PNG matte so the grade-card guilloche background shows through. */
+export async function removeLogoMatteBackground(source: string): Promise<string> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(source);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = image.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+        if (shouldDropLogoMattePixel(r, g, b, a)) {
+          clearTransparentPixel(data, i);
+        } else if (a === 0) {
+          clearTransparentPixel(data, i);
+        }
+      }
+      ctx.putImageData(image, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(source);
+    img.src = source;
   });
 }
 
@@ -52,7 +135,7 @@ export async function loadTransparentAsset(
   options: { dropLightBackground?: boolean } = {},
 ): Promise<string | null> {
   try {
-    const response = await fetch(url);
+    const response = await fetch(encodePublicAssetUrl(url));
     if (!response.ok) return null;
     const blob = await response.blob();
     let dataUrl = await blobToDataUrl(blob);
@@ -66,8 +149,8 @@ export async function loadTransparentAsset(
 }
 
 function isLogoContentPixel(r: number, g: number, b: number, a: number): boolean {
-  if (a < 20) return false;
-  return !(r > 244 && g > 244 && b > 244);
+  if (a < 40) return false;
+  return isGoldLogoPixel(r, g, b);
 }
 
 /** Trim empty margins from the GCU logo so "CITY" is not pushed off the right edge. */
@@ -133,10 +216,11 @@ export async function trimLogoToContentBounds(source: string): Promise<{
 
 export async function prepareGradeCardLogo(url: string) {
   try {
-    const response = await fetch(url);
+    const response = await fetch(encodePublicAssetUrl(url));
     if (!response.ok) return null;
     const blob = await response.blob();
-    const dataUrl = await blobToDataUrl(blob);
+    let dataUrl = await blobToDataUrl(blob);
+    dataUrl = await removeLogoMatteBackground(dataUrl);
     return await trimLogoToContentBounds(dataUrl);
   } catch {
     return null;

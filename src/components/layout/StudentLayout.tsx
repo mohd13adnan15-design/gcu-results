@@ -132,7 +132,7 @@ export function StudentLayout({
             <MessageCircle className="h-4 w-4 shrink-0 text-primary/70" aria-hidden />
             <p>
               If you have any queries, please write to{" "}
-              <span className="font-semibold text-primary">pro.edu.gcu.in</span>
+              <span className="font-semibold text-primary">pro.gcu.edu.in</span>
             </p>
           </div>
         </div>

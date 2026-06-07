@@ -9,9 +9,10 @@ import {
   FRONT_PAGE_FOOTER,
   FRONT_PAGE_HEADER,
   getFrontPageHeaderLayout,
+  GRADE_CARD_ASSETS,
   resolveGradeCardDisplayId,
 } from "./grade-card-constants";
-import { trimLogoToContentBounds } from "./grade-card-image-processing";
+import { prepareGradeCardLogo } from "./grade-card-image-processing";
 import {
   calculateMarksCardTotals,
   getMarksCardCourseValues,
@@ -24,8 +25,8 @@ import {
 } from "./marksheet";
 
 const ASSET_PATHS = {
-  background: "/templates/assets/gcu-gradecard-bg.png",
-  logo: "/templates/assets/ChatGPT Image May 11, 2026, 06_01_10 PM.png",
+  background: GRADE_CARD_ASSETS.background,
+  logo: GRADE_CARD_ASSETS.logo,
   seal: "/templates/assets/gcu-seal.png",
   embossedSeal: "/templates/assets/ChatGPT Image May 10, 2026, 11_02_44 PM.png",
   rightSignatureOld: "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png",
@@ -153,11 +154,22 @@ export async function drawBackPageSignatures(
   await drawSlot(signatures.verifiedByUrl, BACK_PAGE_LAYOUT_REF.slots.verifiedBy, "Verified by");
 }
 
+async function loadGradeCardLogo(): Promise<LoadedDataUrl | null> {
+  const prepared = await prepareGradeCardLogo(ASSET_PATHS.logo);
+  if (!prepared) return null;
+  return {
+    dataUrl: prepared.dataUrl,
+    type: "PNG",
+    width: prepared.width,
+    height: prepared.height,
+  };
+}
+
 async function loadMarksheetPdfAssets(photoUrl?: string | null) {
-  const [background, logoRaw, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] =
+  const [background, logo, seal, embossedSeal, rightSignatureOld, rightSignatureNew, backPage, photo] =
     await Promise.all([
       loadDataUrl(ASSET_PATHS.background),
-      loadDataUrl(ASSET_PATHS.logo),
+      loadGradeCardLogo(),
       loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
       loadDataUrl(ASSET_PATHS.embossedSeal),
       loadDataUrl(ASSET_PATHS.rightSignatureOld, { dropLightBackground: true }),
@@ -167,17 +179,6 @@ async function loadMarksheetPdfAssets(photoUrl?: string | null) {
         ? loadDataUrl(photoUrl, { dropLightBackground: true, trimEdges: 18 })
         : Promise.resolve(null),
     ]);
-
-  let logo = logoRaw;
-  if (logoRaw) {
-    const trimmed = await trimLogoToContentBounds(logoRaw.dataUrl);
-    logo = {
-      ...logoRaw,
-      dataUrl: trimmed.dataUrl,
-      width: trimmed.width || logoRaw.width,
-      height: trimmed.height || logoRaw.height,
-    };
-  }
 
   return {
     background,
@@ -433,7 +434,17 @@ function drawHeader(
 
   if (images.logo) {
     const { logo } = headerLayout;
-    doc.addImage(images.logo.dataUrl, images.logo.type, logo.left, logo.top, logo.width, logo.height);
+    const naturalW = images.logo.width ?? logo.width;
+    const naturalH = images.logo.height ?? logo.height;
+    const fitted = fitImageInBox(naturalW, naturalH, logo.left, logo.top, logo.width, logo.height);
+    doc.addImage(
+      images.logo.dataUrl,
+      images.logo.type,
+      fitted.x,
+      fitted.y,
+      fitted.w,
+      fitted.h,
+    );
   }
 
   if (images.photo) {

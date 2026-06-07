@@ -6,7 +6,7 @@ export const A4_HEIGHT = 841.89;
 
 export const GRADE_CARD_ASSETS = {
   background: "/templates/assets/gcu-gradecard-bg.png",
-  logo: "/templates/assets/ChatGPT Image May 11, 2026, 06_01_10 PM.png",
+  logo: "/templates/assets/Gemini_Generated_Image_6ine1i6ine1i6ine.png",
   seal: "/templates/assets/gcu-seal.png",
   embossedSeal: "/templates/assets/ChatGPT Image May 10, 2026, 11_02_44 PM.png",
   rightSignatureOld: "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png",
