@@ -95,7 +95,7 @@ function getFilteredMarksheet(
   };
 }
 
-type PortalMode = "admin_1" | "admin_2";
+type PortalMode = "head_of_coe" | "admin";
 
 type Props = {
   studentId: string;
@@ -216,12 +216,12 @@ export function StudentMarksReviewPanel({
     setBusy(true);
     try {
       const fallback =
-        portal === "admin_1"
+        portal === "head_of_coe"
           ? `Please recheck and edit grade card data for ${student.full_name} (${student.student_id}).`
           : `Please recheck fees, library, hostel, and grade card data for ${student.full_name} (${student.student_id}).`;
 
       const title =
-        portal === "admin_1"
+        portal === "head_of_coe"
           ? "Admin reported a mismatch"
           : "Student verification issue reported";
 
@@ -249,7 +249,7 @@ export function StudentMarksReviewPanel({
       if (notificationError) throw notificationError;
 
       const verificationPayload =
-        portal === "admin_1"
+        portal === "head_of_coe"
           ? buildFacultyVerificationUpdate(false)
           : { admin_verified: false, fully_verified: false };
       const { error: studentError } = await supabase
@@ -285,7 +285,7 @@ export function StudentMarksReviewPanel({
       if (next) {
         await supabase.from("portal_notifications").insert({
           recipient_portal: "head_of_coe",
-          sender_portal: "admin_1",
+          sender_portal: "head_of_coe",
           student_id: student.id,
           title: "Admin verification complete",
           message: `${student.student_id} was verified.`,
@@ -367,7 +367,7 @@ export function StudentMarksReviewPanel({
   return (
     <div className="space-y-6">
       <Link
-        to={portal === "admin_1" ? "/coe" : "/admin"}
+        to={portal === "head_of_coe" ? "/coe" : "/admin"}
         className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:opacity-80"
       >
         <ArrowLeft className="h-4 w-4" /> Back
@@ -378,7 +378,7 @@ export function StudentMarksReviewPanel({
           <StudentIdentity student={student} />
         </div>
 
-        {portal === "admin_2" && <AdminClearanceReview student={student} />}
+        {portal === "admin" && <AdminClearanceReview student={student} />}
 
         <div className="mt-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3 border-b border-border/40 pb-2">
@@ -430,7 +430,7 @@ export function StudentMarksReviewPanel({
           <MarksheetSavedPreview marksheet={getFilteredMarksheet(marksheet, allMarksheets, showAllSemesters)} />
         </div>
 
-        {portal === "admin_1" && (
+        {portal === "head_of_coe" && (
           <div className="mt-6 flex flex-col gap-3 rounded-xl border border-border bg-cream p-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-sm font-semibold text-primary">
@@ -454,12 +454,12 @@ export function StudentMarksReviewPanel({
 
         <div className="mt-6 space-y-3 rounded-xl border border-border bg-cream p-4">
           <label className="block text-sm font-medium text-primary">
-            {portal === "admin_1" ? "Report mismatch" : "Report issue"}
+            {portal === "head_of_coe" ? "Report mismatch" : "Report issue"}
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder={
-                portal === "admin_1"
+                portal === "head_of_coe"
                   ? "Describe the mismatch and required edits"
                   : "Describe the fee, hostel, library, or grade card issue"
               }

@@ -18,6 +18,12 @@ import {
   getMarksCardCourseValues,
   marksCardResultLabel,
 } from "./marks-card-helpers";
+import { supabase } from "@/integrations/supabase/client";
+
+import {
+  applyMarksConfigurationToMarksheet,
+  fetchMarksConfiguration,
+} from "./marks-configuration";
 import {
   buildMarksheetFileName,
   groupCoursesBySection,
@@ -226,8 +232,11 @@ export async function generateMarksheetPdf(
   marksheet: StudentMarksheet,
   options: MarksheetDocumentOptions = {},
 ) {
+  const config = await fetchMarksConfiguration(supabase);
+  const enrichedMarksheet = applyMarksConfigurationToMarksheet(marksheet, config);
+
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-  const qr = await generateDynamicQrDataUrl(marksheet);
+  const qr = await generateDynamicQrDataUrl(enrichedMarksheet);
   const assets = await loadMarksheetPdfAssets(options.photoUrl);
   const rightSignature = isMarksheetAfterJuly2024(marksheet)
     ? assets.rightSignatureNew
@@ -235,7 +244,7 @@ export async function generateMarksheetPdf(
 
   drawMarksheetPage(
     doc,
-    marksheet,
+    enrichedMarksheet,
     {
       background: assets.background,
       logo: assets.logo,
@@ -260,9 +269,14 @@ export async function generateAllSemestersPdf(
     throw new Error("No grade card data to generate.");
   }
 
+  const config = await fetchMarksConfiguration(supabase);
+  const enrichedMarksheets = marksheets.map((sheet) =>
+    applyMarksConfigurationToMarksheet(sheet, config),
+  );
+
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const assets = await loadMarksheetPdfAssets(options.photoUrl);
-  const sorted = sortMarksheetsBySemester(marksheets);
+  const sorted = sortMarksheetsBySemester(enrichedMarksheets);
 
   for (let i = 0; i < sorted.length; i++) {
     const marksheet = sorted[i];
@@ -1058,14 +1072,17 @@ export async function generateMarksCardPdf(
     throw new Error("No marks card data to generate.");
   }
 
+  const config = await fetchMarksConfiguration(supabase);
+  const enrichedMarksheet = applyMarksConfigurationToMarksheet(marksheet, config);
+
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-  const qr = await generateDynamicQrDataUrl(marksheet);
+  const qr = await generateDynamicQrDataUrl(enrichedMarksheet);
   const assets = await loadMarksheetPdfAssets(options.photoUrl);
-  const rightSignature = isMarksheetAfterJuly2024(marksheet)
+  const rightSignature = isMarksheetAfterJuly2024(enrichedMarksheet)
     ? assets.rightSignatureNew
     : assets.rightSignatureOld;
 
-  drawMarksCardPage(doc, marksheet, {
+  drawMarksCardPage(doc, enrichedMarksheet, {
     background: assets.background,
     logo: assets.logo,
     qr,
@@ -1086,9 +1103,14 @@ export async function generateAllMarksCardsPdf(
     throw new Error("No marks card data to generate.");
   }
 
+  const config = await fetchMarksConfiguration(supabase);
+  const enrichedSheets = withCourses.map((sheet) =>
+    applyMarksConfigurationToMarksheet(sheet, config),
+  );
+
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const assets = await loadMarksheetPdfAssets(options.photoUrl);
-  const sorted = sortMarksheetsBySemester(withCourses);
+  const sorted = sortMarksheetsBySemester(enrichedSheets);
 
   for (let i = 0; i < sorted.length; i++) {
     const marksheet = sorted[i]!;

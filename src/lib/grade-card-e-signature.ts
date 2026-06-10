@@ -37,7 +37,7 @@ type SignatureEntry = {
 
 type SignatureMetaStore = Partial<Record<GradeCardSignatureRole, SignatureEntry>>;
 
-const SIGNING_PORTALS: PortalType[] = ["admin_2", "admin_1", "head_of_coe"];
+const SIGNING_PORTALS: PortalType[] = ["admin", "head_of_coe"];
 
 function isMissingTableError(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;

@@ -4,14 +4,11 @@ import type { PortalType } from "./types";
 export function portalHomePath(portal: PortalType): string {
   switch (portal) {
     case "super_admin":
-      return "/super-admin";
+    case "head_of_coe":
+      return "/coe";
     case "admin":
     case "faculty":
-    case "admin_2":
       return "/admin";
-    case "head_of_coe":
-    case "admin_1":
-      return "/coe";
     case "library":
       return "/library";
     case "hostel":
@@ -29,14 +26,13 @@ export function portalHomePath(portal: PortalType): string {
 export function notificationPortalLabel(raw: string): string {
   switch (raw) {
     case "faculty":
-      return portalDisplayLabel("admin_2");
     case "admin":
-      return portalDisplayLabel("admin_2");
+    case "admin_2":
+      return portalDisplayLabel("admin");
     case "super_admin":
     case "admin_1":
-      return portalDisplayLabel("head_of_coe");
     case "head_of_coe":
-    case "admin_2":
+      return portalDisplayLabel("head_of_coe");
     case "library":
     case "hostel":
     case "fees":
@@ -47,18 +43,14 @@ export function notificationPortalLabel(raw: string): string {
 }
 
 /** Human-readable label for UI (navigation, tables, notifications). */
-
 export function portalDisplayLabel(portal: PortalType): string {
   switch (portal) {
     case "super_admin":
-      return "Super Admin";
+    case "head_of_coe":
+      return "COE";
     case "admin":
-    case "admin_2":
     case "faculty":
       return "Admin";
-    case "head_of_coe":
-    case "admin_1":
-      return "COE";
     case "library":
       return "Library";
     case "hostel":

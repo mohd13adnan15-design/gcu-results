@@ -1,4 +1,11 @@
-export type PortalType = "super_admin" | "faculty" | "admin" | "head_of_coe" | "admin_1" | "admin_2" | "library" | "hostel" | "fees";
+export type PortalType =
+  | "super_admin"
+  | "faculty"
+  | "admin"
+  | "head_of_coe"
+  | "library"
+  | "hostel"
+  | "fees";
 
 export interface Student {
   id: string;
@@ -44,12 +51,14 @@ export interface StudentMarkRow {
   credits_earned?: number;
   cia_max_marks_theory?: number;
   cia_max_marks_practical?: number;
-  cia_marks_obtained_theory?: number;
-  cia_marks_obtained_practical?: number;
+  cia_marks_obtained?: number;
+  ese_marks_obtained?: number;
+  cia_marks_obtained_theory?: number | null;
+  cia_marks_obtained_practical?: number | null;
   ese_max_marks_theory?: number;
   ese_max_marks_practical?: number;
-  ese_marks_obtained_theory?: number;
-  ese_marks_obtained_practical?: number;
+  ese_marks_obtained_theory?: number | null;
+  ese_marks_obtained_practical?: number | null;
   total_marks_theory?: number;
   total_marks_practical?: number;
   marks_obtained: number;

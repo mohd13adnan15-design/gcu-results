@@ -12,17 +12,18 @@ import { Toaster } from "sonner";
 import { Landing } from "@/routes/index";
 import { UnifiedLogin } from "@/routes/login";
 import { SignupPage } from "@/routes/signup";
-import { FacultyLayout } from "@/routes/faculty";
-import { FacultyPage } from "@/routes/faculty.index";
-import { FacultyStudentMarksPage } from "@/routes/faculty.students.$studentId";
+import { AdminOutlet } from "@/routes/admin";
+import { AdminPage } from "@/routes/admin.index";
+import { AdminStudentMarksPage } from "@/routes/admin.students.$studentId";
+import { CoeOutlet } from "@/routes/coe";
+import { CoePage } from "@/routes/coe.index";
+import { CredentialsPage } from "@/routes/coe.credentials";
+import { MarksConfigurationPage } from "@/routes/coe.marks-configuration";
+import { GradeCardApplicationPage } from "@/routes/coe.grade-card-application";
+import { CoeStudentDetailPage } from "@/routes/coe.students.$studentId";
 import { FeesPortalPage } from "@/routes/fees";
 import { HostelPortalPage } from "@/routes/hostel";
 import { LibraryPortalPage } from "@/routes/library";
-import { SuperAdminOutlet } from "@/routes/super-admin";
-import { SuperAdminPage } from "@/routes/super-admin.index";
-import { CredentialsPage } from "@/routes/super-admin.credentials";
-import { GradeCardApplicationPage } from "@/routes/super-admin.grade-card-application";
-import { SuperAdminStudentDetailPage } from "@/routes/super-admin.students.$studentId";
 import { StudentDashboardPage } from "@/routes/student.dashboard";
 import { StudentFeesPage } from "@/routes/student.fees";
 import { StudentHostelPage } from "@/routes/student.hostel";
@@ -94,16 +95,17 @@ export function App() {
           <Route path="signup" element={<SignupPage />} />
 
           {/* New Rebranded Routes */}
-          <Route path="coe" element={<SuperAdminOutlet />}>
-            <Route index element={<SuperAdminPage />} />
+          <Route path="coe" element={<CoeOutlet />}>
+            <Route index element={<CoePage />} />
             <Route path="credentials" element={<CredentialsPage />} />
+            <Route path="marks-configuration" element={<MarksConfigurationPage />} />
             <Route path="grade-card-application" element={<GradeCardApplicationPage />} />
-            <Route path="students/:studentId" element={<SuperAdminStudentDetailPage />} />
+            <Route path="students/:studentId" element={<CoeStudentDetailPage />} />
           </Route>
 
-          <Route path="admin" element={<FacultyLayout />}>
-            <Route index element={<FacultyPage />} />
-            <Route path="students/:studentId" element={<FacultyStudentMarksPage />} />
+          <Route path="admin" element={<AdminOutlet />}>
+            <Route index element={<AdminPage />} />
+            <Route path="students/:studentId" element={<AdminStudentMarksPage />} />
           </Route>
 
           <Route path="fees" element={<FeesPortalPage />} />
@@ -120,9 +122,6 @@ export function App() {
             path="faculty/*"
             element={<LegacyPathRedirect fromPrefix="/faculty" toPrefix="/admin" />}
           />
-          <Route path="admin-1/*" element={<LegacyPathRedirect fromPrefix="/admin-1" toPrefix="/coe" />} />
-          <Route path="admin-2/*" element={<LegacyPathRedirect fromPrefix="/admin-2" toPrefix="/admin" />} />
-          
           <Route path="admin/login" element={<Navigate to="/login" replace />} />
           <Route path="student/login" element={<Navigate to="/login" replace />} />
           <Route

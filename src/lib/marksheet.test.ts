@@ -163,4 +163,15 @@ describe("marksheet data helpers", () => {
       }),
     ).toBe("23msda105.jpg");
   });
+
+  it("does not fall back to another student's photo when there is no match", () => {
+    expect(
+      pickStudentPhotoPath({
+        configuredPath: null,
+        rollNo: "23BSFT102",
+        registrationNo: "23BSFT102",
+        candidates: ["23bsft101.jpg", "23bsft103.jpg"],
+      }),
+    ).toBeNull();
+  });
 });

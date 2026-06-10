@@ -45,7 +45,7 @@ export async function syncStudentGradeAndMarksheet(
     marksRows = await fetchStudentMarksSafe(
       supabase,
       studentId,
-      "subject,subject_code,course_category,course_type,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_min_marks_theory,cia_min_marks_practical,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_min_marks_theory,ese_min_marks_practical,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,course_status,grade,grade_points,semester_label"
+      "subject,subject_code,course_category,course_type,course_priority,credits,credits_earned,cia_max_marks_theory,cia_max_marks_practical,cia_min_marks_theory,cia_min_marks_practical,cia_marks_obtained,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_min_marks_theory,ese_min_marks_practical,ese_marks_obtained,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,marks_obtained,max_marks,course_status,grade,grade_points,semester_label"
     );
   } catch (err) {
     console.error("fetchStudentMarksSafe failed:", err);

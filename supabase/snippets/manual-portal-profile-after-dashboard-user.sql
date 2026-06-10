@@ -8,7 +8,7 @@
 -- 1. Dashboard → create user (email + password). Copy their UUID from the user row.
 -- 2. Replace placeholders below and run in SQL Editor.
 --
--- portal must be one of: library | hostel | fees | admin_1 | admin_2 | head_of_coe
+-- portal must be one of: library | hostel | fees | admin | head_of_coe
 --
 -- Example (Head of COE bootstrap — do once):
 --
