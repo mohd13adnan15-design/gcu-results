@@ -62,9 +62,8 @@ if (serviceKey.startsWith("sbp_")) {
 }
 
 const PORTALS = [
-  { label: "Head of COE", portal: "head_of_coe", email: "coe@gcu-portal.local" },
-  { label: "Admin 1", portal: "admin_1", email: "admin1@gcu-portal.local" },
-  { label: "Admin 2", portal: "admin_2", email: "admin2@gcu-portal.local" },
+  { label: "COE", portal: "head_of_coe", email: "coe@gcu-portal.local" },
+  { label: "Admin", portal: "admin", email: "admin@gcu-portal.local" },
   { label: "Hostel", portal: "hostel", email: "hostel@gcu-portal.local" },
   { label: "Academic fees", portal: "fees", email: "fees@gcu-portal.local" },
   { label: "Library", portal: "library", email: "library@gcu-portal.local" },

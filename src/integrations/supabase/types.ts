@@ -189,12 +189,14 @@ export type Database = {
           cia_max_marks_practical: number | null;
           cia_min_marks_theory: number | null;
           cia_min_marks_practical: number | null;
+          cia_marks_obtained: number | null;
           cia_marks_obtained_theory: number | null;
           cia_marks_obtained_practical: number | null;
           ese_max_marks_theory: number | null;
           ese_max_marks_practical: number | null;
           ese_min_marks_theory: number | null;
           ese_min_marks_practical: number | null;
+          ese_marks_obtained: number | null;
           ese_marks_obtained_theory: number | null;
           ese_marks_obtained_practical: number | null;
           total_marks_theory: number | null;
@@ -220,10 +222,12 @@ export type Database = {
           subject_code: string;
           cia_max_marks_theory?: number | null;
           cia_max_marks_practical?: number | null;
+          cia_marks_obtained?: number | null;
           cia_marks_obtained_theory?: number | null;
           cia_marks_obtained_practical?: number | null;
           ese_max_marks_theory?: number | null;
           ese_max_marks_practical?: number | null;
+          ese_marks_obtained?: number | null;
           ese_marks_obtained_theory?: number | null;
           ese_marks_obtained_practical?: number | null;
           total_marks_theory?: number | null;
@@ -247,10 +251,12 @@ export type Database = {
           subject_code?: string;
           cia_max_marks_theory?: number | null;
           cia_max_marks_practical?: number | null;
+          cia_marks_obtained?: number | null;
           cia_marks_obtained_theory?: number | null;
           cia_marks_obtained_practical?: number | null;
           ese_max_marks_theory?: number | null;
           ese_max_marks_practical?: number | null;
+          ese_marks_obtained?: number | null;
           ese_marks_obtained_theory?: number | null;
           ese_marks_obtained_practical?: number | null;
           total_marks_theory?: number | null;
@@ -474,6 +480,54 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      marks_configuration: {
+        Row: {
+          id: string;
+          cia_max_marks_theory: number;
+          cia_max_marks_practical: number;
+          cia_min_marks_theory: number;
+          cia_min_marks_practical: number;
+          ese_max_marks_theory: number;
+          ese_max_marks_practical: number;
+          ese_min_marks_theory: number;
+          ese_min_marks_practical: number;
+          total_marks_theory: number;
+          total_marks_practical: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          cia_max_marks_theory?: number;
+          cia_max_marks_practical?: number;
+          cia_min_marks_theory?: number;
+          cia_min_marks_practical?: number;
+          ese_max_marks_theory?: number;
+          ese_max_marks_practical?: number;
+          ese_min_marks_theory?: number;
+          ese_min_marks_practical?: number;
+          total_marks_theory?: number;
+          total_marks_practical?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          cia_max_marks_theory?: number;
+          cia_max_marks_practical?: number;
+          cia_min_marks_theory?: number;
+          cia_min_marks_practical?: number;
+          ese_max_marks_theory?: number;
+          ese_max_marks_practical?: number;
+          ese_min_marks_theory?: number;
+          ese_min_marks_practical?: number;
+          total_marks_theory?: number;
+          total_marks_practical?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
       };
       main_grade_card: {
         Row: {
@@ -706,8 +760,6 @@ export type Database = {
       | "super_admin"
       | "faculty"
       | "admin"
-      | "admin_1"
-      | "admin_2"
       | "head_of_coe"
       | "library"
       | "hostel"
@@ -841,8 +893,6 @@ export const Constants = {
         "super_admin",
         "faculty",
         "admin",
-        "admin_1",
-        "admin_2",
         "head_of_coe",
         "library",
         "hostel",

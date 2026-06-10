@@ -2,13 +2,12 @@ import { Outlet } from "react-router-dom";
 
 import { AdminLayout } from "@/components/layout/AdminLayout";
 
-export function AdminLayoutRoute() {
+export function AdminOutlet() {
   return (
     <AdminLayout
-      requirePortal="admin_2"
-      title="Admin · Final verification"
-      tagline="THE GUARDIAN OF INTEGRITY. YOUR DILIGENCE ENSURES EXCELLENCE IN EVERY GRADECARD ISSUED."
-      subtitle="Full verification dashboard"
+      requirePortal={["admin"]}
+      title="Admin · Grade Card review"
+      tagline="THE ARCHITECT OF ACCURACY. YOUR PRECISION BUILDS THE FOUNDATION OF EVERY STUDENT'S SUCCESS."
     >
       {() => <Outlet />}
     </AdminLayout>

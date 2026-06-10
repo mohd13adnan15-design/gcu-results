@@ -1,4 +1,5 @@
 import type { MarksheetCourse } from "@/lib/marksheet";
+import { resolveObtainedMarks } from "@/lib/marks-resolution";
 
 export type MarksCardCourseValues = {
   courseType: "THEORY" | "PRACTICAL";
@@ -45,15 +46,12 @@ export function getMarksCardCourseValues(course: MarksheetCourse): MarksCardCour
   const ciaMax = isPractical
     ? Number(course.cia_max_marks_practical ?? 0)
     : Number(course.cia_max_marks_theory ?? 0);
-  const ciaScored = isPractical
-    ? Number(course.cia_marks_obtained_practical ?? 0)
-    : Number(course.cia_marks_obtained_theory ?? 0);
+  const obtained = resolveObtainedMarks(course);
+  const ciaScored = obtained.cia;
   const eseMax = isPractical
     ? Number(course.ese_max_marks_practical ?? 0)
     : Number(course.ese_max_marks_theory ?? 0);
-  const eseScored = isPractical
-    ? Number(course.ese_marks_obtained_practical ?? 0)
-    : Number(course.ese_marks_obtained_theory ?? 0);
+  const eseScored = obtained.ese;
 
   const ciaMinRaw = isPractical ? course.cia_min_marks_practical : course.cia_min_marks_theory;
   const eseMinRaw = isPractical ? course.ese_min_marks_practical : course.ese_min_marks_theory;
