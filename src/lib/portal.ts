@@ -1,13 +1,47 @@
 import type { PortalType } from "./types";
 
-/** Default landing path after sign-in for each portal role. */
-export function portalHomePath(portal: PortalType): string {
-  switch (portal) {
+/** Map legacy DB portal enum values (admin_1, admin_2, …) to current roles. */
+export function normalizePortalType(raw: string | null | undefined): PortalType | null {
+  if (!raw) return null;
+  switch (raw) {
+    case "admin":
+    case "admin_2":
+    case "faculty":
+      return "admin";
+    case "head_of_coe":
+    case "admin_1":
     case "super_admin":
+      return "head_of_coe";
+    case "library":
+    case "hostel":
+    case "fees":
+      return raw;
+    default:
+      return null;
+  }
+}
+
+/** All stored recipient_portal values that belong to a normalized role. */
+export function portalNotificationRecipientValues(portal: PortalType): string[] {
+  switch (portal) {
+    case "admin":
+      return ["admin", "admin_2", "faculty"];
+    case "head_of_coe":
+      return ["head_of_coe", "admin_1", "super_admin"];
+    default:
+      return [portal];
+  }
+}
+
+/** Default landing path after sign-in for each portal role. */
+export function portalHomePath(portal: PortalType | string): string {
+  const normalized = typeof portal === "string" ? normalizePortalType(portal) : portal;
+  if (!normalized) return "/login";
+
+  switch (normalized) {
     case "head_of_coe":
       return "/coe";
     case "admin":
-    case "faculty":
       return "/admin";
     case "library":
       return "/library";
@@ -16,7 +50,7 @@ export function portalHomePath(portal: PortalType): string {
     case "fees":
       return "/fees";
     default: {
-      const _exhaustive: never = portal;
+      const _exhaustive: never = normalized;
       return _exhaustive;
     }
   }
@@ -43,13 +77,14 @@ export function notificationPortalLabel(raw: string): string {
 }
 
 /** Human-readable label for UI (navigation, tables, notifications). */
-export function portalDisplayLabel(portal: PortalType): string {
-  switch (portal) {
-    case "super_admin":
+export function portalDisplayLabel(portal: PortalType | string): string {
+  const normalized = typeof portal === "string" ? normalizePortalType(portal) : portal;
+  if (!normalized) return String(portal);
+
+  switch (normalized) {
     case "head_of_coe":
       return "COE";
     case "admin":
-    case "faculty":
       return "Admin";
     case "library":
       return "Library";
@@ -58,7 +93,7 @@ export function portalDisplayLabel(portal: PortalType): string {
     case "fees":
       return "Academic fees";
     default: {
-      const _exhaustive: never = portal;
+      const _exhaustive: never = normalized;
       return _exhaustive;
     }
   }

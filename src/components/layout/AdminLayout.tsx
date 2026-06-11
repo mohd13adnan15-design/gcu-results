@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { AdminSession } from "@/lib/auth";
 import { signOutEverywhere } from "@/lib/auth";
 import type { PortalType } from "@/lib/types";
-import { portalDisplayLabel } from "@/lib/portal";
+import { normalizePortalType, portalDisplayLabel } from "@/lib/portal";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { PortalNotificationsBell } from "@/components/notifications/PortalNotificationsBell";
@@ -49,8 +49,15 @@ export function AdminLayout({ requirePortal, title, subtitle, tagline, children 
         return;
       }
 
-      const portal = profile.portal as PortalType;
-      const allowed = Array.isArray(requirePortal) 
+      const portal = normalizePortalType(String(profile.portal));
+      if (!portal) {
+        toast.error("No portal access for this account");
+        await signOutEverywhere();
+        navigate("/login");
+        return;
+      }
+
+      const allowed = Array.isArray(requirePortal)
         ? requirePortal.includes(portal)
         : portal === requirePortal;
 

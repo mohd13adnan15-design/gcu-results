@@ -6,7 +6,7 @@ const headers = [
   "Programme Title", "Programme Code", "Registration No", "Exam Month & Year",
   "Issue Date", "Semester Label", "Grade Card No", "Course Category", "Course Type",
   "Course Priority", "Course Code", "Course Title", "Course Credits", "Credits Earned",
-  "CIA Marks Obtained", "ESE Marks Obtained",
+  "CIA Obtained", "ESE Obtained",
   "Status", "Grade Obtained", "Grade Points",
 ];
 

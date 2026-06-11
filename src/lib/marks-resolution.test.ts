@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { getMarksCardCourseValues } from "@/lib/marks-card-helpers";
 import {
+  computeTotalObtained,
   mapObtainedMarksToStorage,
   resolveObtainedMarks,
+  withComputedTotalObtained,
 } from "@/lib/marks-resolution";
 import {
   detectMarksObtainedFormat,
@@ -71,6 +73,25 @@ describe("marks-resolution", () => {
     expect(resolveObtainedMarks(course)).toEqual({ cia: 38, ese: 57 });
   });
 
+  it("computes total obtained as CIA + ESE", () => {
+    expect(computeTotalObtained(30, 45)).toBe(75);
+    const course = withComputedTotalObtained({
+      sl_no: 1,
+      section: "CORE",
+      course_code: "X",
+      course_title: "X",
+      course_type: "THEORY",
+      course_credits: 4,
+      credits_earned: 4,
+      cia_marks_obtained: 30,
+      ese_marks_obtained: 45,
+      marks_obtained: 999,
+      grade_obtained: "A",
+      grade_points: 8,
+    });
+    expect(course.marks_obtained).toBe(75);
+  });
+
   it("keeps marks card PDF values unchanged for unified rows", () => {
     const course: MarksheetCourse = {
       sl_no: 1,
@@ -118,8 +139,8 @@ describe("marks-excel-template unified format", () => {
       coursecode: "SUB101",
       coursetitle: "Subject One",
       coursetype: "THEORY",
-      ciamarksobtained: 30,
-      esemarksobtained: 45,
+      ciaobtained: 30,
+      eseobtained: 45,
       gradeobtained: "A",
       gradepoints: 8,
       coursecredits: 4,
@@ -129,6 +150,7 @@ describe("marks-excel-template unified format", () => {
     expect(row).not.toBeNull();
     expect(row?.cia_marks_obtained).toBe(30);
     expect(row?.ese_marks_obtained).toBe(45);
+    expect(row?.marks_obtained).toBe(75);
     expect(row?.cia_marks_obtained_theory).toBe(30);
     expect(row?.cia_marks_obtained_practical).toBeNull();
     expect(row?.ese_marks_obtained_theory).toBe(45);

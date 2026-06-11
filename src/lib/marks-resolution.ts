@@ -1,6 +1,19 @@
 import { getMarksCardCourseType } from "@/lib/marks-card-helpers";
 import type { MarksheetCourse } from "@/lib/marksheet";
 
+type ObtainedCourseFields = Pick<
+  MarksheetCourse,
+  | "course_type"
+  | "section"
+  | "cia_marks_obtained"
+  | "ese_marks_obtained"
+  | "cia_marks_obtained_theory"
+  | "cia_marks_obtained_practical"
+  | "ese_marks_obtained_theory"
+  | "ese_marks_obtained_practical"
+  | "marks_obtained"
+>;
+
 export type ObtainedMarks = {
   cia: number;
   ese: number;
@@ -21,18 +34,13 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Total obtained is always CIA + ESE — never uploaded independently. */
+export function computeTotalObtained(cia: number, ese: number): number {
+  return cia + ese;
+}
+
 /** Resolve CIA/ESE obtained marks from unified or legacy split columns. */
-export function resolveObtainedMarks(course: Pick<
-  MarksheetCourse,
-  | "course_type"
-  | "section"
-  | "cia_marks_obtained"
-  | "ese_marks_obtained"
-  | "cia_marks_obtained_theory"
-  | "cia_marks_obtained_practical"
-  | "ese_marks_obtained_theory"
-  | "ese_marks_obtained_practical"
->): ObtainedMarks {
+export function resolveObtainedMarks(course: ObtainedCourseFields): ObtainedMarks {
   const unifiedCia = finiteNumber(course.cia_marks_obtained);
   const unifiedEse = finiteNumber(course.ese_marks_obtained);
   if (unifiedCia != null || unifiedEse != null) {
@@ -82,5 +90,14 @@ export function mapObtainedMarksToStorage(
     cia_marks_obtained_practical: null,
     ese_marks_obtained_theory: ese,
     ese_marks_obtained_practical: null,
+  };
+}
+
+/** Ensure marks_obtained on a course always equals CIA obtained + ESE obtained. */
+export function withComputedTotalObtained<T extends MarksheetCourse>(course: T): T {
+  const { cia, ese } = resolveObtainedMarks(course);
+  return {
+    ...course,
+    marks_obtained: computeTotalObtained(cia, ese),
   };
 }

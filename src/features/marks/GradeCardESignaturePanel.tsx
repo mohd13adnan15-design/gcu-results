@@ -19,6 +19,7 @@ import {
   type GradeCardESignatureRow,
   type GradeCardSignatureRole,
 } from "@/lib/grade-card-e-signature";
+import { normalizePortalType } from "@/lib/portal";
 import type { PortalType } from "@/lib/types";
 
 type Props = {
@@ -47,7 +48,7 @@ export function useAdminSigningContext() {
         .maybeSingle();
       if (cancelled) return;
       setAdminId(session.user.id);
-      setPortal((profile?.portal as PortalType) ?? null);
+      setPortal(normalizePortalType(profile?.portal ? String(profile.portal) : null));
     })();
     return () => {
       cancelled = true;
