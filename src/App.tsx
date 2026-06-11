@@ -92,6 +92,15 @@ export function App() {
         <Route element={<RootLayout />}>
           <Route index element={<Landing />} />
           <Route path="login" element={<UnifiedLogin />} />
+          {/* Legacy per-portal login URLs (admin_2 → Admin, admin_1 → COE) */}
+          <Route path="login/admin_2" element={<Navigate to="/login" replace />} />
+          <Route path="login/admin_1" element={<Navigate to="/login" replace />} />
+          <Route path="login/faculty" element={<Navigate to="/login" replace />} />
+          <Route path="login/admin" element={<Navigate to="/login" replace />} />
+          <Route path="login/super-admin" element={<Navigate to="/login" replace />} />
+          <Route path="login/super_admin" element={<Navigate to="/login" replace />} />
+          <Route path="login/head-of-coe" element={<Navigate to="/login" replace />} />
+          <Route path="login/head_of_coe" element={<Navigate to="/login" replace />} />
           <Route path="signup" element={<SignupPage />} />
 
           {/* New Rebranded Routes */}

@@ -31,8 +31,10 @@ import {
 } from "@/lib/marks-excel-template";
 import {
   calculateMarksheetTotals,
+  checkUnifiedObtainedColumnsExist,
   legacyMarkRowsToMarksheetCourses,
   normalizeMarksheet,
+  sanitizeStudentMarkInsertRow,
 } from "@/lib/marksheet";
 import {
   extractStudentPhotosFromZip,
@@ -915,6 +917,11 @@ function MarksUploader() {
 
       console.log("Total marks records:", marksToInsert.length);
 
+      const hasUnifiedObtained = await checkUnifiedObtainedColumnsExist(supabase);
+      const marksPayload = marksToInsert.map((row) =>
+        sanitizeStudentMarkInsertRow(row, { hasUnifiedObtained }),
+      );
+
       // Delete old marks if replace is checked
       const studentUuids = Array.from(idLookup.values());
       if (replace && studentUuids.length > 0) {
@@ -934,7 +941,7 @@ function MarksUploader() {
       }
 
       // Insert Marks
-      const { error: markErr } = await supabase.from("student_marks").insert(marksToInsert);
+      const { error: markErr } = await supabase.from("student_marks").insert(marksPayload);
       if (markErr) {
         console.error("Marks insert error:", markErr);
         throw new Error(`Failed to insert marks: ${markErr.message}`);

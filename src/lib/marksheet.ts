@@ -6,7 +6,12 @@ import {
   enrichMarksheetWithConfiguration,
   fetchMarksConfiguration,
 } from "@/lib/marks-configuration";
-import { mapObtainedMarksToStorage, resolveObtainedMarks } from "@/lib/marks-resolution";
+import {
+  computeTotalObtained,
+  mapObtainedMarksToStorage,
+  resolveObtainedMarks,
+  withComputedTotalObtained,
+} from "@/lib/marks-resolution";
 
 import { studentPhotoCandidatePaths } from "@/lib/student-photo-zip";
 import type { Student } from "@/lib/types";
@@ -780,7 +785,10 @@ export function legacyMarkRowsToMarksheetCourses(marks: LegacyMarkRow[]): Marksh
       ese_marks_obtained_practical: storedObtained.ese_marks_obtained_practical,
       total_marks_theory: Number(m.total_marks_theory ?? 0) || 0,
       total_marks_practical: Number(m.total_marks_practical ?? 0) || 0,
-      marks_obtained: Number(m.marks_obtained ?? 0) || 0,
+      marks_obtained: computeTotalObtained(
+        storedObtained.cia_marks_obtained,
+        storedObtained.ese_marks_obtained,
+      ),
       max_marks,
       course_status: String(m.course_status ?? "").trim() || undefined,
       grade_obtained: String(m.grade ?? "").trim(),
@@ -826,7 +834,7 @@ export function marksheetCoursesToStudentMarkInserts(
       ese_marks_obtained_practical: storedObtained.ese_marks_obtained_practical,
       total_marks_theory: c.total_marks_theory ?? 0,
       total_marks_practical: c.total_marks_practical ?? 0,
-      marks_obtained: c.marks_obtained ?? 0,
+      marks_obtained: computeTotalObtained(obtained.cia, obtained.ese),
       max_marks,
       course_status: c.course_status ?? "",
       grade: c.grade_obtained || "RA",
@@ -890,6 +898,30 @@ export function studentMarksToMarksheet(
 }
 
 let _hasSemesterLabelColumn: boolean | null = null;
+let _hasUnifiedObtainedColumns: boolean | null = null;
+
+export async function checkUnifiedObtainedColumnsExist(supabase: SupabaseClient): Promise<boolean> {
+  if (_hasUnifiedObtainedColumns !== null) return _hasUnifiedObtainedColumns;
+  try {
+    const { error } = await supabase
+      .from("student_marks")
+      .select("cia_marks_obtained,ese_marks_obtained")
+      .limit(1);
+    _hasUnifiedObtainedColumns = !error;
+  } catch {
+    _hasUnifiedObtainedColumns = false;
+  }
+  return _hasUnifiedObtainedColumns;
+}
+
+export function sanitizeStudentMarkInsertRow(
+  row: Record<string, unknown>,
+  options: { hasUnifiedObtained: boolean },
+): Record<string, unknown> {
+  if (options.hasUnifiedObtained) return row;
+  const { cia_marks_obtained: _cia, ese_marks_obtained: _ese, ...rest } = row;
+  return rest;
+}
 
 export async function checkSemesterLabelColumnExists(supabase: SupabaseClient): Promise<boolean> {
   if (_hasSemesterLabelColumn !== null) return _hasSemesterLabelColumn;
@@ -910,18 +942,25 @@ export async function fetchStudentMarksSafe(
   studentId: string,
   selectStr?: string,
 ) {
-  const hasSemCol = await checkSemesterLabelColumnExists(supabase);
+  const [hasSemCol, hasUnifiedObtained] = await Promise.all([
+    checkSemesterLabelColumnExists(supabase),
+    checkUnifiedObtainedColumnsExist(supabase),
+  ]);
   const queryStr =
     selectStr ||
     "id,subject,subject_code,course_category,course_type,credits,credits_earned,marks_obtained,max_marks,grade,grade_points,course_priority,cia_max_marks_theory,cia_max_marks_practical,cia_min_marks_theory,cia_min_marks_practical,cia_marks_obtained,cia_marks_obtained_theory,cia_marks_obtained_practical,ese_max_marks_theory,ese_max_marks_practical,ese_min_marks_theory,ese_min_marks_practical,ese_marks_obtained,ese_marks_obtained_theory,ese_marks_obtained_practical,total_marks_theory,total_marks_practical,course_status,semester_label";
 
-  let finalQueryStr = queryStr;
-  if (!hasSemCol) {
-    finalQueryStr = queryStr
-      .split(",")
-      .filter((col) => col.trim() !== "semester_label")
-      .join(",");
-  }
+  let finalQueryStr = queryStr
+    .split(",")
+    .map((col) => col.trim())
+    .filter((col) => {
+      if (!hasSemCol && col === "semester_label") return false;
+      if (!hasUnifiedObtained && (col === "cia_marks_obtained" || col === "ese_marks_obtained")) {
+        return false;
+      }
+      return Boolean(col);
+    })
+    .join(",");
 
   const { data, error } = await supabase
     .from("student_marks")
@@ -1173,7 +1212,7 @@ function normalizeCourse(course: Record<string, unknown>): MarksheetCourse {
   const section = text(course.section);
   const max_marksRaw = numberOr(course.max_marks, 0);
   const max_marks = section.toUpperCase().includes("PRACTICAL") ? 50 : (max_marksRaw || 100);
-  return {
+  const base: MarksheetCourse = {
     sl_no: numberOr(course.sl_no, 0),
     section,
     course_code: text(course.course_code),
@@ -1216,6 +1255,8 @@ function normalizeCourse(course: Record<string, unknown>): MarksheetCourse {
     grade_obtained: text(course.grade_obtained),
     grade_points: numberOr(course.grade_points, 0),
   };
+
+  return withComputedTotalObtained(base);
 }
 
 function gradeFromSgpa(sgpa: number) {

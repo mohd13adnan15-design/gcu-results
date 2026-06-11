@@ -48,7 +48,7 @@ export const GCU_MARKS_TEMPLATE_HEADERS = [
   "Programme Title", "Programme Code", "Registration No", "Exam Month & Year",
   "Issue Date", "Semester Label", "Grade Card No", "Course Category", "Course Type",
   "Course Priority", "Course Code", "Course Title", "Course Credits", "Credits Earned",
-  "CIA Marks Obtained", "ESE Marks Obtained",
+  "CIA Obtained", "ESE Obtained",
   "Status", "Grade Obtained", "Grade Points",
 ] as const;
 
@@ -81,7 +81,8 @@ export type MarksObtainedFormat = "unified" | "split" | "legacy_simple";
 export function detectMarksObtainedFormat(keys: Iterable<string>): MarksObtainedFormat {
   const normalized = new Set(Array.from(keys).map(normalizeExcelHeaderKey));
   const hasUnified =
-    normalized.has("ciamarksobtained") &&
+    (normalized.has("ciaobtained") ||
+      normalized.has("ciamarksobtained")) &&
     !normalized.has("ciamarksobtainedtheory") &&
     !normalized.has("ciamarksobtainedpractical");
   if (hasUnified) return "unified";
@@ -105,7 +106,11 @@ export function detectGcuMarksTemplateHeaders(aoa: unknown[][]): readonly string
   if (rowText.includes("cia marks obtained theory")) {
     return GCU_MARKS_TEMPLATE_HEADERS_SPLIT_OBTAINED;
   }
-  if (rowText.includes("cia marks obtained") || rowText.includes("status")) {
+  if (
+    rowText.includes("cia obtained") ||
+    rowText.includes("cia marks obtained") ||
+    rowText.includes("status")
+  ) {
     return GCU_MARKS_TEMPLATE_HEADERS;
   }
   return GCU_MARKS_TEMPLATE_HEADERS_LEGACY;
@@ -372,8 +377,10 @@ export function parseMarksTemplateRow(
   let ese_obt_raw = 0;
 
   if (obtainedFormat === "unified") {
-    cia_obt_raw = cellNum(nc, "CIA Marks Obtained", "ciamarksobtained") || 0;
-    ese_obt_raw = cellNum(nc, "ESE Marks Obtained", "esemarksobtained") || 0;
+    cia_obt_raw =
+      cellNum(nc, "CIA Obtained", "CIA Marks Obtained", "ciamarksobtained", "ciaobtained") || 0;
+    ese_obt_raw =
+      cellNum(nc, "ESE Obtained", "ESE Marks Obtained", "esemarksobtained", "eseobtained") || 0;
   } else if (obtainedFormat === "split") {
     const cia_obt_theory_raw = cellNum(nc, "CIA Marks Obtained Theory", "ciamarksobtainedtheory");
     const cia_obt_practical_raw = cellNum(nc, "CIA Marks Obtained Practical", "ciamarksobtainedpractical");
@@ -388,8 +395,10 @@ export function parseMarksTemplateRow(
       cellNum(nc, "ESE Marks Obtained", "esemarksobtained") ||
       0;
   } else {
-    cia_obt_raw = cellNum(nc, "CIA Marks Obtained", "ciamarksobtained") || 0;
-    ese_obt_raw = cellNum(nc, "ESE Marks Obtained", "esemarksobtained") || 0;
+    cia_obt_raw =
+      cellNum(nc, "CIA Obtained", "CIA Marks Obtained", "ciamarksobtained", "ciaobtained") || 0;
+    ese_obt_raw =
+      cellNum(nc, "ESE Obtained", "ESE Marks Obtained", "esemarksobtained", "eseobtained") || 0;
     if (!cia_obt_raw && !ese_obt_raw) {
       const marksObtained = cellNum(nc, "Marks Obtained", "marksobtained");
       if (Number.isFinite(marksObtained)) {
@@ -398,6 +407,8 @@ export function parseMarksTemplateRow(
       }
     }
   }
+
+  // Total obtained is never read from Excel — always CIA + ESE.
 
   const staticMarks = staticMarksFromConfiguration(isPractical, config);
   const {

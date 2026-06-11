@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribePostgresChanges } from "@/lib/supabase-realtime";
+import { portalNotificationRecipientValues } from "@/lib/portal";
 import type { PortalType } from "@/lib/types";
 
 interface NotificationRow {
@@ -17,10 +18,11 @@ export function PortalNotificationsBell({ portal }: { portal: PortalType }) {
   const [rows, setRows] = useState<NotificationRow[]>([]);
 
   const load = useCallback(async () => {
+    const recipients = portalNotificationRecipientValues(portal);
     const { data } = await supabase
       .from("portal_notifications")
       .select("id, title, message, is_read, created_at")
-      .eq("recipient_portal", portal)
+      .in("recipient_portal", recipients)
       .order("created_at", { ascending: false })
       .limit(20);
     setRows((data as NotificationRow[]) ?? []);

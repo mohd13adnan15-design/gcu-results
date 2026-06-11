@@ -3,7 +3,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { clearStudentSession, setStudentSession, signOutEverywhere } from "@/lib/auth";
 import type { PortalType, Student } from "@/lib/types";
-import { portalHomePath } from "@/lib/portal";
+import { normalizePortalType, portalHomePath } from "@/lib/portal";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 
@@ -14,7 +14,7 @@ async function loadStaffPortal(userId: string): Promise<PortalType | null> {
     .eq("user_id", userId)
     .maybeSingle();
   if (error || !data) return null;
-  return data.portal as PortalType;
+  return normalizePortalType(String(data.portal));
 }
 
 async function loadStudentAfterAuth(userId: string, email: string): Promise<Student | null> {
