@@ -130,6 +130,65 @@ export async function removeLightBackground(source: string): Promise<string> {
   });
 }
 
+/** Infer jsPDF image format from a data URL (after any canvas re-encoding). */
+export function inferPdfImageType(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
+  const mime = dataUrl.match(/^data:([^;]+);/i)?.[1]?.toLowerCase() ?? "";
+  if (mime.includes("jpeg") || mime.includes("jpg")) return "JPEG";
+  if (mime.includes("webp")) return "WEBP";
+  return "PNG";
+}
+
+/** Crop to a square and mask pixels outside the inscribed circle (official embossed seal). */
+export async function clipImageToCircle(source: string): Promise<string> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (img.width <= 0 || img.height <= 0) {
+        resolve(source);
+        return;
+      }
+
+      const size = Math.min(img.width, img.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(source);
+        return;
+      }
+
+      const offsetX = (img.width - size) / 2;
+      const offsetY = (img.height - size) / 2;
+      const radius = size / 2;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(radius, radius, radius, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
+      ctx.restore();
+
+      try {
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(source);
+      }
+    };
+    img.onerror = () => resolve(source);
+    img.src = source;
+  });
+}
+
+export async function prepareEmbossedSeal(url: string): Promise<string | null> {
+  const loaded = await loadTransparentAsset(url, { dropLightBackground: false });
+  if (!loaded) return null;
+  const clipped = await clipImageToCircle(loaded);
+  return inferPdfImageType(clipped) === "PNG" ? clipped : loaded;
+}
+
 export async function loadTransparentAsset(
   url: string,
   options: { dropLightBackground?: boolean } = {},

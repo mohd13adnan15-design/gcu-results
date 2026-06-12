@@ -12,7 +12,12 @@ import {
   GRADE_CARD_ASSETS,
   resolveGradeCardDisplayId,
 } from "./grade-card-constants";
-import { prepareGradeCardLogo } from "./grade-card-image-processing";
+import {
+  encodePublicAssetUrl,
+  inferPdfImageType,
+  prepareEmbossedSeal,
+  prepareGradeCardLogo,
+} from "./grade-card-image-processing";
 import {
   calculateMarksCardTotals,
   getMarksCardCourseValues,
@@ -161,12 +166,19 @@ export async function drawBackPageSignatures(
   await drawSlot(signatures.verifiedByUrl, BACK_PAGE_LAYOUT_REF.slots.verifiedBy, "Verified by");
 }
 
+async function loadEmbossedSeal(): Promise<LoadedDataUrl | null> {
+  const dataUrl = await prepareEmbossedSeal(ASSET_PATHS.embossedSeal);
+  if (!dataUrl) return null;
+  const size = await measureDataUrlSize(dataUrl);
+  return { dataUrl, type: inferPdfImageType(dataUrl), width: size.width, height: size.height };
+}
+
 async function loadGradeCardLogo(): Promise<LoadedDataUrl | null> {
   const prepared = await prepareGradeCardLogo(ASSET_PATHS.logo);
   if (!prepared) return null;
   return {
     dataUrl: prepared.dataUrl,
-    type: "PNG",
+    type: inferPdfImageType(prepared.dataUrl),
     width: prepared.width,
     height: prepared.height,
   };
@@ -178,7 +190,7 @@ async function loadMarksheetPdfAssets(photoUrl?: string | null) {
       loadDataUrl(ASSET_PATHS.background),
       loadGradeCardLogo(),
       loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
-      loadDataUrl(ASSET_PATHS.embossedSeal),
+      loadEmbossedSeal(),
       loadDataUrl(ASSET_PATHS.rightSignatureOld, { dropLightBackground: true }),
       loadDataUrl(ASSET_PATHS.rightSignatureNew, { dropLightBackground: true }),
       loadDataUrl(ASSET_PATHS.backPage),
@@ -853,7 +865,8 @@ async function loadDataUrl(
   options: { dropLightBackground?: boolean; trimEdges?: number } = {},
 ): Promise<LoadedDataUrl | null> {
   try {
-    const response = await fetch(url);
+    const fetchUrl = url.startsWith("/") ? encodePublicAssetUrl(url) : url;
+    const response = await fetch(fetchUrl);
     if (!response.ok) return null;
     const blob = await response.blob();
     let dataUrl = await new Promise<string>((resolve, reject) => {
@@ -871,7 +884,7 @@ async function loadDataUrl(
     const size = await measureDataUrlSize(dataUrl);
     return {
       dataUrl,
-      type: pdfImageType(blob.type, url),
+      type: inferPdfImageType(dataUrl),
       width: size.width,
       height: size.height,
     };
@@ -920,7 +933,7 @@ async function generateDynamicQrDataUrl(marksheet: StudentMarksheet): Promise<Lo
       color: { dark: "#1a1a1a", light: "#f6f1e4" },
       width: 180,
     });
-    return { dataUrl, type: "PNG" };
+    return { dataUrl, type: inferPdfImageType(dataUrl) };
   } catch {
     return null;
   }
@@ -984,14 +997,6 @@ async function removeLightBackground(source: string): Promise<string> {
     img.onerror = () => resolve(source);
     img.src = source;
   });
-}
-
-function pdfImageType(contentType: string, url: string): LoadedDataUrl["type"] {
-  if (contentType.includes("jpeg") || contentType.includes("jpg") || /\.jpe?g($|\?)/i.test(url)) {
-    return "JPEG";
-  }
-  if (contentType.includes("webp") || /\.webp($|\?)/i.test(url)) return "WEBP";
-  return "PNG";
 }
 
 function formatDate(value: string) {
