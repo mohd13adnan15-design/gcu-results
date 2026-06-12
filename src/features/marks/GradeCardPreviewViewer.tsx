@@ -27,7 +27,6 @@ type Props = {
   loading?: boolean;
   darkTheme?: boolean;
   onSelectSemester?: (sheet: StudentMarksheet) => void;
-  onShowAllSemesters?: () => void;
   emptyMessage?: string;
   /** When false, hides the Download PDF control (e.g. Admin preview-only). */
   showDownloadButton?: boolean;
@@ -42,7 +41,6 @@ export function GradeCardPreviewViewer({
   loading = false,
   darkTheme = true,
   onSelectSemester,
-  onShowAllSemesters,
   emptyMessage = "No grade card data yet. Upload the Excel marks sheet (and optional photo ZIP) from the COE home page.",
   showDownloadButton = false,
 }: Props) {
@@ -110,14 +108,14 @@ export function GradeCardPreviewViewer({
         }}
       />
 
-      {allSheets.length > 1 && onSelectSemester && onShowAllSemesters && (
+      {allSheets.length > 1 && onSelectSemester && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-slate-400">Semester:</span>
           {allSheets.map((sheet) => {
             const semName = (sheet.semester_label || "").toLowerCase().startsWith("sem")
               ? sheet.semester_label
               : `Sem ${sheet.semester_label}`;
-            const isSelected = !showAllSemesters && activeSheet?.semester_label === sheet.semester_label;
+            const isSelected = activeSheet?.semester_label === sheet.semester_label;
             return (
               <button
                 key={sheet.semester_label}
@@ -133,17 +131,6 @@ export function GradeCardPreviewViewer({
               </button>
             );
           })}
-          <button
-            type="button"
-            onClick={onShowAllSemesters}
-            className={`rounded-lg px-3 py-1 text-xs font-bold transition border ${
-              showAllSemesters
-                ? "bg-emerald-600 border-emerald-500 text-white"
-                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"
-            }`}
-          >
-            All Sem
-          </button>
         </div>
       )}
 

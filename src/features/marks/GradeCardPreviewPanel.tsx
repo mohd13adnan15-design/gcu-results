@@ -17,7 +17,6 @@ export function GradeCardPreviewPanel({ studentId, semester = 1, refreshKey = 0 
   const [allSheets, setAllSheets] = useState<StudentMarksheet[]>([]);
   const [activeSheet, setActiveSheet] = useState<StudentMarksheet | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [showAllSemesters, setShowAllSemesters] = useState(false);
 
   const loadPreview = useCallback(async () => {
     setLoading(true);
@@ -63,7 +62,6 @@ export function GradeCardPreviewPanel({ studentId, semester = 1, refreshKey = 0 
 
   async function selectSemester(sheet: StudentMarksheet) {
     setActiveSheet(sheet);
-    setShowAllSemesters(false);
     try {
       const url = await resolveStudentPhotoUrl(supabase, sheet, { studentUuid: studentId });
       setPhotoUrl(url);
@@ -86,11 +84,9 @@ export function GradeCardPreviewPanel({ studentId, semester = 1, refreshKey = 0 
         activeSheet={activeSheet}
         allSheets={allSheets}
         photoUrl={photoUrl}
-        showAllSemesters={showAllSemesters}
         loading={loading}
         darkTheme
         onSelectSemester={(sheet) => void selectSemester(sheet)}
-        onShowAllSemesters={() => setShowAllSemesters(true)}
       />
     </div>
   );

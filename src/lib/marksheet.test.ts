@@ -9,6 +9,7 @@ import {
   buildMarksheetFileName,
   calculateMarksheetTotals,
   groupCoursesBySection,
+  reorderLeadingPracticalCourses,
   pickStudentPhotoPath,
   studentMarksToMarksheet,
 } from "./marksheet";
@@ -80,6 +81,17 @@ describe("marksheet data helpers", () => {
       sgpa: 8.36,
       finalGrade: "A+",
     });
+  });
+
+  it("moves leading practical rows below theory when labs are listed first", () => {
+    const reordered = reorderLeadingPracticalCourses([
+      { sl_no: 1, section: "PRACTICAL", course_code: "P0101", course_title: "Practical 1", course_type: "PRACTICAL", course_credits: 2, credits_earned: 2, grade_obtained: "A", grade_points: 8 },
+      { sl_no: 2, section: "PRACTICAL", course_code: "P0102", course_title: "Practical 2", course_type: "PRACTICAL", course_credits: 2, credits_earned: 2, grade_obtained: "A", grade_points: 8 },
+      { sl_no: 3, section: "Robotics", course_code: "T0101", course_title: "Theory 1", course_type: "THEORY", course_credits: 4, credits_earned: 4, grade_obtained: "A+", grade_points: 9 },
+      { sl_no: 4, section: "Robotics", course_code: "T0102", course_title: "Theory 2", course_type: "THEORY", course_credits: 4, credits_earned: 4, grade_obtained: "A", grade_points: 8 },
+    ]);
+    expect(reordered.map((course) => course.course_code)).toEqual(["T0101", "T0102", "P0101", "P0102"]);
+    expect(reordered.map((course) => course.sl_no)).toEqual([1, 2, 3, 4]);
   });
 
   it("groups courses in the same order as the grade-card reference", () => {

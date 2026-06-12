@@ -387,15 +387,34 @@ export function ClearanceAdminPage({ kind }: Props) {
       toast.error("Cannot clear student: they have unreturned borrowed books!");
       return;
     }
-    const { error } = await supabase
-      .from("students")
-      .update({ [cfg.cleared]: !current } as never)
-      .eq("id", id);
+    const nextCleared = !current;
+    const student = students.find((s) => s.id === id);
+    const payload: Record<string, unknown> = { [cfg.cleared]: nextCleared };
+
+    if (money && nextCleared && student) {
+      const total = Number(student[money.total] ?? 0) || money.defaultTotal;
+      payload[money.paid] = total;
+      payload[money.total] = total;
+    }
+
+    const { error } = await supabase.from("students").update(payload as never).eq("id", id);
     if (error) return toast.error(error.message);
     setStudents((prev) =>
-      prev.map((s) => (s.id === id ? ({ ...s, [cfg.cleared]: !current } as Student) : s)),
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        if (money && nextCleared) {
+          const total = Number(s[money.total] ?? 0) || money.defaultTotal;
+          return {
+            ...s,
+            [cfg.cleared]: true,
+            [money.paid]: total,
+            [money.total]: total,
+          } as Student;
+        }
+        return { ...s, [cfg.cleared]: nextCleared } as Student;
+      }),
     );
-    toast.success(!current ? "Marked as cleared" : "Marked as pending");
+    toast.success(nextCleared ? "Marked as cleared" : "Marked as pending");
   }
 
   async function removeStudent(id: string) {

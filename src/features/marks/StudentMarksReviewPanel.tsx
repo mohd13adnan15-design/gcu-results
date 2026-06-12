@@ -107,7 +107,7 @@ type Props = {
 export function StudentMarksReviewPanel({
   studentId,
   portal,
-  showAllSemestersButton = true,
+  showAllSemestersButton = false,
 }: Props) {
   const [student, setStudent] = useState<Student | null>(null);
   const [marksheet, setMarksheet] = useState<StudentMarksheet | null>(null);
@@ -538,11 +538,9 @@ function AdminClearanceReview({ student }: { student: Student }) {
         }
         lines={
           student.in_library
-            ? [
-              student.library_remote_profile_id
-                ? `Remote profile ${student.library_remote_profile_id}`
-                : "No remote profile linked",
-            ]
+            ? student.library_cleared
+              ? ["All Books Returned, No penalties"]
+              : ["Library clearance pending"]
             : ["No Penalty"]
         }
         ok={!student.in_library || student.library_cleared}
