@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 
-import type { StudentMarksheet } from "@/lib/marksheet";
+import { prepareCoursesForDisplay, type StudentMarksheet } from "@/lib/marksheet";
 import {
   calculateMarksCardTotals,
   getMarksCardCourseValues,
@@ -52,7 +52,11 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
     const headerLayout = getFrontPageHeaderLayout();
 
-    const totals = useMemo(() => calculateMarksCardTotals(marksheet.courses), [marksheet.courses]);
+    const displayCourses = useMemo(
+      () => prepareCoursesForDisplay(marksheet.courses),
+      [marksheet.courses],
+    );
+    const totals = useMemo(() => calculateMarksCardTotals(displayCourses), [displayCourses]);
     const resultLabel = useMemo(
       () => marksCardResultLabel(totals.obtained, totals.maxTotal),
       [totals],
@@ -359,7 +363,7 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
               </tr>
             </thead>
             <tbody>
-              {marksheet.courses.map((course) => {
+              {displayCourses.map((course) => {
                 const values = getMarksCardCourseValues(course);
                 return (
                   <tr key={`${course.sl_no}-${course.course_code}`}>

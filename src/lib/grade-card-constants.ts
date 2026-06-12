@@ -46,7 +46,10 @@ export function formatGradeCardDate(value: string) {
 }
 
 export function formatGradeCardNumber(value: number) {
-  return Number.isInteger(value) ? value.toFixed(1) : value.toFixed(2);
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+  return n.toFixed(2);
 }
 
 export function formatSgpa(value: number) {

@@ -493,7 +493,14 @@ export function calculateMarksheetTotals(courses: MarksheetCourse[]): MarksheetT
   };
 }
 
-export function isPracticalCourse(course: { course_title: string; section?: string; course_code?: string }): boolean {
+export function isPracticalCourse(course: {
+  course_title: string;
+  section?: string;
+  course_code?: string;
+  course_type?: string;
+}): boolean {
+  const courseType = (course.course_type || "").toUpperCase().trim();
+  if (courseType.includes("PRACTICAL")) return true;
   const title = (course.course_title || "").toUpperCase().trim();
   const section = (course.section || "").toUpperCase().trim();
   if (section.includes("PRACTICAL")) return true;
@@ -507,10 +514,32 @@ export function isPracticalCourse(course: { course_title: string; section?: stri
   return false;
 }
 
+/** Move leading practical rows below theory when uploads list labs before theory (e.g. Sem 1). */
+export function reorderLeadingPracticalCourses(courses: MarksheetCourse[]): MarksheetCourse[] {
+  const sorted = [...courses].sort((a, b) => a.sl_no - b.sl_no);
+  let leadingEnd = 0;
+  while (leadingEnd < sorted.length && isPracticalCourse(sorted[leadingEnd]!)) {
+    leadingEnd++;
+  }
+  if (leadingEnd === 0) return sorted;
+
+  const hasTheoryLater = sorted.slice(leadingEnd).some((course) => !isPracticalCourse(course));
+  if (!hasTheoryLater) return sorted;
+
+  const leadingPractical = sorted.slice(0, leadingEnd);
+  const rest = sorted.slice(leadingEnd);
+  return [...rest, ...leadingPractical].map((course, index) => ({
+    ...course,
+    sl_no: index + 1,
+  }));
+}
+
+export function prepareCoursesForDisplay(courses: MarksheetCourse[]): MarksheetCourse[] {
+  return reorderLeadingPracticalCourses(courses);
+}
+
 export function groupCoursesBySection(courses: MarksheetCourse[]): MarksheetCourseGroup[] {
-  return [...courses]
-    .sort((a, b) => a.sl_no - b.sl_no)
-    .reduce<MarksheetCourseGroup[]>((groups, course) => {
+  return prepareCoursesForDisplay(courses).reduce<MarksheetCourseGroup[]>((groups, course) => {
       const isPractical = isPracticalCourse(course);
       const effectiveSection = isPractical ? "PRACTICAL" : course.section;
       const previous = groups.at(-1);

@@ -27,6 +27,7 @@ import {
 import {
   buildMarksheetFileName,
   groupCoursesBySection,
+  prepareCoursesForDisplay,
   type StudentMarksheet,
 } from "./marksheet";
 
@@ -1001,7 +1002,7 @@ function formatDate(value: string) {
 }
 
 function formatNumber(value: number) {
-  return Number.isInteger(value) ? value.toFixed(1) : value.toFixed(2);
+  return formatGradeCardNumber(value);
 }
 
 function setText(doc: jsPDF, color: readonly [number, number, number]) {
@@ -1350,7 +1351,7 @@ function drawMarksCardTable(
   drawMarksCardTableHeader(doc, x, y, widths, headerRow1Height, headerRow2Height);
   y += headerRow1Height + headerRow2Height;
 
-  for (const course of marksheet.courses) {
+  for (const course of prepareCoursesForDisplay(marksheet.courses)) {
     const values = getMarksCardCourseValues(course);
     const titleLines = fitLines(doc, course.course_title, widths[2]! - 8, 2);
     const rowHeight =

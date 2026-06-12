@@ -1,5 +1,6 @@
 import { CircleAlert } from "lucide-react";
-import type { MarksheetCourse, StudentMarksheet } from "@/lib/marksheet";
+import { formatGradeCardNumber } from "@/lib/grade-card-constants";
+import { prepareCoursesForDisplay, type MarksheetCourse, type StudentMarksheet } from "@/lib/marksheet";
 
 export function computeMarksheetPreviewTotals(marksheet: StudentMarksheet | null) {
   const courses = marksheet?.courses ?? [];
@@ -16,7 +17,10 @@ type MarksheetSavedPreviewProps = {
 
 /** COE/Admin marksheet preview (via fetchStudentMarksheet → `student_marksheets`). */
 export function MarksheetSavedPreview({ marksheet, readOnlyNotice }: MarksheetSavedPreviewProps) {
-  const totals = computeMarksheetPreviewTotals(marksheet);
+  const displayCourses = marksheet ? prepareCoursesForDisplay(marksheet.courses) : [];
+  const totals = computeMarksheetPreviewTotals(
+    marksheet ? { ...marksheet, courses: displayCourses } : null,
+  );
 
   if (!marksheet) {
     return (
@@ -49,8 +53,8 @@ export function MarksheetSavedPreview({ marksheet, readOnlyNotice }: MarksheetSa
             Courses: <strong>{totals.courseCount}</strong>
           </p>
           <p>
-            Credits: <strong>{totals.earnedCredits.toFixed(1)}</strong> /{" "}
-            {totals.totalCredits.toFixed(1)}
+            Credits: <strong>{formatGradeCardNumber(totals.earnedCredits)}</strong> /{" "}
+            {formatGradeCardNumber(totals.totalCredits)}
           </p>
           <p>
             SGPA: <strong>{marksheet.sgpa.toFixed(2)}</strong> · Grade{" "}
@@ -79,7 +83,7 @@ export function MarksheetSavedPreview({ marksheet, readOnlyNotice }: MarksheetSa
             </tr>
           </thead>
           <tbody>
-            {marksheet.courses.map((course, index) => (
+            {displayCourses.map((course, index) => (
               <CourseRow
                 key={`${course.sl_no}-${course.course_code}`}
                 course={course}
@@ -109,10 +113,10 @@ function CourseRow({ course, index }: { course: MarksheetCourse; index: number }
       <td className="px-2 py-2">{course.course_code}</td>
       <td className="px-2 py-2">{course.course_title}</td>
       <td className="px-2 py-2">{course.section}</td>
-      <td className="px-2 py-2">{course.course_credits}</td>
-      <td className="px-2 py-2">{course.credits_earned}</td>
+      <td className="px-2 py-2">{formatGradeCardNumber(course.course_credits)}</td>
+      <td className="px-2 py-2">{formatGradeCardNumber(course.credits_earned)}</td>
       <td className="px-2 py-2">{course.grade_obtained}</td>
-      <td className="px-2 py-2">{course.grade_points}</td>
+      <td className="px-2 py-2">{formatGradeCardNumber(course.grade_points)}</td>
     </tr>
   );
 }
