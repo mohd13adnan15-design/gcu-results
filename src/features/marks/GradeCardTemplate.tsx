@@ -23,6 +23,7 @@ import {
 } from "@/lib/grade-card-constants";
 import {
   loadTransparentAsset,
+  prepareEmbossedSeal,
   prepareGradeCardLogo,
   prepareGradeCardStudentPhoto,
 } from "@/lib/grade-card-image-processing";
@@ -106,7 +107,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         const sigUrl = getControllerSignatureAsset(marksheet);
         const [seal, embossed, signature] = await Promise.all([
           loadTransparentAsset(GRADE_CARD_ASSETS.seal),
-          loadTransparentAsset(GRADE_CARD_ASSETS.embossedSeal, { dropLightBackground: false }),
+          prepareEmbossedSeal(GRADE_CARD_ASSETS.embossedSeal),
           loadTransparentAsset(sigUrl),
         ]);
         if (cancelled) return;
@@ -515,6 +516,8 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
               top: FRONT_PAGE_FOOTER.embossedSeal.y,
               width: FRONT_PAGE_FOOTER.embossedSeal.w,
               height: FRONT_PAGE_FOOTER.embossedSeal.h,
+              borderRadius: "50%",
+              objectFit: "cover",
             }}
           />
         )}
