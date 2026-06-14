@@ -25,8 +25,10 @@ import {
 } from "@/lib/grade-card-constants";
 import {
   loadTransparentAsset,
+  prepareControllerSignature,
   prepareGradeCardLogo,
   prepareGradeCardStudentPhoto,
+  resolveAssetDisplaySrc,
 } from "@/lib/grade-card-image-processing";
 
 export type MarksCardTemplateProps = {
@@ -121,7 +123,7 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
         const sigUrl = getControllerSignatureAsset(marksheet);
         const [seal, signature] = await Promise.all([
           loadTransparentAsset(GRADE_CARD_ASSETS.seal),
-          loadTransparentAsset(sigUrl),
+          prepareControllerSignature(sigUrl),
         ]);
         if (cancelled) return;
         setSealSrc(seal);
@@ -470,7 +472,7 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
 
         {(signatureSrc ?? getControllerSignatureAsset(marksheet)) && (
           <img
-            src={signatureSrc ?? getControllerSignatureAsset(marksheet)}
+            src={resolveAssetDisplaySrc(signatureSrc, getControllerSignatureAsset(marksheet))}
             alt=""
             aria-hidden
             style={{

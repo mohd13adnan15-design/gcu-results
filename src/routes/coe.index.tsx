@@ -38,11 +38,9 @@ import {
 } from "@/lib/marksheet";
 import {
   extractStudentPhotosFromZip,
-  matchStudentPhotoFromZip,
-  studentPhotoContentType,
-  studentPhotoLookupKeys,
+  matchAndUploadStudentPhotos,
+  persistStudentPhotoUpdates,
   studentPhotoStorageFileName,
-  toTypedStudentPhotoBlob,
   type ExtractedStudentPhoto,
 } from "@/lib/student-photo-zip";
 import { notificationPortalLabel } from "@/lib/portal";
@@ -559,7 +557,105 @@ function MarksUploader() {
     window.location.href = "/marks_template_final.xlsx";
   }
 
+  async function handleUploadPhotosOnly() {
+    if (!zipFile) {
+      toast.error("Please select a student photos ZIP file.");
+      return;
+    }
+
+    setBusy(true);
+    console.group("COE Photos-only ZIP Upload");
+
+    try {
+      let uploadedImages: Map<string, ExtractedStudentPhoto>;
+      try {
+        uploadedImages = await extractStudentPhotosFromZip(zipFile);
+      } catch (err) {
+        toast.error("Failed to extract ZIP file. Ensure it is a valid ZIP archive.");
+        console.error("ZIP extraction error:", err);
+        return;
+      }
+
+      if (uploadedImages.size === 0) {
+        toast.error("No JPG or PNG images found in the ZIP.");
+        return;
+      }
+
+      const { data: studentRows, error: studentErr } = await supabase
+        .from("students")
+        .select("id, student_id, image_path");
+      if (studentErr) throw new Error(studentErr.message);
+      if (!studentRows?.length) {
+        toast.error("No students in the database yet. Upload the Excel marks sheet first.");
+        return;
+      }
+
+      const studentIds = studentRows.map((row) => row.id);
+      const [{ data: detailRows }, { data: marksheetRows }] = await Promise.all([
+        supabase
+          .from("grade_card_details")
+          .select("student_id, registration_no")
+          .in("student_id", studentIds),
+        supabase
+          .from("student_marksheets")
+          .select("student_id, registration_no, student_roll_no")
+          .in("student_id", studentIds),
+      ]);
+
+      const registrationByStudentId = new Map<string, string>();
+      for (const row of marksheetRows ?? []) {
+        const reg = String(row.registration_no || row.student_roll_no || "").trim();
+        if (reg) registrationByStudentId.set(row.student_id, reg);
+      }
+      for (const row of detailRows ?? []) {
+        const reg = String(row.registration_no || "").trim();
+        if (reg) registrationByStudentId.set(row.student_id, reg);
+      }
+
+      const targets = studentRows.map((row) => ({
+        id: row.id,
+        student_id: row.student_id,
+        image_path: row.image_path,
+        registration_no: registrationByStudentId.get(row.id) ?? row.student_id,
+      }));
+
+      const photoResult = await matchAndUploadStudentPhotos(supabase, uploadedImages, targets);
+      await persistStudentPhotoUpdates(supabase, photoResult.dbUpdates);
+
+      if (photoResult.photosMatched === 0) {
+        toast.error(
+          "No photos matched existing students. Name each file with the registration number (e.g. 23MSDA105.jpg).",
+        );
+        return;
+      }
+
+      toast.success(
+        `Uploaded ${photoResult.photosMatched} student photo(s).` +
+          (photoResult.photosMissing > 0
+            ? ` ${photoResult.photosMissing} student(s) had no matching file in the ZIP.`
+            : ""),
+      );
+      setZipFile(null);
+    } catch (error) {
+      console.error("Photos-only upload failed:", error);
+      toast.error(error instanceof Error ? error.message : "Photo upload failed.");
+    } finally {
+      console.groupEnd();
+      setBusy(false);
+    }
+  }
+
   async function handleUploadAll() {
+    if (!excelFile && !zipFile) {
+      toast.error("Please select an Excel marks sheet and/or a student photos ZIP file.");
+      return;
+    }
+
+    if (!excelFile && zipFile) {
+      await handleUploadPhotosOnly();
+      return;
+    }
+
     if (!excelFile) {
       toast.error("Please select an Excel marks sheet file.");
       return;
@@ -750,45 +846,21 @@ function MarksUploader() {
 
       // 4. Match and Upload ZIP photos (filename must match registration no, e.g. 23MSDA105.jpg)
       const uniqueStudentsList = Array.from(studentsMap.values());
-      let photosMatched = 0;
-      let photosMissing = 0;
-
+      const photoResult = await matchAndUploadStudentPhotos(
+        supabase,
+        uploadedImages,
+        uniqueStudentsList.map((s) => ({
+          student_id: s.student_id,
+          registration_no: s.registration_no,
+          image_path: s.image_path,
+        })),
+      );
       for (const s of uniqueStudentsList) {
-        const registrationNo = (s.registration_no || s.student_id).trim();
-        const lookupKeys = studentPhotoLookupKeys({
-          registrationNo,
-          studentId: s.student_id,
-          imagePath: s.image_path,
-        });
-
-        const matched = matchStudentPhotoFromZip(uploadedImages, lookupKeys);
-
-        if (matched) {
-          const storageFileName = studentPhotoStorageFileName(registrationNo, matched.ext);
-          const typedBlob = toTypedStudentPhotoBlob(matched.blob, matched.ext);
-          try {
-            const { error: uploadErr } = await supabase.storage
-              .from("student-photos")
-              .upload(storageFileName, typedBlob, {
-                upsert: true,
-                contentType: studentPhotoContentType(matched.ext),
-              });
-            if (uploadErr) {
-              console.error(`Error uploading photo for ${registrationNo}:`, uploadErr);
-              photosMissing += 1;
-            } else {
-              s.image_path = storageFileName;
-              photosMatched += 1;
-            }
-          } catch (err) {
-            console.error(`Exception uploading photo for ${registrationNo}:`, err);
-            photosMissing += 1;
-          }
-        } else if (uploadedImages.size > 0) {
-          photosMissing += 1;
-          console.warn(`No ZIP photo matched registration no "${registrationNo}"`);
-        }
+        const path = photoResult.imagePathByStudentId.get(s.student_id.toLowerCase().trim());
+        if (path) s.image_path = path;
       }
+      const photosMatched = photoResult.photosMatched;
+      const photosMissing = photoResult.photosMissing;
 
       if (uploadedImages.size > 0) {
         console.log(`Photo matching: ${photosMatched} matched, ${photosMissing} missing`);
@@ -1104,7 +1176,8 @@ function MarksUploader() {
             <FileSpreadsheet className="h-5 w-5" /> Upload student marks
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Upload the Excel spreadsheet containing student records and marks, along with a ZIP archive of student photos.
+            Upload the Excel spreadsheet containing student records and marks, with an optional ZIP of student photos.
+            You can also upload <strong>photos only</strong> later if marks were already imported without images.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Each photo file must be named exactly according to the student&apos;s registration number (for example:{" "}
@@ -1124,7 +1197,7 @@ function MarksUploader() {
         <div className="grid gap-6 md:grid-cols-2">
           {/* Excel Input */}
           <div className="flex flex-col gap-2 rounded-xl border border-border bg-cream/20 p-4">
-            <label className="text-sm font-semibold text-primary">Excel Marks Sheet</label>
+            <label className="text-sm font-semibold text-primary">Excel Marks Sheet (optional for photos-only)</label>
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -1160,21 +1233,27 @@ function MarksUploader() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/60 pt-4">
-          <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-            <input
-              type="checkbox"
-              checked={replace}
-              onChange={(e) => setReplace(e.target.checked)}
-              disabled={busy}
-              className="h-4 w-4 accent-[var(--color-primary)]"
-            />
-            Replace existing marks for matched students
-          </label>
+          {excelFile ? (
+            <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={replace}
+                onChange={(e) => setReplace(e.target.checked)}
+                disabled={busy}
+                className="h-4 w-4 accent-[var(--color-primary)]"
+              />
+              Replace existing marks for matched students
+            </label>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Photos-only upload updates student and marksheet images without changing marks.
+            </p>
+          )}
 
           <button
             type="button"
             onClick={handleUploadAll}
-            disabled={busy || !excelFile}
+            disabled={busy || (!excelFile && !zipFile)}
             className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60 transition-colors shadow-sm"
           >
             {busy ? (
@@ -1183,7 +1262,12 @@ function MarksUploader() {
               </>
             ) : (
               <>
-                <Upload className="h-4 w-4" /> Upload Marks & Photos
+                <Upload className="h-4 w-4" />{" "}
+                {excelFile && zipFile
+                  ? "Upload Marks & Photos"
+                  : excelFile
+                    ? "Upload Marks"
+                    : "Upload Photos Only"}
               </>
             )}
           </button>
