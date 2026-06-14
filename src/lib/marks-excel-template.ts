@@ -523,8 +523,12 @@ export function validateMarksTemplateColumns(sampleRow: Record<string, unknown>)
 const TEMPLATE_SAMPLE_COURSES = [
   { code: "SUB101", title: "Introduction to Subject One", type: "THEORY", grade: "A", points: 8 },
   { code: "SUB102", title: "Introduction to Subject Two", type: "THEORY", grade: "A+", points: 9 },
-  { code: "SUB103P", title: "Practical Lab One", type: "PRACTICAL", grade: "O", points: 10 },
+  { code: "SUB103", title: "Introduction to Subject Three", type: "THEORY", grade: "A", points: 8 },
   { code: "SUB104", title: "Advanced Subject Four", type: "THEORY", grade: "B+", points: 7 },
+  { code: "SUB105", title: "Introduction to Subject Five", type: "THEORY", grade: "A", points: 8 },
+  { code: "SUB106", title: "Introduction to Subject Six", type: "THEORY", grade: "A+", points: 9 },
+  { code: "SUB107P", title: "Practical Lab One", type: "PRACTICAL", grade: "O", points: 10 },
+  { code: "SUB108P", title: "Practical Lab Two", type: "PRACTICAL", grade: "O", points: 10 },
 ] as const;
 
 function buildTemplateCourseRow(
@@ -574,50 +578,25 @@ function buildTemplateCourseRow(
   ];
 }
 
-/** Two sample students × 2 semesters × 4 courses (16 example rows). COE may add unlimited rows. */
+/** One sample student × 1 semester × 8 courses (6 theory + 2 practical). COE may add unlimited rows. */
 export function buildTejashviTemplateExampleRows(): (string | number)[][] {
-  const students = [
-    {
-      roll: "23BSFT101",
-      email: "23bsft101@gcu.edu.in",
-      name: "Abigail Albert Anbudurai",
-      dept: "BSFT",
-      programmeTitle: "Bachelor of Science Food Science and Technology",
-      programmeCode: "BSFT",
-      gradeCardNo: "GCBSFT00001",
-      slStart: 1,
-    },
-    {
-      roll: "23BSFT102",
-      email: "23bsft102@gcu.edu.in",
-      name: "Rahul Krishnan",
-      dept: "BSFT",
-      programmeTitle: "Bachelor of Science Food Science and Technology",
-      programmeCode: "BSFT",
-      gradeCardNo: "GCBSFT00002",
-      slStart: 9,
-    },
-  ];
+  const student = {
+    roll: "23BSFT101",
+    email: "23bsft101@gcu.edu.in",
+    name: "Abigail Albert Anbudurai",
+    dept: "BSFT",
+    programmeTitle: "Bachelor of Science Food Science and Technology",
+    programmeCode: "BSFT",
+    gradeCardNo: "GCBSFT00001",
+    slStart: 1,
+  };
+
+  const semLabel = "I";
+  const examMonth = "April - 2026";
 
   const rows: (string | number)[][] = [];
-  for (const student of students) {
-    const semesters = [
-      ["IV", "April - 2026"],
-      ["V", "December - 2026"],
-    ] as const;
-    semesters.forEach(([semLabel, examMonth], semIndex) => {
-      TEMPLATE_SAMPLE_COURSES.forEach((course, courseIndex) => {
-        rows.push(
-          buildTemplateCourseRow(
-            student,
-            course,
-            semIndex * TEMPLATE_SAMPLE_COURSES.length + courseIndex,
-            semLabel,
-            examMonth,
-          ),
-        );
-      });
-    });
-  }
+  TEMPLATE_SAMPLE_COURSES.forEach((course, courseIndex) => {
+    rows.push(buildTemplateCourseRow(student, course, courseIndex, semLabel, examMonth));
+  });
   return rows;
 }

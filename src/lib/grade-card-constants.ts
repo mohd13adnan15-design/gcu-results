@@ -175,7 +175,29 @@ export const FRONT_PAGE_FOOTER = {
   embossedSeal: { x: 448, y: 672, w: 64, h: 64 },
   signatureNew: { x: 375, y: 735, w: 210, h: 93 },
   signatureOld: { x: 390, y: 742, w: 180, h: 80 },
+  controllerLabel: {
+    fontSize: 10,
+    /** Tight gap below signature ink (pt), matching official grade card. */
+    gapBelowSignature: 2,
+    /** Preview fallback when ink bounds are unavailable. */
+    fallbackInkRatio: 0.52,
+    pageBorderInset: 16.5,
+  },
 } as const;
+
+/** Place the controller title just under the signature ink, inside the inner border. */
+export function getControllerSignatureLabelTop(
+  sig: { y: number; h: number },
+  inkBottomY?: number,
+): number {
+  const { gapBelowSignature, fontSize, pageBorderInset, fallbackInkRatio } =
+    FRONT_PAGE_FOOTER.controllerLabel;
+  const innerBottom = A4_HEIGHT - pageBorderInset;
+  const anchor = inkBottomY ?? sig.y + sig.h * fallbackInkRatio;
+  const idealTop = anchor + gapBelowSignature;
+  const maxTop = innerBottom - fontSize - 1;
+  return Math.min(idealTop, maxTop);
+}
 
 /** Back-page e-signature overlay (A4 pt). Measured from template PNG 1049×1500 → A4 pt. */
 export const BACK_PAGE_LAYOUT = {

@@ -8,6 +8,7 @@ import {
   formatSgpa,
   FRONT_PAGE_FOOTER,
   FRONT_PAGE_HEADER,
+  getControllerSignatureLabelTop,
   getFrontPageHeaderLayout,
   GRADE_CARD_ASSETS,
   resolveGradeCardDisplayId,
@@ -15,6 +16,7 @@ import {
 import {
   encodePublicAssetUrl,
   inferPdfImageType,
+  measureDataUrlInkBottomFraction,
   prepareEmbossedSeal,
   prepareControllerSignature,
   prepareGradeCardLogo,
@@ -104,6 +106,7 @@ type LoadedDataUrl = {
   type: "JPEG" | "PNG" | "WEBP";
   width?: number;
   height?: number;
+  inkBottomFraction?: number | null;
 };
 
 export function downloadBlob(blob: Blob, filename: string) {
@@ -171,8 +174,17 @@ export async function drawBackPageSignatures(
 async function loadControllerSignature(url: string): Promise<LoadedDataUrl | null> {
   const dataUrl = await prepareControllerSignature(url);
   if (!dataUrl) return null;
-  const size = await measureDataUrlSize(dataUrl);
-  return { dataUrl, type: inferPdfImageType(dataUrl), width: size.width, height: size.height };
+  const [size, inkBottomFraction] = await Promise.all([
+    measureDataUrlSize(dataUrl),
+    measureDataUrlInkBottomFraction(dataUrl),
+  ]);
+  return {
+    dataUrl,
+    type: inferPdfImageType(dataUrl),
+    width: size.width,
+    height: size.height,
+    inkBottomFraction,
+  };
 }
 
 async function loadEmbossedSeal(): Promise<LoadedDataUrl | null> {
@@ -697,6 +709,22 @@ function drawTotals(doc: jsPDF, marksheet: StudentMarksheet, x: number, y: numbe
   return y + height;
 }
 
+function drawControllerSignatureLabel(
+  doc: jsPDF,
+  sig: { x: number; y: number; w: number; h: number },
+  inkBottomY?: number,
+) {
+  const label = "Controller of Examinations";
+  const fontSize = FRONT_PAGE_FOOTER.controllerLabel.fontSize;
+  const labelTop = getControllerSignatureLabelTop(sig, inkBottomY);
+  const labelBaseline = labelTop + fontSize * 0.85;
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(fontSize);
+  setText(doc, DARK);
+  doc.text(label, sig.x + sig.w / 2, labelBaseline, { align: "center" });
+}
+
 function drawFirstPageFooter(
   doc: jsPDF,
   marksheet: StudentMarksheet,
@@ -720,12 +748,16 @@ function drawFirstPageFooter(
   if (images.embossedSeal) {
     doc.addImage(images.embossedSeal.dataUrl, images.embossedSeal.type, 448, 672, 64, 64);
   }
+  const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
+  const sig = isAfterJuly24 ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
+  let inkBottomY: number | undefined;
   if (images.rightSignature) {
-    const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
-    const sig = isAfterJuly24 ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
     const naturalW = images.rightSignature.width ?? sig.w;
     const naturalH = images.rightSignature.height ?? sig.h;
     const fitted = fitImageInBox(naturalW, naturalH, sig.x, sig.y, sig.w, sig.h);
+    const inkFraction = images.rightSignature.inkBottomFraction;
+    inkBottomY =
+      inkFraction != null ? fitted.y + inkFraction * fitted.h : fitted.y + fitted.h;
     doc.addImage(
       images.rightSignature.dataUrl,
       images.rightSignature.type,
@@ -735,6 +767,7 @@ function drawFirstPageFooter(
       fitted.h,
     );
   }
+  drawControllerSignatureLabel(doc, sig, inkBottomY);
 }
 
 function drawBackgroundTheme(
@@ -1694,12 +1727,16 @@ function drawMarksCardFooter(
 ) {
   drawMarksCardSealWithLabel(doc, images.seal);
 
+  const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
+  const sig = isAfterJuly24 ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
+  let inkBottomY: number | undefined;
   if (images.rightSignature) {
-    const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
-    const sig = isAfterJuly24 ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
     const naturalW = images.rightSignature.width ?? sig.w;
     const naturalH = images.rightSignature.height ?? sig.h;
     const fitted = fitImageInBox(naturalW, naturalH, sig.x, sig.y, sig.w, sig.h);
+    const inkFraction = images.rightSignature.inkBottomFraction;
+    inkBottomY =
+      inkFraction != null ? fitted.y + inkFraction * fitted.h : fitted.y + fitted.h;
     doc.addImage(
       images.rightSignature.dataUrl,
       images.rightSignature.type,
@@ -1709,4 +1746,5 @@ function drawMarksCardFooter(
       fitted.h,
     );
   }
+  drawControllerSignatureLabel(doc, sig, inkBottomY);
 }

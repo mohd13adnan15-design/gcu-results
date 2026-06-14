@@ -15,6 +15,7 @@ import {
   FRONT_PAGE_FOOTER,
   FRONT_PAGE_HEADER,
   getBackPageWipeHeight,
+  getControllerSignatureLabelTop,
   getControllerSignatureAsset,
   GRADE_CARD_ASSETS,
   GRADE_CARD_COLORS,
@@ -27,6 +28,7 @@ import {
   prepareControllerSignature,
   prepareGradeCardLogo,
   prepareGradeCardStudentPhoto,
+  measureSignatureInkBottomY,
   resolveAssetDisplaySrc,
 } from "@/lib/grade-card-image-processing";
 
@@ -47,6 +49,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
     const [sealSrc, setSealSrc] = useState<string | null>(null);
     const [embossedSealSrc, setEmbossedSealSrc] = useState<string | null>(null);
     const [signatureSrc, setSignatureSrc] = useState<string | null>(null);
+    const [signatureInkBottomY, setSignatureInkBottomY] = useState<number | undefined>();
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
     const headerLayout = getFrontPageHeaderLayout();
 
@@ -107,6 +110,8 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
       let cancelled = false;
       void (async () => {
         const sigUrl = getControllerSignatureAsset(marksheet);
+        const isNewSig = isMarksheetAfterJuly2024(marksheet);
+        const sigLayout = isNewSig ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
         const [seal, embossed, signature] = await Promise.all([
           loadTransparentAsset(GRADE_CARD_ASSETS.seal),
           prepareEmbossedSeal(GRADE_CARD_ASSETS.embossedSeal),
@@ -116,6 +121,12 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         setSealSrc(seal);
         setEmbossedSealSrc(embossed);
         setSignatureSrc(signature);
+        if (signature) {
+          const inkBottomY = await measureSignatureInkBottomY(signature, sigLayout);
+          if (!cancelled) setSignatureInkBottomY(inkBottomY ?? undefined);
+        } else {
+          setSignatureInkBottomY(undefined);
+        }
       })();
       return () => {
         cancelled = true;
@@ -537,6 +548,20 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
             }}
           />
         )}
+        <div
+          style={{
+            position: "absolute",
+            left: sigLayout.x,
+            top: getControllerSignatureLabelTop(sigLayout, signatureInkBottomY),
+            width: sigLayout.w,
+            textAlign: "center",
+            fontSize: FRONT_PAGE_FOOTER.controllerLabel.fontSize,
+            fontWeight: "bold",
+            lineHeight: 1,
+          }}
+        >
+          Controller of Examinations
+        </div>
       </div>
     );
   },

@@ -175,6 +175,102 @@ export function resolveAssetDisplaySrc(processed: string | null, assetPath: stri
   return processed ?? encodePublicAssetUrl(assetPath);
 }
 
+export function fitImageInLayoutBox(
+  naturalW: number,
+  naturalH: number,
+  boxX: number,
+  boxY: number,
+  boxW: number,
+  boxH: number,
+) {
+  const scale = Math.min(boxW / naturalW, boxH / naturalH);
+  const drawW = naturalW * scale;
+  const drawH = naturalH * scale;
+  return {
+    x: boxX + (boxW - drawW) / 2,
+    y: boxY + (boxH - drawH) / 2,
+    w: drawW,
+    h: drawH,
+  };
+}
+
+function scanInkBottomFraction(
+  imageData: ImageData,
+  alphaThreshold = 12,
+): number | null {
+  const { data, width, height } = imageData;
+  let maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const alpha = data[(y * width + x) * 4 + 3];
+      if (alpha > alphaThreshold) maxY = y;
+    }
+  }
+  if (maxY < 0) return null;
+  return (maxY + 1) / height;
+}
+
+/** Fraction (0–1) of image height where signature ink ends. */
+export async function measureDataUrlInkBottomFraction(source: string): Promise<number | null> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (img.width <= 0 || img.height <= 0) {
+        resolve(null);
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      resolve(scanInkBottomFraction(ctx.getImageData(0, 0, img.width, img.height)));
+    };
+    img.onerror = () => resolve(null);
+    img.src = source;
+  });
+}
+
+/** Absolute page Y of the lowest signature ink pixel inside the layout box. */
+export async function measureSignatureInkBottomY(
+  source: string,
+  box: { x: number; y: number; w: number; h: number },
+): Promise<number | null> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (img.width <= 0 || img.height <= 0) {
+        resolve(null);
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const fraction = scanInkBottomFraction(ctx.getImageData(0, 0, img.width, img.height));
+      if (fraction == null) {
+        resolve(null);
+        return;
+      }
+      const fitted = fitImageInLayoutBox(img.width, img.height, box.x, box.y, box.w, box.h);
+      resolve(fitted.y + fraction * fitted.h);
+    };
+    img.onerror = () => resolve(null);
+    img.src = source;
+  });
+}
+
 /** Infer jsPDF image format from a data URL (after any canvas re-encoding). */
 export function inferPdfImageType(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
   const mime = dataUrl.match(/^data:([^;]+);/i)?.[1]?.toLowerCase() ?? "";

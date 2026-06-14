@@ -13,12 +13,17 @@ const headers = [
 const courses = [
   { code: "SUB101", title: "Introduction to Subject One", type: "THEORY", grade: "A", points: 8 },
   { code: "SUB102", title: "Introduction to Subject Two", type: "THEORY", grade: "A+", points: 9 },
-  { code: "SUB103P", title: "Practical Lab One", type: "PRACTICAL", grade: "O", points: 10 },
+  { code: "SUB103", title: "Introduction to Subject Three", type: "THEORY", grade: "A", points: 8 },
   { code: "SUB104", title: "Advanced Subject Four", type: "THEORY", grade: "B+", points: 7 },
+  { code: "SUB105", title: "Introduction to Subject Five", type: "THEORY", grade: "A", points: 8 },
+  { code: "SUB106", title: "Introduction to Subject Six", type: "THEORY", grade: "A+", points: 9 },
+  { code: "SUB107P", title: "Practical Lab One", type: "PRACTICAL", grade: "O", points: 10 },
+  { code: "SUB108P", title: "Practical Lab Two", type: "PRACTICAL", grade: "O", points: 10 },
 ];
 
 function courseRow(sl, student, course, semLabel, examMonth) {
-  const approx = course.grade === "O" ? 95 : course.grade === "A+" ? 88 : course.grade === "A" ? 75 : 68;
+  const approx =
+    course.grade === "O" ? 95 : course.grade === "A+" ? 88 : course.grade === "A" ? 75 : 68;
   return [
     sl,
     student.email,
@@ -48,48 +53,24 @@ function courseRow(sl, student, course, semLabel, examMonth) {
   ];
 }
 
-const students = [
-  {
-    roll: "23BSFT101",
-    email: "23bsft101@gcu.edu.in",
-    name: "Abigail Albert Anbudurai",
-    dept: "BSFT",
-    programmeTitle: "Bachelor of Science Food Science and Technology",
-    programmeCode: "BSFT",
-    gradeCardNo: "GCBSFT00001",
-    slStart: 1,
-  },
-  {
-    roll: "23BSFT102",
-    email: "23bsft102@gcu.edu.in",
-    name: "Rahul Krishnan",
-    dept: "BSFT",
-    programmeTitle: "Bachelor of Science Food Science and Technology",
-    programmeCode: "BSFT",
-    gradeCardNo: "GCBSFT00002",
-    slStart: 9,
-  },
-];
+const student = {
+  roll: "23BSFT101",
+  email: "23bsft101@gcu.edu.in",
+  name: "Abigail Albert Anbudurai",
+  dept: "BSFT",
+  programmeTitle: "Bachelor of Science Food Science and Technology",
+  programmeCode: "BSFT",
+  gradeCardNo: "GCBSFT00001",
+};
+
+const semLabel = "I";
+const examMonth = "April - 2026";
 
 const rows = [headers];
-for (const student of students) {
-  const semesters = [
-    ["IV", "April - 2026"],
-    ["V", "December - 2026"],
-  ];
-  semesters.forEach(([semLabel, examMonth], semIndex) => {
-    courses.forEach((course, courseIndex) => {
-      rows.push(
-        courseRow(
-          student.slStart + semIndex * courses.length + courseIndex,
-          student,
-          course,
-          semLabel,
-          examMonth,
-        ),
-      );
-    });
-  });
+let sl = 1;
+for (const course of courses) {
+  rows.push(courseRow(sl, student, course, semLabel, examMonth));
+  sl += 1;
 }
 
 const wb = XLSX.utils.book_new();
@@ -98,4 +79,4 @@ XLSX.utils.book_append_sheet(wb, ws, "Marks Template");
 
 const outPath = path.join(__dirname, "..", "public", "marks_template_final.xlsx");
 XLSX.writeFile(wb, outPath);
-console.log("Wrote", outPath);
+console.log("Wrote", outPath, "with", courses.length, "courses for semester", semLabel);
