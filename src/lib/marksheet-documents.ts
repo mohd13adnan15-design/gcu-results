@@ -16,7 +16,9 @@ import {
   encodePublicAssetUrl,
   inferPdfImageType,
   prepareEmbossedSeal,
+  prepareControllerSignature,
   prepareGradeCardLogo,
+  resolveAssetDisplaySrc,
 } from "./grade-card-image-processing";
 import {
   calculateMarksCardTotals,
@@ -40,9 +42,9 @@ const ASSET_PATHS = {
   background: GRADE_CARD_ASSETS.background,
   logo: GRADE_CARD_ASSETS.logo,
   seal: "/templates/assets/gcu-seal.png",
-  embossedSeal: "/templates/assets/ChatGPT Image May 10, 2026, 11_02_44 PM.png",
-  rightSignatureOld: "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png",
-  rightSignatureNew: "/templates/assets/sibimamsign.png",
+  embossedSeal: GRADE_CARD_ASSETS.embossedSeal,
+  rightSignatureOld: GRADE_CARD_ASSETS.rightSignatureOld,
+  rightSignatureNew: GRADE_CARD_ASSETS.rightSignatureNew,
   backPage: "/templates/assets/file_00000000f02871f897434ec5582a144c.png",
 };
 
@@ -166,6 +168,13 @@ export async function drawBackPageSignatures(
   await drawSlot(signatures.verifiedByUrl, BACK_PAGE_LAYOUT_REF.slots.verifiedBy, "Verified by");
 }
 
+async function loadControllerSignature(url: string): Promise<LoadedDataUrl | null> {
+  const dataUrl = await prepareControllerSignature(url);
+  if (!dataUrl) return null;
+  const size = await measureDataUrlSize(dataUrl);
+  return { dataUrl, type: inferPdfImageType(dataUrl), width: size.width, height: size.height };
+}
+
 async function loadEmbossedSeal(): Promise<LoadedDataUrl | null> {
   const dataUrl = await prepareEmbossedSeal(ASSET_PATHS.embossedSeal);
   if (!dataUrl) return null;
@@ -191,8 +200,8 @@ async function loadMarksheetPdfAssets(photoUrl?: string | null) {
       loadGradeCardLogo(),
       loadDataUrl(ASSET_PATHS.seal, { dropLightBackground: true }),
       loadEmbossedSeal(),
-      loadDataUrl(ASSET_PATHS.rightSignatureOld, { dropLightBackground: true }),
-      loadDataUrl(ASSET_PATHS.rightSignatureNew, { dropLightBackground: true }),
+      loadControllerSignature(ASSET_PATHS.rightSignatureOld),
+      loadControllerSignature(ASSET_PATHS.rightSignatureNew),
       loadDataUrl(ASSET_PATHS.backPage),
       photoUrl
         ? loadDataUrl(photoUrl, { dropLightBackground: true, trimEdges: 18 })
@@ -730,16 +739,12 @@ function drawFirstPageFooter(
 
 function drawBackgroundTheme(
   doc: jsPDF,
-  background: LoadedDataUrl | null,
+  _background: LoadedDataUrl | null,
   pageWidth: number,
   pageHeight: number,
 ) {
-  if (background) {
-    doc.addImage(background.dataUrl, background.type, 0, 0, pageWidth, pageHeight);
-  } else {
-    doc.setFillColor(246, 243, 235);
-    doc.rect(0, 0, pageWidth, pageHeight, "F");
-  }
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
 }
 
 function drawTableRow(

@@ -24,8 +24,10 @@ import {
 import {
   loadTransparentAsset,
   prepareEmbossedSeal,
+  prepareControllerSignature,
   prepareGradeCardLogo,
   prepareGradeCardStudentPhoto,
+  resolveAssetDisplaySrc,
 } from "@/lib/grade-card-image-processing";
 
 export type GradeCardTemplateProps = {
@@ -108,7 +110,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         const [seal, embossed, signature] = await Promise.all([
           loadTransparentAsset(GRADE_CARD_ASSETS.seal),
           prepareEmbossedSeal(GRADE_CARD_ASSETS.embossedSeal),
-          loadTransparentAsset(sigUrl),
+          prepareControllerSignature(sigUrl),
         ]);
         if (cancelled) return;
         setSealSrc(seal);
@@ -135,22 +137,21 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           height: A4_HEIGHT,
           position: "relative",
           overflow: "hidden",
-          backgroundColor: "#f6f3eb",
+          backgroundColor: "#ffffff",
           fontFamily: '"Times New Roman", Times, serif',
           color: GRADE_CARD_COLORS.dark,
           boxSizing: "border-box",
         }}
       >
-        <img
-          src={GRADE_CARD_ASSETS.background}
-          alt=""
-          aria-hidden
+        {/* Plain white interior — no guilloche theme inside the border */}
+        <div
           style={{
             position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "fill",
+            top: 16.5,
+            left: 16.5,
+            right: 16.5,
+            bottom: 16.5,
+            backgroundColor: "#ffffff",
             pointerEvents: "none",
           }}
         />
@@ -215,7 +216,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
               style={{
                 width: "100%",
                 height: "100%",
-                background: "#f6f1e4",
+                background: "#ffffff",
                 border: "1px solid #ccc",
               }}
             />
@@ -523,7 +524,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         )}
         {(signatureSrc ?? signatureAsset) && (
           <img
-            src={signatureSrc ?? signatureAsset}
+            src={resolveAssetDisplaySrc(signatureSrc, signatureAsset)}
             alt=""
             aria-hidden
             style={{

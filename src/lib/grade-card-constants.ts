@@ -8,8 +8,8 @@ export const GRADE_CARD_ASSETS = {
   background: "/templates/assets/gcu-gradecard-bg.png",
   logo: "/templates/assets/logo.png",
   seal: "/templates/assets/gcu-seal.png",
-  embossedSeal: "/templates/assets/ChatGPT Image May 10, 2026, 11_02_44 PM.png",
-  rightSignatureOld: "/templates/assets/ChatGPT Image May 10, 2026, 11_22_08 PM.png",
+  embossedSeal: "/templates/assets/gcu-embossed-seal.png",
+  rightSignatureOld: "/templates/assets/gcu-controller-signature.png",
   rightSignatureNew: "/templates/assets/sibimamsign.png",
   backPage: "/templates/assets/file_00000000f02871f897434ec5582a144c.png",
 } as const;

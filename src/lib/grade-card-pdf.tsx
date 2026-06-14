@@ -15,9 +15,9 @@ import type { StudentMarksheet } from "@/lib/marksheet";
 /** html2canvas cannot parse modern CSS color functions from app stylesheets (e.g. oklch). */
 function prepareDocumentCloneForCanvas(clonedDoc: Document) {
   clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => node.remove());
-  clonedDoc.documentElement.style.background = "#f6f3eb";
+  clonedDoc.documentElement.style.background = "#ffffff";
   if (clonedDoc.body) {
-    clonedDoc.body.style.background = "#f6f3eb";
+    clonedDoc.body.style.background = "#ffffff";
     clonedDoc.body.style.margin = "0";
     clonedDoc.body.style.padding = "0";
   }
@@ -53,7 +53,7 @@ export async function capturePagesToPdf(pageElements: HTMLElement[]): Promise<Bl
       scale: 2,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: "#f6f3eb",
+      backgroundColor: "#ffffff",
       width: A4_WIDTH,
       height: A4_HEIGHT,
       windowWidth: A4_WIDTH,
@@ -137,7 +137,7 @@ async function renderGradeCardPdfOffscreen(options: RenderPdfOptions): Promise<B
 
   iframeDoc.open();
   iframeDoc.write(
-    '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f6f3eb"></body></html>',
+    '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#ffffff"></body></html>',
   );
   iframeDoc.close();
 

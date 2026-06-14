@@ -130,6 +130,51 @@ export async function removeLightBackground(source: string): Promise<string> {
   });
 }
 
+export async function removeDarkBackground(source: string): Promise<string> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(source);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = image.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const max = Math.max(r, g, b);
+        if (max < 45) data[i + 3] = 0;
+      }
+      ctx.putImageData(image, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(source);
+    img.src = source;
+  });
+}
+
+/** Controller signature PNGs already have transparency or a black matte — do not run light-bg removal. */
+export async function prepareControllerSignature(url: string): Promise<string | null> {
+  const loaded = await loadTransparentAsset(url, { dropLightBackground: false });
+  if (!loaded) return null;
+  if (url.includes("sibimamsign")) {
+    return await removeDarkBackground(loaded);
+  }
+  return loaded;
+}
+
+export function resolveAssetDisplaySrc(processed: string | null, assetPath: string): string {
+  return processed ?? encodePublicAssetUrl(assetPath);
+}
+
 /** Infer jsPDF image format from a data URL (after any canvas re-encoding). */
 export function inferPdfImageType(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
   const mime = dataUrl.match(/^data:([^;]+);/i)?.[1]?.toLowerCase() ?? "";
