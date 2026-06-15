@@ -161,14 +161,141 @@ export async function removeDarkBackground(source: string): Promise<string> {
   });
 }
 
-/** Strip white/cream matte so the guilloche background shows through; keep ink and caption text. */
-export async function prepareControllerSignature(url: string): Promise<string | null> {
-  const loaded = await loadTransparentAsset(url, { dropLightBackground: true });
-  if (!loaded) return null;
-  if (url.includes("sibimamsign")) {
-    return await removeDarkBackground(loaded);
+function isGreenSignaturePixel(r: number, g: number, b: number, a: number): boolean {
+  if (a < 12) return false;
+  return g > 55 && g > r + 10 && g > b + 6;
+}
+
+function scanGreenInkBottomY(imageData: ImageData): number | null {
+  const { data, width, height } = imageData;
+  let maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (isGreenSignaturePixel(data[i], data[i + 1], data[i + 2], data[i + 3])) {
+        maxY = y;
+      }
+    }
   }
-  return loaded;
+  return maxY >= 0 ? maxY : null;
+}
+
+/** Remove only near-pure-black matte; keep green ink and dark caption pixels. */
+async function removePureBlackMatte(source: string): Promise<string> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(source);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = image.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        if (isGreenSignaturePixel(r, g, b, data[i + 3])) continue;
+        if (max < 22 && max - min < 10) {
+          data[i + 3] = 0;
+        }
+      }
+      ctx.putImageData(image, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(source);
+    img.src = source;
+  });
+}
+
+/** Crop to signature ink only — caption text is rendered separately below the ink. */
+async function cropControllerSignatureInk(source: string): Promise<string> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(source);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const inkBottomY = scanGreenInkBottomY(image);
+      if (inkBottomY == null) {
+        resolve(source);
+        return;
+      }
+      const pad = Math.max(2, Math.round(img.height * 0.02));
+      const cropH = Math.min(img.height, inkBottomY + pad + 1);
+      const out = document.createElement("canvas");
+      out.width = img.width;
+      out.height = cropH;
+      out.getContext("2d")!.drawImage(canvas, 0, 0, img.width, cropH, 0, 0, img.width, cropH);
+      resolve(out.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(source);
+    img.src = source;
+  });
+}
+
+/** Keep only green signature ink; remove baked-in caption text from the PNG. */
+async function stripNonGreenInkPixels(source: string): Promise<string> {
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(source);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = image.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+        if (a < 12) continue;
+        if (!isGreenSignaturePixel(r, g, b, a)) {
+          clearTransparentPixel(data, i);
+        }
+      }
+      ctx.putImageData(image, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(source);
+    img.src = source;
+  });
+}
+
+/** Strip matte so the guilloche background shows through; caption is drawn in the layout. */
+export async function prepareControllerSignature(url: string): Promise<string | null> {
+  const loaded = await loadTransparentAsset(url, {
+    dropLightBackground: !url.includes("sibimamsign"),
+  });
+  if (!loaded) return null;
+  const matteFree = url.includes("sibimamsign")
+    ? await removePureBlackMatte(loaded)
+    : loaded;
+  const inkOnly = await cropControllerSignatureInk(matteFree);
+  return await stripNonGreenInkPixels(inkOnly);
 }
 
 export function resolveAssetDisplaySrc(processed: string | null, assetPath: string): string {

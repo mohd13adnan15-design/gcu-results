@@ -7,6 +7,7 @@ import {
   A4_WIDTH,
   BACK_PAGE_LAYOUT,
   getFrontPageHeaderLayout,
+  CONTROLLER_SIGNATURE_LABEL,
   formatGradeCardDate,
   formatGradeCardNumber,
   formatProgrammeTitleDisplay,
@@ -15,9 +16,11 @@ import {
   FRONT_PAGE_FOOTER,
   FRONT_PAGE_HEADER,
   getBackPageWipeHeight,
+  getControllerSignatureLabelTop,
   getControllerSignatureAsset,
   GRADE_CARD_ASSETS,
   GRADE_CARD_COLORS,
+  GRADE_CARD_PAGE_BORDER,
   isMarksheetAfterJuly2024,
   resolveGradeCardDisplayId,
 } from "@/lib/grade-card-constants";
@@ -27,7 +30,7 @@ import {
   prepareControllerSignature,
   prepareGradeCardLogo,
   prepareGradeCardStudentPhoto,
-  resolveAssetDisplaySrc,
+  measureSignatureInkBottomY,
 } from "@/lib/grade-card-image-processing";
 
 export type GradeCardTemplateProps = {
@@ -47,6 +50,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
     const [sealSrc, setSealSrc] = useState<string | null>(null);
     const [embossedSealSrc, setEmbossedSealSrc] = useState<string | null>(null);
     const [signatureSrc, setSignatureSrc] = useState<string | null>(null);
+    const [signatureInkBottomY, setSignatureInkBottomY] = useState<number | undefined>();
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
     const headerLayout = getFrontPageHeaderLayout();
 
@@ -107,6 +111,8 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
       let cancelled = false;
       void (async () => {
         const sigUrl = getControllerSignatureAsset(marksheet);
+        const isNewSig = isMarksheetAfterJuly2024(marksheet);
+        const sigLayout = isNewSig ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
         const [seal, embossed, signature] = await Promise.all([
           loadTransparentAsset(GRADE_CARD_ASSETS.seal),
           prepareEmbossedSeal(GRADE_CARD_ASSETS.embossedSeal),
@@ -116,6 +122,12 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         setSealSrc(seal);
         setEmbossedSealSrc(embossed);
         setSignatureSrc(signature);
+        if (signature) {
+          const inkBottomY = await measureSignatureInkBottomY(signature, sigLayout);
+          if (!cancelled) setSignatureInkBottomY(inkBottomY ?? undefined);
+        } else {
+          setSignatureInkBottomY(undefined);
+        }
       })();
       return () => {
         cancelled = true;
@@ -123,7 +135,6 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
     }, [marksheet.exam_month_year]);
 
     const uniqueId = resolveGradeCardDisplayId(marksheet);
-    const signatureAsset = getControllerSignatureAsset(marksheet);
     const isNewSig = isMarksheetAfterJuly2024(marksheet);
     const sigLayout = isNewSig ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
 
@@ -137,7 +148,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           height: A4_HEIGHT,
           position: "relative",
           overflow: "hidden",
-          backgroundColor: GRADE_CARD_COLORS.paper,
+          backgroundColor: "#ffffff",
           fontFamily: '"Times New Roman", Times, serif',
           color: GRADE_CARD_COLORS.dark,
           boxSizing: "border-box",
@@ -149,9 +160,10 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           aria-hidden
           style={{
             position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
+            top: GRADE_CARD_PAGE_BORDER.innerInset,
+            left: GRADE_CARD_PAGE_BORDER.innerInset,
+            width: A4_WIDTH - GRADE_CARD_PAGE_BORDER.innerInset * 2,
+            height: A4_HEIGHT - GRADE_CARD_PAGE_BORDER.innerInset * 2,
             objectFit: "fill",
             pointerEvents: "none",
           }}
@@ -161,10 +173,10 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         <div
           style={{
             position: "absolute",
-            top: 14,
-            left: 14,
-            right: 14,
-            bottom: 14,
+            top: GRADE_CARD_PAGE_BORDER.outerInset,
+            left: GRADE_CARD_PAGE_BORDER.outerInset,
+            right: GRADE_CARD_PAGE_BORDER.outerInset,
+            bottom: GRADE_CARD_PAGE_BORDER.outerInset,
             border: `1.2px solid ${GRADE_CARD_COLORS.border}`,
             pointerEvents: "none",
           }}
@@ -172,10 +184,10 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         <div
           style={{
             position: "absolute",
-            top: 16.5,
-            left: 16.5,
-            right: 16.5,
-            bottom: 16.5,
+            top: GRADE_CARD_PAGE_BORDER.innerInset,
+            left: GRADE_CARD_PAGE_BORDER.innerInset,
+            right: GRADE_CARD_PAGE_BORDER.innerInset,
+            bottom: GRADE_CARD_PAGE_BORDER.innerInset,
             border: `0.45px solid ${GRADE_CARD_COLORS.border}`,
             pointerEvents: "none",
           }}
@@ -523,21 +535,40 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
             }}
           />
         )}
-        {(signatureSrc ?? signatureAsset) && (
-          <img
-            src={resolveAssetDisplaySrc(signatureSrc, signatureAsset)}
-            alt=""
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: sigLayout.x,
-              top: sigLayout.y,
-              width: sigLayout.w,
-              height: sigLayout.h,
-              objectFit: "contain",
-              objectPosition: "top center",
-            }}
-          />
+        {signatureSrc && (
+          <>
+            <img
+              src={signatureSrc}
+              alt=""
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: sigLayout.x,
+                top: sigLayout.y,
+                width: sigLayout.w,
+                height: sigLayout.h,
+                objectFit: "contain",
+                objectPosition: "top center",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                left: sigLayout.x,
+                top: getControllerSignatureLabelTop(sigLayout, signatureInkBottomY),
+                width: sigLayout.w,
+                textAlign: "center",
+                fontFamily: '"Times New Roman", Times, serif',
+                fontSize: FRONT_PAGE_FOOTER.controllerLabel.fontSize,
+                fontWeight: "normal",
+                lineHeight: 1,
+                color: GRADE_CARD_COLORS.dark,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {CONTROLLER_SIGNATURE_LABEL}
+            </div>
+          </>
         )}
       </div>
     );

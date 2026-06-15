@@ -22,6 +22,14 @@ export const GRADE_CARD_COLORS = {
   paper: "#fdfcf7",
 } as const;
 
+export const CONTROLLER_SIGNATURE_LABEL = "Controller of Examinations";
+
+/** Page border insets (pt) — guilloche theme stays inside the inner border only. */
+export const GRADE_CARD_PAGE_BORDER = {
+  outerInset: 14,
+  innerInset: 16.5,
+} as const;
+
 export function isMarksheetAfterJuly2024(marksheet: StudentMarksheet) {
   if (!marksheet.exam_month_year) return true;
   const match = marksheet.exam_month_year.match(/([a-zA-Z]+)\s*(?:-)?\s*(\d{4})/);
