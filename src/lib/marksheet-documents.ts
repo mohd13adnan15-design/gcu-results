@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 
 import {
+  computeGradeCardAdaptiveLayout,
   formatGradeCardNumber,
   formatProgrammeTitleDisplay,
   formatSemesterDisplay,
@@ -14,6 +15,8 @@ import {
   GRADE_CARD_PAGE_BORDER,
   GRADE_CARD_ASSETS,
   resolveGradeCardDisplayId,
+  type GradeCardAdaptiveLayout,
+  type GradeCardFooterBox,
 } from "./grade-card-constants";
 import {
   encodePublicAssetUrl,
@@ -414,28 +417,52 @@ function drawMarksheetPage(
   setStroke(doc);
   drawHeader(doc, marksheet, images, x, y, width);
 
-  y = FRONT_PAGE_HEADER.schoolNameTop;
+  const layout = computeGradeCardAdaptiveLayout(marksheet);
+  const contentBottomY = drawGradeCardMainContent(doc, marksheet, x, width, layout);
+  drawFirstPageFooter(doc, marksheet, images, contentBottomY, layout);
+}
+
+function drawGradeCardMainContent(
+  doc: jsPDF,
+  marksheet: StudentMarksheet,
+  x: number,
+  width: number,
+  layout: GradeCardAdaptiveLayout,
+): number {
+  const { contentScale, contentStartY } = layout;
+  const scale = contentScale;
+  const localWidth = width / scale;
+  const centerX = localWidth / 2;
+
+  doc.save();
+  doc.translate(x, contentStartY);
+  if (scale < 1) doc.scale(scale, scale);
+
+  let y = 0;
+
   doc.setFont("times", "bold");
   doc.setFontSize(14.5);
   setText(doc, RED);
-  drawCenteredTextFit(doc, marksheet.school_name, pageWidth / 2, y, width - 20, 14.5, 11);
+  drawCenteredTextFit(doc, marksheet.school_name, centerX, y + 14.5, localWidth - 20, 14.5, 11);
 
-  y = FRONT_PAGE_HEADER.detailsTop;
-  y = drawDetailsTable(doc, marksheet, x, y, width);
+  y += 26;
+  y = drawDetailsTable(doc, marksheet, 0, y, localWidth);
 
-  y = FRONT_PAGE_HEADER.gradeCardTitleTop;
+  y += 10;
   setStroke(doc);
-  doc.rect(x, y, width, 18, "S");
+  doc.rect(0, y, localWidth, 18, "S");
   doc.setFont("times", "bold");
   doc.setFontSize(14);
   setText(doc, RED);
-  doc.text("GRADE CARD", pageWidth / 2, y + 13, { align: "center" });
+  doc.text("GRADE CARD", centerX, y + 13, { align: "center" });
 
-  y = FRONT_PAGE_HEADER.tableTop;
-  y = drawMarksTable(doc, marksheet, x, y, width);
-  y = drawTotals(doc, marksheet, x, y, width);
+  y += 18;
+  y = drawMarksTable(doc, marksheet, 0, y, localWidth);
+  y = drawTotals(doc, marksheet, 0, y, localWidth);
 
-  drawFirstPageFooter(doc, marksheet, images, y);
+  doc.restore();
+
+  return contentStartY + y * scale;
 }
 
 function drawOuterBorder(doc: jsPDF, pageWidth: number, pageHeight: number) {
@@ -713,7 +740,7 @@ function drawTotals(doc: jsPDF, marksheet: StudentMarksheet, x: number, y: numbe
 
 function drawControllerSignatureLabel(
   doc: jsPDF,
-  sig: { x: number; y: number; w: number; h: number },
+  sig: GradeCardFooterBox,
   inkBottomY?: number,
 ) {
   const fontSize = FRONT_PAGE_FOOTER.controllerLabel.fontSize;
@@ -734,23 +761,34 @@ function drawFirstPageFooter(
     embossedSeal: LoadedDataUrl | null;
     rightSignature: LoadedDataUrl | null;
   },
-  yEnd: number,
+  contentBottomY: number,
+  layout: GradeCardAdaptiveLayout,
 ) {
   const pageWidth = doc.internal.pageSize.getWidth();
+  const dateGap = 18 * layout.contentScale;
+  const { footer } = layout;
 
   doc.setFont("times", "bold");
-  doc.setFontSize(11.5);
+  doc.setFontSize(11.5 * layout.contentScale);
   setText(doc, DARK);
-  doc.text(`Date : ${formatDate(marksheet.issue_date || new Date().toISOString())}`, pageWidth / 2, yEnd + 18, {
+  doc.text(`Date : ${formatDate(marksheet.issue_date || new Date().toISOString())}`, pageWidth / 2, contentBottomY + dateGap, {
     align: "center",
   });
 
-  if (images.seal) doc.addImage(images.seal.dataUrl, images.seal.type, 32, 705, 96, 96);
-  if (images.embossedSeal) {
-    doc.addImage(images.embossedSeal.dataUrl, images.embossedSeal.type, 448, 672, 64, 64);
+  if (images.seal) {
+    doc.addImage(images.seal.dataUrl, images.seal.type, footer.seal.x, footer.seal.y, footer.seal.w, footer.seal.h);
   }
-  const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
-  const sig = isAfterJuly24 ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
+  if (images.embossedSeal) {
+    doc.addImage(
+      images.embossedSeal.dataUrl,
+      images.embossedSeal.type,
+      footer.embossedSeal.x,
+      footer.embossedSeal.y,
+      footer.embossedSeal.w,
+      footer.embossedSeal.h,
+    );
+  }
+  const sig = footer.signature;
   let inkBottomY: number | undefined;
   if (images.rightSignature) {
     const naturalW = images.rightSignature.width ?? sig.w;

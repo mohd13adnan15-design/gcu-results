@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useState } from "react";
+import { forwardRef, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 
 import { groupCoursesBySection, type StudentMarksheet } from "@/lib/marksheet";
@@ -7,6 +7,7 @@ import {
   A4_WIDTH,
   BACK_PAGE_LAYOUT,
   getFrontPageHeaderLayout,
+  computeGradeCardAdaptiveLayout,
   CONTROLLER_SIGNATURE_LABEL,
   formatGradeCardDate,
   formatGradeCardNumber,
@@ -137,6 +138,13 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
     const uniqueId = resolveGradeCardDisplayId(marksheet);
     const isNewSig = isMarksheetAfterJuly2024(marksheet);
     const sigLayout = isNewSig ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
+    const layout = useMemo(() => computeGradeCardAdaptiveLayout(marksheet), [marksheet]);
+    const contentScale = layout.contentScale;
+    const scaledSignatureInkBottomY =
+      signatureInkBottomY != null && layout.footerScale < 1
+        ? layout.footer.signature.y +
+          (signatureInkBottomY - sigLayout.y) * layout.footerScale
+        : signatureInkBottomY;
 
     return (
       <div
@@ -295,8 +303,10 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           style={{
             position: "absolute",
             left: CONTENT_X,
-            top: FRONT_PAGE_HEADER.schoolNameTop,
-            width: CONTENT_WIDTH,
+            top: layout.contentStartY,
+            width: contentScale < 1 ? CONTENT_WIDTH / contentScale : CONTENT_WIDTH,
+            transform: contentScale < 1 ? `scale(${contentScale})` : undefined,
+            transformOrigin: "top left",
             display: "flex",
             flexDirection: "column",
           }}
@@ -510,10 +520,10 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
             aria-hidden
             style={{
               position: "absolute",
-              left: FRONT_PAGE_FOOTER.seal.x,
-              top: FRONT_PAGE_FOOTER.seal.y,
-              width: FRONT_PAGE_FOOTER.seal.w,
-              height: FRONT_PAGE_FOOTER.seal.h,
+              left: layout.footer.seal.x,
+              top: layout.footer.seal.y,
+              width: layout.footer.seal.w,
+              height: layout.footer.seal.h,
               transform: "rotate(-6deg)",
               transformOrigin: "center center",
             }}
@@ -526,10 +536,10 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
             aria-hidden
             style={{
               position: "absolute",
-              left: FRONT_PAGE_FOOTER.embossedSeal.x,
-              top: FRONT_PAGE_FOOTER.embossedSeal.y,
-              width: FRONT_PAGE_FOOTER.embossedSeal.w,
-              height: FRONT_PAGE_FOOTER.embossedSeal.h,
+              left: layout.footer.embossedSeal.x,
+              top: layout.footer.embossedSeal.y,
+              width: layout.footer.embossedSeal.w,
+              height: layout.footer.embossedSeal.h,
               borderRadius: "50%",
               objectFit: "cover",
             }}
@@ -543,10 +553,10 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
               aria-hidden
               style={{
                 position: "absolute",
-                left: sigLayout.x,
-                top: sigLayout.y,
-                width: sigLayout.w,
-                height: sigLayout.h,
+                left: layout.footer.signature.x,
+                top: layout.footer.signature.y,
+                width: layout.footer.signature.w,
+                height: layout.footer.signature.h,
                 objectFit: "contain",
                 objectPosition: "top center",
               }}
@@ -554,9 +564,12 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
             <div
               style={{
                 position: "absolute",
-                left: sigLayout.x,
-                top: getControllerSignatureLabelTop(sigLayout, signatureInkBottomY),
-                width: sigLayout.w,
+                left: layout.footer.signature.x,
+                top: getControllerSignatureLabelTop(
+                  layout.footer.signature,
+                  scaledSignatureInkBottomY,
+                ),
+                width: layout.footer.signature.w,
                 textAlign: "center",
                 fontFamily: '"Times New Roman", Times, serif',
                 fontSize: FRONT_PAGE_FOOTER.controllerLabel.fontSize,

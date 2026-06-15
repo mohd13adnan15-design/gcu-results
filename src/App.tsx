@@ -31,6 +31,11 @@ import { StudentLibraryPage } from "@/routes/student.library";
 import { StudentCertificateFlowPage } from "@/routes/student.certificate-flow";
 import { StudentMarksCardPage } from "@/routes/student.marks-card";
 import { GradecardQrDownloadPage } from "@/routes/gradecard.download";
+import { CoeDegreeCertificatePage } from "@/routes/coe.degree-certificate";
+import { CoeDegreeCertificatePreviewPage } from "@/routes/coe.degree-certificate.preview.$studentId";
+import { StudentDegreeCertificatePage } from "@/routes/student.degree-certificate";
+import { DegreeVerifyPage } from "@/routes/degree.verify";
+import { DegreeQrDownloadPage } from "@/routes/degree.download";
 
 function RootLayout() {
   return (
@@ -109,6 +114,11 @@ export function App() {
             <Route path="credentials" element={<CredentialsPage />} />
             <Route path="marks-configuration" element={<MarksConfigurationPage />} />
             <Route path="grade-card-application" element={<GradeCardApplicationPage />} />
+            <Route path="degree-certificate" element={<CoeDegreeCertificatePage />} />
+            <Route
+              path="degree-certificate/preview/:studentId"
+              element={<CoeDegreeCertificatePreviewPage />}
+            />
             <Route path="students/:studentId" element={<CoeStudentDetailPage />} />
           </Route>
 
@@ -145,7 +155,10 @@ export function App() {
           <Route path="student/library" element={<StudentLibraryPage />} />
           <Route path="student/certificate-flow" element={<StudentCertificateFlowPage />} />
           <Route path="student/marks-card" element={<StudentMarksCardPage />} />
+          <Route path="student/degree-certificate" element={<StudentDegreeCertificatePage />} />
           <Route path="gradecard/download" element={<GradecardQrDownloadPage />} />
+          <Route path="degree/download" element={<DegreeQrDownloadPage />} />
+          <Route path="degree/verify" element={<DegreeVerifyPage />} />
 
           <Route path="*" element={<NotFoundPage />} />
         </Route>

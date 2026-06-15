@@ -17,6 +17,7 @@ import {
   Home,
   Library,
   Settings2,
+  GraduationCap,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -95,6 +96,12 @@ function CoeContent() {
             className="inline-flex items-center gap-2 rounded-md border border-border bg-cream px-4 py-2 text-sm font-medium text-primary hover:bg-secondary"
           >
             <ShieldCheck className="h-4 w-4" /> Manage credentials
+          </Link>
+          <Link
+            to="/coe/degree-certificate"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-cream px-4 py-2 text-sm font-medium text-primary hover:bg-secondary"
+          >
+            <GraduationCap className="h-4 w-4" /> Degree certificate
           </Link>
         </div>
       </div>
@@ -1262,12 +1269,7 @@ function MarksUploader() {
               </>
             ) : (
               <>
-                <Upload className="h-4 w-4" />{" "}
-                {excelFile && zipFile
-                  ? "Upload Marks & Photos"
-                  : excelFile
-                    ? "Upload Marks"
-                    : "Upload Photos Only"}
+                <Upload className="h-4 w-4" /> Upload
               </>
             )}
           </button>

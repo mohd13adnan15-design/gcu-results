@@ -1,4 +1,5 @@
 import type { StudentMarksheet } from "./marksheet";
+import { groupCoursesBySection } from "./marksheet";
 
 /** A4 page size in points (matches jsPDF). 1pt ≈ 1px in template. */
 export const A4_WIDTH = 595.28;
@@ -241,4 +242,99 @@ export function getBackPageWipeHeight(slot: (typeof BACK_PAGE_LAYOUT)["slots"]["
   const footerBottom = getBackPageFooterBottom(slot);
   const maxWipeBottom = BACK_PAGE_LAYOUT.pageBorderBottom - BACK_PAGE_LAYOUT.borderClearance;
   return Math.min(footerBottom - wipeTop + 2, maxWipeBottom - wipeTop);
+}
+
+/** Minimum vertical gap between main content bottom and embossed seal (pt). */
+export const GRADE_CARD_FOOTER_CLEARANCE = 10;
+
+/** Do not shrink content below this scale factor. */
+export const GRADE_CARD_MIN_CONTENT_SCALE = 0.72;
+
+export type GradeCardFooterBox = { x: number; y: number; w: number; h: number };
+
+export type GradeCardAdaptiveLayout = {
+  contentScale: number;
+  footerScale: number;
+  contentStartY: number;
+  footerZoneTop: number;
+  footer: {
+    seal: GradeCardFooterBox;
+    embossedSeal: GradeCardFooterBox;
+    signature: GradeCardFooterBox;
+  };
+};
+
+function estimateCourseRowHeight(title: string): number {
+  const len = (title || "").trim().length;
+  if (len > 55) return 30;
+  if (len > 32) return 24;
+  return 18;
+}
+
+/** Estimate main content height from school name through date line (pt). */
+export function estimateGradeCardContentHeight(marksheet: StudentMarksheet): number {
+  const groups = groupCoursesBySection(marksheet.courses);
+  let height = 26 + 72 + 28;
+  height += 24;
+  for (const group of groups) {
+    height += 15;
+    for (const course of group.courses) {
+      height += estimateCourseRowHeight(course.course_title);
+    }
+  }
+  height += 20 + 48 + 32;
+  return height;
+}
+
+function scaleFooterBox(
+  box: GradeCardFooterBox,
+  scale: number,
+): GradeCardFooterBox {
+  if (scale >= 0.999) return box;
+  const w = box.w * scale;
+  const h = box.h * scale;
+  return {
+    x: box.x + (box.w - w) / 2,
+    y: box.y + (box.h - h) / 2,
+    w,
+    h,
+  };
+}
+
+/**
+ * When many courses push the table into the footer band, scale the main content down
+ * (and slightly shrink seal/signature) so nothing overlaps the embossed seal.
+ */
+export function computeGradeCardAdaptiveLayout(
+  marksheet: StudentMarksheet,
+): GradeCardAdaptiveLayout {
+  const contentStartY = FRONT_PAGE_HEADER.schoolNameTop;
+  const footerZoneTop = FRONT_PAGE_FOOTER.embossedSeal.y - GRADE_CARD_FOOTER_CLEARANCE;
+  const naturalHeight = estimateGradeCardContentHeight(marksheet);
+  const naturalBottom = contentStartY + naturalHeight;
+
+  let contentScale = 1;
+  if (naturalBottom > footerZoneTop) {
+    const available = footerZoneTop - contentStartY;
+    contentScale = Math.max(GRADE_CARD_MIN_CONTENT_SCALE, available / naturalHeight);
+  }
+
+  const footerScale =
+    contentScale < 1 ? Math.max(0.78, Math.min(0.92, contentScale + 0.08)) : 1;
+
+  const signatureBase = isMarksheetAfterJuly2024(marksheet)
+    ? FRONT_PAGE_FOOTER.signatureNew
+    : FRONT_PAGE_FOOTER.signatureOld;
+
+  return {
+    contentScale,
+    footerScale,
+    contentStartY,
+    footerZoneTop,
+    footer: {
+      seal: scaleFooterBox(FRONT_PAGE_FOOTER.seal, footerScale),
+      embossedSeal: scaleFooterBox(FRONT_PAGE_FOOTER.embossedSeal, footerScale),
+      signature: scaleFooterBox(signatureBase, footerScale),
+    },
+  };
 }
