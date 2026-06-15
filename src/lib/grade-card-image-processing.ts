@@ -161,9 +161,9 @@ export async function removeDarkBackground(source: string): Promise<string> {
   });
 }
 
-/** Controller signature PNGs already have transparency or a black matte — do not run light-bg removal. */
+/** Strip white/cream matte so the guilloche background shows through; keep ink and caption text. */
 export async function prepareControllerSignature(url: string): Promise<string | null> {
-  const loaded = await loadTransparentAsset(url, { dropLightBackground: false });
+  const loaded = await loadTransparentAsset(url, { dropLightBackground: true });
   if (!loaded) return null;
   if (url.includes("sibimamsign")) {
     return await removeDarkBackground(loaded);

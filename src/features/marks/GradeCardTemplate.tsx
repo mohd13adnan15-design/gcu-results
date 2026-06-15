@@ -15,7 +15,6 @@ import {
   FRONT_PAGE_FOOTER,
   FRONT_PAGE_HEADER,
   getBackPageWipeHeight,
-  getControllerSignatureLabelTop,
   getControllerSignatureAsset,
   GRADE_CARD_ASSETS,
   GRADE_CARD_COLORS,
@@ -28,7 +27,6 @@ import {
   prepareControllerSignature,
   prepareGradeCardLogo,
   prepareGradeCardStudentPhoto,
-  measureSignatureInkBottomY,
   resolveAssetDisplaySrc,
 } from "@/lib/grade-card-image-processing";
 
@@ -49,7 +47,6 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
     const [sealSrc, setSealSrc] = useState<string | null>(null);
     const [embossedSealSrc, setEmbossedSealSrc] = useState<string | null>(null);
     const [signatureSrc, setSignatureSrc] = useState<string | null>(null);
-    const [signatureInkBottomY, setSignatureInkBottomY] = useState<number | undefined>();
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
     const headerLayout = getFrontPageHeaderLayout();
 
@@ -110,8 +107,6 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
       let cancelled = false;
       void (async () => {
         const sigUrl = getControllerSignatureAsset(marksheet);
-        const isNewSig = isMarksheetAfterJuly2024(marksheet);
-        const sigLayout = isNewSig ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
         const [seal, embossed, signature] = await Promise.all([
           loadTransparentAsset(GRADE_CARD_ASSETS.seal),
           prepareEmbossedSeal(GRADE_CARD_ASSETS.embossedSeal),
@@ -121,12 +116,6 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
         setSealSrc(seal);
         setEmbossedSealSrc(embossed);
         setSignatureSrc(signature);
-        if (signature) {
-          const inkBottomY = await measureSignatureInkBottomY(signature, sigLayout);
-          if (!cancelled) setSignatureInkBottomY(inkBottomY ?? undefined);
-        } else {
-          setSignatureInkBottomY(undefined);
-        }
       })();
       return () => {
         cancelled = true;
@@ -148,21 +137,22 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
           height: A4_HEIGHT,
           position: "relative",
           overflow: "hidden",
-          backgroundColor: "#ffffff",
+          backgroundColor: GRADE_CARD_COLORS.paper,
           fontFamily: '"Times New Roman", Times, serif',
           color: GRADE_CARD_COLORS.dark,
           boxSizing: "border-box",
         }}
       >
-        {/* Plain white interior — no guilloche theme inside the border */}
-        <div
+        <img
+          src={GRADE_CARD_ASSETS.background}
+          alt=""
+          aria-hidden
           style={{
             position: "absolute",
-            top: 16.5,
-            left: 16.5,
-            right: 16.5,
-            bottom: 16.5,
-            backgroundColor: "#ffffff",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "fill",
             pointerEvents: "none",
           }}
         />
@@ -227,7 +217,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
               style={{
                 width: "100%",
                 height: "100%",
-                background: "#ffffff",
+                background: GRADE_CARD_COLORS.paper,
                 border: "1px solid #ccc",
               }}
             />
@@ -545,23 +535,10 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
               width: sigLayout.w,
               height: sigLayout.h,
               objectFit: "contain",
+              objectPosition: "top center",
             }}
           />
         )}
-        <div
-          style={{
-            position: "absolute",
-            left: sigLayout.x,
-            top: getControllerSignatureLabelTop(sigLayout, signatureInkBottomY),
-            width: sigLayout.w,
-            textAlign: "center",
-            fontSize: FRONT_PAGE_FOOTER.controllerLabel.fontSize,
-            fontWeight: "bold",
-            lineHeight: 1,
-          }}
-        >
-          Controller of Examinations
-        </div>
       </div>
     );
   },

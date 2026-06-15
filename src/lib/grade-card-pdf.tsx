@@ -53,7 +53,7 @@ export async function capturePagesToPdf(pageElements: HTMLElement[]): Promise<Bl
       scale: 2,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: "#ffffff",
+      backgroundColor: "#fdfcf7",
       width: A4_WIDTH,
       height: A4_HEIGHT,
       windowWidth: A4_WIDTH,

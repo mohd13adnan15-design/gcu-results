@@ -8,7 +8,6 @@ import {
   formatSgpa,
   FRONT_PAGE_FOOTER,
   FRONT_PAGE_HEADER,
-  getControllerSignatureLabelTop,
   getFrontPageHeaderLayout,
   GRADE_CARD_ASSETS,
   resolveGradeCardDisplayId,
@@ -710,19 +709,11 @@ function drawTotals(doc: jsPDF, marksheet: StudentMarksheet, x: number, y: numbe
 }
 
 function drawControllerSignatureLabel(
-  doc: jsPDF,
-  sig: { x: number; y: number; w: number; h: number },
-  inkBottomY?: number,
+  _doc: jsPDF,
+  _sig: { x: number; y: number; w: number; h: number },
+  _inkBottomY?: number,
 ) {
-  const label = "Controller of Examinations";
-  const fontSize = FRONT_PAGE_FOOTER.controllerLabel.fontSize;
-  const labelTop = getControllerSignatureLabelTop(sig, inkBottomY);
-  const labelBaseline = labelTop + fontSize * 0.85;
-
-  doc.setFont("times", "bold");
-  doc.setFontSize(fontSize);
-  setText(doc, DARK);
-  doc.text(label, sig.x + sig.w / 2, labelBaseline, { align: "center" });
+  // Caption is baked into the signature PNG — no duplicate label drawn.
 }
 
 function drawFirstPageFooter(
@@ -750,14 +741,10 @@ function drawFirstPageFooter(
   }
   const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
   const sig = isAfterJuly24 ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
-  let inkBottomY: number | undefined;
   if (images.rightSignature) {
     const naturalW = images.rightSignature.width ?? sig.w;
     const naturalH = images.rightSignature.height ?? sig.h;
     const fitted = fitImageInBox(naturalW, naturalH, sig.x, sig.y, sig.w, sig.h);
-    const inkFraction = images.rightSignature.inkBottomFraction;
-    inkBottomY =
-      inkFraction != null ? fitted.y + inkFraction * fitted.h : fitted.y + fitted.h;
     doc.addImage(
       images.rightSignature.dataUrl,
       images.rightSignature.type,
@@ -767,16 +754,20 @@ function drawFirstPageFooter(
       fitted.h,
     );
   }
-  drawControllerSignatureLabel(doc, sig, inkBottomY);
+  drawControllerSignatureLabel(doc, sig);
 }
 
 function drawBackgroundTheme(
   doc: jsPDF,
-  _background: LoadedDataUrl | null,
+  background: LoadedDataUrl | null,
   pageWidth: number,
   pageHeight: number,
 ) {
-  doc.setFillColor(255, 255, 255);
+  if (background) {
+    doc.addImage(background.dataUrl, background.type, 0, 0, pageWidth, pageHeight);
+    return;
+  }
+  doc.setFillColor(253, 252, 247);
   doc.rect(0, 0, pageWidth, pageHeight, "F");
 }
 
@@ -1729,14 +1720,10 @@ function drawMarksCardFooter(
 
   const isAfterJuly24 = isMarksheetAfterJuly2024(marksheet);
   const sig = isAfterJuly24 ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
-  let inkBottomY: number | undefined;
   if (images.rightSignature) {
     const naturalW = images.rightSignature.width ?? sig.w;
     const naturalH = images.rightSignature.height ?? sig.h;
     const fitted = fitImageInBox(naturalW, naturalH, sig.x, sig.y, sig.w, sig.h);
-    const inkFraction = images.rightSignature.inkBottomFraction;
-    inkBottomY =
-      inkFraction != null ? fitted.y + inkFraction * fitted.h : fitted.y + fitted.h;
     doc.addImage(
       images.rightSignature.dataUrl,
       images.rightSignature.type,
@@ -1746,5 +1733,5 @@ function drawMarksCardFooter(
       fitted.h,
     );
   }
-  drawControllerSignatureLabel(doc, sig, inkBottomY);
+  drawControllerSignatureLabel(doc, sig);
 }

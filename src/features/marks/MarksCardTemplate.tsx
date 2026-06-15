@@ -17,7 +17,6 @@ import {
   FRONT_PAGE_FOOTER,
   FRONT_PAGE_HEADER,
   getControllerSignatureAsset,
-  getControllerSignatureLabelTop,
   getFrontPageHeaderLayout,
   GRADE_CARD_ASSETS,
   GRADE_CARD_COLORS,
@@ -29,7 +28,6 @@ import {
   prepareControllerSignature,
   prepareGradeCardLogo,
   prepareGradeCardStudentPhoto,
-  measureSignatureInkBottomY,
   resolveAssetDisplaySrc,
 } from "@/lib/grade-card-image-processing";
 
@@ -53,7 +51,6 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
     const [sealSrc, setSealSrc] = useState<string | null>(null);
     const [signatureSrc, setSignatureSrc] = useState<string | null>(null);
-    const [signatureInkBottomY, setSignatureInkBottomY] = useState<number | undefined>();
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
     const headerLayout = getFrontPageHeaderLayout();
 
@@ -124,8 +121,6 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
       let cancelled = false;
       void (async () => {
         const sigUrl = getControllerSignatureAsset(marksheet);
-        const isNewSig = isMarksheetAfterJuly2024(marksheet);
-        const sigLayout = isNewSig ? FRONT_PAGE_FOOTER.signatureNew : FRONT_PAGE_FOOTER.signatureOld;
         const [seal, signature] = await Promise.all([
           loadTransparentAsset(GRADE_CARD_ASSETS.seal),
           prepareControllerSignature(sigUrl),
@@ -133,12 +128,6 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
         if (cancelled) return;
         setSealSrc(seal);
         setSignatureSrc(signature);
-        if (signature) {
-          const inkBottomY = await measureSignatureInkBottomY(signature, sigLayout);
-          if (!cancelled) setSignatureInkBottomY(inkBottomY ?? undefined);
-        } else {
-          setSignatureInkBottomY(undefined);
-        }
       })();
       return () => {
         cancelled = true;
@@ -493,23 +482,10 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
               width: sigLayout.w,
               height: sigLayout.h,
               objectFit: "contain",
+              objectPosition: "top center",
             }}
           />
         )}
-        <div
-          style={{
-            position: "absolute",
-            left: sigLayout.x,
-            top: getControllerSignatureLabelTop(sigLayout, signatureInkBottomY),
-            width: sigLayout.w,
-            textAlign: "center",
-            fontSize: FRONT_PAGE_FOOTER.controllerLabel.fontSize,
-            fontWeight: "bold",
-            lineHeight: 1,
-          }}
-        >
-          Controller of Examinations
-        </div>
       </div>
     );
   },
