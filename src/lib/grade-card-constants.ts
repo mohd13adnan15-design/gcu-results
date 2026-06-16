@@ -108,10 +108,13 @@ export const FRONT_PAGE_HEADER = {
   /** Hardcoded official logo size (pt) — do not scale dynamically. */
   logoWidth: 292,
   logoHeight: 74,
-  schoolNameTop: 178,
-  detailsTop: 206,
-  gradeCardTitleTop: 278,
-  tableTop: 296,
+  /** Top of school heading block (pt from page top). */
+  schoolNameTop: 154,
+  /** Clear gap between school heading and student details (pt). */
+  schoolNameGapBelow: 22,
+  detailsTop: 194,
+  gradeCardTitleTop: 266,
+  tableTop: 284,
 } as const;
 
 export type FrontPageHeaderLayout = {
@@ -180,10 +183,10 @@ export function resolveGradeCardDisplayId(marksheet: {
 
 /** Front-page footer positions (A4 pt — matches drawFirstPageFooter in marksheet-documents.ts). */
 export const FRONT_PAGE_FOOTER = {
-  seal: { x: 32, y: 705, w: 96, h: 96 },
-  embossedSeal: { x: 448, y: 672, w: 64, h: 64 },
-  signatureNew: { x: 375, y: 735, w: 210, h: 93 },
-  signatureOld: { x: 390, y: 742, w: 180, h: 80 },
+  seal: { x: 32, y: 691, w: 96, h: 96 },
+  embossedSeal: { x: 448, y: 658, w: 64, h: 64 },
+  signatureNew: { x: 375, y: 721, w: 210, h: 93 },
+  signatureOld: { x: 390, y: 728, w: 180, h: 80 },
   controllerLabel: {
     fontSize: 10,
     /** Tight gap below signature ink (pt), matching official grade card. */
@@ -191,6 +194,8 @@ export const FRONT_PAGE_FOOTER = {
     /** Preview fallback when ink bounds are unavailable. */
     fallbackInkRatio: 0.52,
     pageBorderInset: 16.5,
+    /** Keep controller title this far above the inner page border. */
+    labelBorderClearance: 10,
   },
 } as const;
 
@@ -199,12 +204,12 @@ export function getControllerSignatureLabelTop(
   sig: { y: number; h: number },
   inkBottomY?: number,
 ): number {
-  const { gapBelowSignature, fontSize, pageBorderInset, fallbackInkRatio } =
+  const { gapBelowSignature, fontSize, pageBorderInset, fallbackInkRatio, labelBorderClearance } =
     FRONT_PAGE_FOOTER.controllerLabel;
   const innerBottom = A4_HEIGHT - pageBorderInset;
   const anchor = inkBottomY ?? sig.y + sig.h * fallbackInkRatio;
   const idealTop = anchor + gapBelowSignature;
-  const maxTop = innerBottom - fontSize - 1;
+  const maxTop = innerBottom - fontSize * 0.85 - labelBorderClearance;
   return Math.min(idealTop, maxTop);
 }
 
@@ -274,7 +279,7 @@ function estimateCourseRowHeight(title: string): number {
 /** Estimate main content height from school name through date line (pt). */
 export function estimateGradeCardContentHeight(marksheet: StudentMarksheet): number {
   const groups = groupCoursesBySection(marksheet.courses);
-  let height = 26 + 72 + 28;
+  let height = FRONT_PAGE_HEADER.schoolNameGapBelow + 90 + 28;
   height += 24;
   for (const group of groups) {
     height += 15;

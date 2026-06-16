@@ -418,7 +418,7 @@ function drawMarksheetPage(
   drawHeader(doc, marksheet, images, x, y, width);
 
   const layout = computeGradeCardAdaptiveLayout(marksheet);
-  const contentBottomY = drawGradeCardMainContent(doc, marksheet, x, width, layout);
+  const contentBottomY = drawGradeCardMainContent(doc, marksheet, x, width, pageWidth, layout);
   drawFirstPageFooter(doc, marksheet, images, contentBottomY, layout);
 }
 
@@ -427,42 +427,33 @@ function drawGradeCardMainContent(
   marksheet: StudentMarksheet,
   x: number,
   width: number,
+  pageWidth: number,
   layout: GradeCardAdaptiveLayout,
 ): number {
-  const { contentScale, contentStartY } = layout;
-  const scale = contentScale;
-  const localWidth = width / scale;
-  const centerX = localWidth / 2;
-
-  doc.save();
-  doc.translate(x, contentStartY);
-  if (scale < 1) doc.scale(scale, scale);
-
-  let y = 0;
+  const s = layout.contentScale;
+  let y = layout.contentStartY;
 
   doc.setFont("times", "bold");
-  doc.setFontSize(14.5);
+  doc.setFontSize(14.5 * s);
   setText(doc, RED);
-  drawCenteredTextFit(doc, marksheet.school_name, centerX, y + 14.5, localWidth - 20, 14.5, 11);
+  drawCenteredTextFit(doc, marksheet.school_name, pageWidth / 2, y + 14.5 * s, width - 20, 14.5 * s, 11 * s);
 
-  y += 26;
-  y = drawDetailsTable(doc, marksheet, 0, y, localWidth);
+  y += (14.5 * 1.2 + FRONT_PAGE_HEADER.schoolNameGapBelow) * s;
+  y = drawDetailsTable(doc, marksheet, x, y, width, s);
 
-  y += 10;
+  y += 10 * s;
   setStroke(doc);
-  doc.rect(0, y, localWidth, 18, "S");
+  doc.rect(x, y, width, 18 * s, "S");
   doc.setFont("times", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(14 * s);
   setText(doc, RED);
-  doc.text("GRADE CARD", centerX, y + 13, { align: "center" });
+  doc.text("GRADE CARD", pageWidth / 2, y + 13 * s, { align: "center" });
 
-  y += 18;
-  y = drawMarksTable(doc, marksheet, 0, y, localWidth);
-  y = drawTotals(doc, marksheet, 0, y, localWidth);
+  y += 18 * s;
+  y = drawMarksTable(doc, marksheet, x, y, width, s);
+  y = drawTotals(doc, marksheet, x, y, width, s);
 
-  doc.restore();
-
-  return contentStartY + y * scale;
+  return y;
 }
 
 function drawOuterBorder(doc: jsPDF, pageWidth: number, pageHeight: number) {
@@ -551,8 +542,9 @@ function drawDetailsTable(
   x: number,
   y: number,
   width: number,
+  scale = 1,
 ) {
-  const baseRowHeight = 16;
+  const baseRowHeight = 16 * scale;
   const col1X = x;
 
   const rows = [
@@ -561,7 +553,7 @@ function drawDetailsTable(
     ["SEMESTER", formatSemesterDisplay(marksheet.semester_label), "MONTH & YEAR OF THE EXAMINATION", marksheet.exam_month_year],
   ];
 
-  doc.setFontSize(11.5);
+  doc.setFontSize(11.5 * scale);
   doc.setFont("times", "normal");
   let maxL1Width = 0;
   for (const row of rows) {
@@ -600,7 +592,7 @@ function drawDetailsTable(
     doc.setFont("times", "normal");
     doc.text(rightLabel, x + width - rightValueWidth - 2, currentY, { align: "right" });
 
-    currentY += baseRowHeight + (v1Lines.length - 1) * 14;
+    currentY += baseRowHeight + (v1Lines.length - 1) * 14 * scale;
   }
 
   return currentY;
@@ -612,6 +604,7 @@ function drawMarksTable(
   x: number,
   y: number,
   width: number,
+  scale = 1,
 ) {
   const widths = [32, 72, 202, 55, 55, 56, width - 472];
   const headers = [
@@ -624,31 +617,34 @@ function drawMarksTable(
     "GRADE\nPOINTS",
   ];
 
-  drawTableRow(doc, x, y, widths, headers, 24, {
-    fontSize: 7.9,
+  const headerHeight = 24 * scale;
+  drawTableRow(doc, x, y, widths, headers, headerHeight, {
+    fontSize: 7.9 * scale,
     boldIndexes: [0, 1, 2, 3, 4, 5, 6],
     maxLines: [2, 2, 1, 2, 2, 2, 2],
   });
-  y += 24;
+  y += headerHeight;
 
   for (const group of groupCoursesBySection(marksheet.courses)) {
+    const sectionHeight = 15 * scale;
     setStroke(doc);
-    doc.rect(x, y, width, 15, "S");
+    doc.rect(x, y, width, sectionHeight, "S");
     doc.setFont("times", "bold");
     const isPractical = group.section.trim().toLowerCase().includes("practical");
-    doc.setFontSize(isPractical ? 9.5 : 13.5);
+    doc.setFontSize((isPractical ? 9.5 : 13.5) * scale);
     setText(doc, isPractical ? BLACK : RED);
     const displayText = isPractical ? "Practical" : group.section;
-    doc.text(displayText, isPractical ? x + 4 : x + width / 2, y + 11.5, {
+    doc.text(displayText, isPractical ? x + 4 : x + width / 2, y + 11.5 * scale, {
       align: isPractical ? "left" : "center",
     });
-    y += 15;
+    y += sectionHeight;
 
     for (const course of group.courses) {
       let displayTitle = course.course_title;
 
       const titleLines = fitLines(doc, displayTitle, widths[2] - 7, 3);
-      const rowHeight = titleLines.length > 2 ? 30 : titleLines.length > 1 ? 24 : 18;
+      const rowHeight =
+        (titleLines.length > 2 ? 30 : titleLines.length > 1 ? 24 : 18) * scale;
 
       drawTableRow(
         doc,
@@ -666,7 +662,7 @@ function drawMarksTable(
         ],
         rowHeight,
         {
-          fontSize: 8.2,
+          fontSize: 8.2 * scale,
           boldIndexes: [],
           alignments: ["center", "center", "left", "center", "center", "center", "center"],
           maxLines: [1, 1, 3, 1, 1, 1, 1],
@@ -676,6 +672,7 @@ function drawMarksTable(
     }
   }
 
+  const totalRowHeight = 20 * scale;
   drawTableRow(
     doc,
     x,
@@ -690,9 +687,9 @@ function drawMarksTable(
       "",
       "",
     ],
-    20,
+    totalRowHeight,
     {
-      fontSize: 11,
+      fontSize: 11 * scale,
       boldIndexes: [2],
       redIndexes: [2],
       alignments: ["center", "center", "right", "center", "center", "center", "center"],
@@ -700,11 +697,11 @@ function drawMarksTable(
     },
   );
 
-  return y + 20;
+  return y + totalRowHeight;
 }
 
-function drawTotals(doc: jsPDF, marksheet: StudentMarksheet, x: number, y: number, width: number) {
-  const height = 48;
+function drawTotals(doc: jsPDF, marksheet: StudentMarksheet, x: number, y: number, width: number, scale = 1) {
+  const height = 48 * scale;
   const gradeWidth = 116;
   setStroke(doc);
   doc.rect(x, y, width, height);
@@ -712,28 +709,28 @@ function drawTotals(doc: jsPDF, marksheet: StudentMarksheet, x: number, y: numbe
   doc.line(x + width - gradeWidth, y, x + width - gradeWidth, y + height);
 
   doc.setFont("times", "bold");
-  doc.setFontSize(12.5);
+  doc.setFontSize(12.5 * scale);
 
   // Row 1: TOTAL CREDIT POINTS
   setText(doc, RED);
   const label1 = "TOTAL CREDIT POINTS = ";
-  doc.text(label1, x + 7, y + 16);
+  doc.text(label1, x + 7, y + 16 * scale);
   setText(doc, DARK);
-  doc.text(formatNumber(marksheet.total_credit_points), x + 7 + doc.getTextWidth(label1), y + 16);
+  doc.text(formatNumber(marksheet.total_credit_points), x + 7 + doc.getTextWidth(label1), y + 16 * scale);
 
   // Row 2: SGPA and GRADE
   setText(doc, RED);
   const label2 = "SEMESTER GRADE POINT AVERAGE = ";
-  doc.text(label2, x + 7, y + 36);
+  doc.text(label2, x + 7, y + 36 * scale);
   setText(doc, DARK);
   const val2 = `${formatNumber(marksheet.total_credit_points)} / ${formatNumber(marksheet.total_credits)} = ${formatSgpa(marksheet.sgpa)}`;
-  doc.text(val2, x + 7 + doc.getTextWidth(label2), y + 36);
+  doc.text(val2, x + 7 + doc.getTextWidth(label2), y + 36 * scale);
 
   // GRADE (Aligned with Row 2 only)
   setText(doc, RED);
-  doc.text("GRADE :", x + width - gradeWidth + 12, y + 36);
+  doc.text("GRADE :", x + width - gradeWidth + 12, y + 36 * scale);
   setText(doc, DARK);
-  doc.text(marksheet.final_grade, x + width - gradeWidth + 80, y + 36);
+  doc.text(marksheet.final_grade, x + width - gradeWidth + 80, y + 36 * scale);
 
   return y + height;
 }

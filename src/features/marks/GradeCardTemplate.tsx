@@ -6,6 +6,7 @@ import {
   A4_HEIGHT,
   A4_WIDTH,
   BACK_PAGE_LAYOUT,
+  FRONT_PAGE_HEADER,
   getFrontPageHeaderLayout,
   computeGradeCardAdaptiveLayout,
   CONTROLLER_SIGNATURE_LABEL,
@@ -15,7 +16,6 @@ import {
   formatSemesterDisplay,
   formatSgpa,
   FRONT_PAGE_FOOTER,
-  FRONT_PAGE_HEADER,
   getBackPageWipeHeight,
   getControllerSignatureLabelTop,
   getControllerSignatureAsset,
@@ -318,7 +318,7 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
               fontWeight: "bold",
               color: GRADE_CARD_COLORS.red,
               lineHeight: 1.2,
-              marginBottom: 8,
+              marginBottom: FRONT_PAGE_HEADER.schoolNameGapBelow,
             }}
           >
             {marksheet.school_name}
