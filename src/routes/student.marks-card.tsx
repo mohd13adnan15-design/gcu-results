@@ -336,7 +336,10 @@ function MarksCard() {
         import("@/lib/marksheet-documents"),
         resolveStudentPhotoUrl(supabase, targetMarksheet),
       ]);
-      const blob = await documents.generateMarksCardPdf(targetMarksheet, { photoUrl });
+      const blob = await documents.generateMarksCardPdf(targetMarksheet, {
+        photoUrl,
+        allMarksheets,
+      });
       documents.downloadMarksCardBlob(targetMarksheet, blob);
       toast.success("Marks card PDF generated");
     } catch (error) {

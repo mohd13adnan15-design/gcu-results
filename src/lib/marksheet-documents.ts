@@ -29,8 +29,9 @@ import {
 } from "./grade-card-image-processing";
 import {
   calculateMarksCardTotals,
+  filterMarksheetForMarksCard,
   getMarksCardCourseValues,
-  marksCardResultLabel,
+  marksCardSemesterResult,
 } from "./marks-card-helpers";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -1157,14 +1158,21 @@ function marksCardColumnWidths(contentWidth: number) {
 
 export async function generateMarksCardPdf(
   marksheet: StudentMarksheet,
-  options: Pick<MarksheetDocumentOptions, "photoUrl"> = {},
+  options: Pick<MarksheetDocumentOptions, "photoUrl" | "allMarksheets"> = {},
 ) {
   if (!marksheet?.courses?.length) {
     throw new Error("No marks card data to generate.");
   }
 
   const config = await fetchMarksConfiguration(supabase);
-  const enrichedMarksheet = applyMarksConfigurationToMarksheet(marksheet, config);
+  const semesterMarksheet = options.allMarksheets?.length
+    ? filterMarksheetForMarksCard(marksheet, options.allMarksheets)
+    : marksheet;
+  if (!semesterMarksheet.courses?.length) {
+    throw new Error("No marks card data for the selected semester.");
+  }
+
+  const enrichedMarksheet = applyMarksConfigurationToMarksheet(semesterMarksheet, config);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const qr = await generateDynamicQrDataUrl(enrichedMarksheet);
@@ -1198,10 +1206,17 @@ export async function generateAllMarksCardsPdf(
   const enrichedSheets = withCourses.map((sheet) =>
     applyMarksConfigurationToMarksheet(sheet, config),
   );
+  const semesterSheets = enrichedSheets
+    .map((sheet) => filterMarksheetForMarksCard(sheet, enrichedSheets))
+    .filter((sheet) => (sheet.courses?.length ?? 0) > 0);
+
+  if (semesterSheets.length === 0) {
+    throw new Error("No marks card data to generate.");
+  }
 
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const assets = await loadMarksheetPdfAssets(options.photoUrl);
-  const sorted = sortMarksheetsBySemester(enrichedSheets);
+  const sorted = sortMarksheetsBySemester(semesterSheets);
 
   for (let i = 0; i < sorted.length; i++) {
     const marksheet = sorted[i]!;
@@ -1476,8 +1491,9 @@ function drawMarksCardTable(
     y += rowHeight;
   }
 
-  const totals = calculateMarksCardTotals(marksheet.courses);
-  const resultLabel = marksCardResultLabel(totals.obtained, totals.maxTotal);
+  const displayCourses = prepareCoursesForDisplay(marksheet.courses);
+  const totals = calculateMarksCardTotals(displayCourses);
+  const resultLabel = marksCardSemesterResult(displayCourses);
   const grandTotalText = `${formatGradeCardNumber(totals.obtained)}/${formatGradeCardNumber(totals.maxTotal)}`;
   const firstFourWidth = widths.slice(0, 4).reduce((sum, value) => sum + value, 0);
   const middleSixWidth = widths.slice(4, 10).reduce((sum, value) => sum + value, 0);

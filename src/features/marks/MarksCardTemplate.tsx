@@ -4,8 +4,9 @@ import QRCode from "qrcode";
 import { prepareCoursesForDisplay, type StudentMarksheet } from "@/lib/marksheet";
 import {
   calculateMarksCardTotals,
+  filterMarksheetForMarksCard,
   getMarksCardCourseValues,
-  marksCardResultLabel,
+  marksCardSemesterResult,
 } from "@/lib/marks-card-helpers";
 import {
   A4_HEIGHT,
@@ -35,6 +36,7 @@ import {
 
 export type MarksCardTemplateProps = {
   marksheet: StudentMarksheet;
+  allMarksheets?: StudentMarksheet[];
   photoUrl?: string | null;
   className?: string;
 };
@@ -48,7 +50,7 @@ const MARKS_COL_WIDTHS = [24, 50, 118, 46, 28, 28, 28, 28, 28, 28, 34] as const;
 const MARKS_CARD_SEAL_IMAGE_OFFSET_X = 12;
 
 export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplateProps>(
-  function MarksCardTemplate({ marksheet, photoUrl, className = "" }, ref) {
+  function MarksCardTemplate({ marksheet, allMarksheets, photoUrl, className = "" }, ref) {
     const [photoSrc, setPhotoSrc] = useState<string | null>(photoUrl ?? null);
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
     const [sealSrc, setSealSrc] = useState<string | null>(null);
@@ -57,14 +59,21 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
     const headerLayout = getFrontPageHeaderLayout();
 
+    const semesterMarksheet = useMemo(
+      () =>
+        allMarksheets?.length
+          ? filterMarksheetForMarksCard(marksheet, allMarksheets)
+          : marksheet,
+      [marksheet, allMarksheets],
+    );
     const displayCourses = useMemo(
-      () => prepareCoursesForDisplay(marksheet.courses),
-      [marksheet.courses],
+      () => prepareCoursesForDisplay(semesterMarksheet.courses),
+      [semesterMarksheet.courses],
     );
     const totals = useMemo(() => calculateMarksCardTotals(displayCourses), [displayCourses]);
     const resultLabel = useMemo(
-      () => marksCardResultLabel(totals.obtained, totals.maxTotal),
-      [totals],
+      () => marksCardSemesterResult(displayCourses),
+      [displayCourses],
     );
 
     useEffect(() => {
@@ -308,7 +317,7 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
             {marksheet.school_name}
           </div>
 
-          <StudentDetailsSection marksheet={marksheet} />
+          <StudentDetailsSection marksheet={semesterMarksheet} />
 
           <div
             style={{

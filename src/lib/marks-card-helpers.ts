@@ -1,4 +1,5 @@
-import type { MarksheetCourse } from "@/lib/marksheet";
+import { getFilteredMarksheet } from "@/lib/grade-card-filter";
+import type { MarksheetCourse, StudentMarksheet } from "@/lib/marksheet";
 import { resolveObtainedMarks } from "@/lib/marks-resolution";
 
 export type MarksCardCourseValues = {
@@ -81,12 +82,24 @@ export function calculateMarksCardTotals(courses: MarksheetCourse[]) {
   return { obtained, maxTotal };
 }
 
-/** Class result label shown on the marks card (matches official sample bands). */
-export function marksCardResultLabel(obtained: number, maxTotal: number): string {
-  if (maxTotal <= 0) return "-";
-  const pct = (obtained / maxTotal) * 100;
-  if (pct >= 85) return "First Class with Distinction";
-  if (pct >= 60) return "First Class";
-  if (pct >= 50) return "Second Class";
-  return "Fail";
+/** Semester-wise marks card: same course filtering as grade card (exclude prior-semester codes). */
+export function filterMarksheetForMarksCard(
+  marksheet: StudentMarksheet,
+  allMarksheets: StudentMarksheet[],
+): StudentMarksheet {
+  if (!allMarksheets.length) return marksheet;
+  return getFilteredMarksheet(marksheet, allMarksheets, false) ?? marksheet;
+}
+
+/**
+ * Semester result on the marks card — PASS when every subject passed, otherwise RA.
+ * Uses the same per-subject pass detection as the marks card status column.
+ */
+export function marksCardSemesterResult(courses: MarksheetCourse[]): string {
+  if (!courses.length) return "-";
+  const allPassed = courses.every(
+    (course) =>
+      resolveCourseStatus(String(course.course_status ?? ""), course.grade_obtained) === "PASS",
+  );
+  return allPassed ? "PASS" : "RA";
 }
