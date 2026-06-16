@@ -27,7 +27,9 @@ import {
   detectGcuMarksTemplateHeaders,
   normalizeExcelRowKeys,
   parseMarksTemplateRow,
-  validateMarksTemplateColumns,
+  mergeGroupedExcelHeaders,
+  validateMarksTemplateHeaders,
+  validateMarksTemplateHeadersAgainstExpected,
   type ParsedMarksCourseRow,
 } from "@/lib/marks-excel-template";
 import {
@@ -720,7 +722,10 @@ function MarksUploader() {
         const isGCUFormat = String(row0[0] || '').trim() === 'Sl No' && String(row0[1] || '').trim() === 'Email' && String(row0[16] || '').trim() === 'Course Code';
         
         if (isGCUFormat) {
-          finalHeaders = [...detectGcuMarksTemplateHeaders(aoa)];
+          const expectedHeaders = [...detectGcuMarksTemplateHeaders(aoa)];
+          const uploadedHeaderLabels = mergeGroupedExcelHeaders(row0, row1);
+          validateMarksTemplateHeadersAgainstExpected(uploadedHeaderLabels, expectedHeaders);
+          finalHeaders = expectedHeaders;
         } else {
           let lastMainHeader = "";
           for (let i = 0; i < Math.max(row0.length, row1.length); i++) {
@@ -765,9 +770,8 @@ function MarksUploader() {
         return;
       }
 
-      // 1. Normalize Headers and Validate
-      const sample = rows[0] || {};
-      validateMarksTemplateColumns(sample);
+      // 1. Validate all required template columns are present
+      validateMarksTemplateHeaders(finalHeaders);
       console.log("Header validation passed.");
 
       const marksConfig = await fetchMarksConfiguration(supabase);

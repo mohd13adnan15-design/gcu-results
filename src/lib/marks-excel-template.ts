@@ -492,32 +492,86 @@ export function parseMarksTemplateRow(
   };
 }
 
-/** Ensure the uploaded sheet has the required column headers (lenient check). */
-export function validateMarksTemplateColumns(sampleRow: Record<string, unknown>): void {
-  const keys = new Set(Object.keys(sampleRow).map(normalizeExcelHeaderKey));
+/** Merge two-row grouped Excel headers (row 0 + row 1) into flat column labels. */
+export function mergeGroupedExcelHeaders(row0: unknown[], row1: unknown[]): string[] {
+  const headers: string[] = [];
+  let lastMainHeader = "";
+  for (let i = 0; i < Math.max(row0.length, row1.length); i++) {
+    const top = String(row0[i] ?? "").trim();
+    if (top) lastMainHeader = top;
 
-  // Critical column sets (must have at least one from each) - Pre-normalized
-  const idAliases = ["studentid", "rollno", "rollnumber", "regno", "registrationno", "id"];
-  const nameAliases = ["studentname", "name", "fullname", "candidatename"];
-  const codeAliases = ["coursecode", "subjectcode", "code", "subcode"];
-  const titleAliases = ["coursetitle", "subject", "subjectname", "coursename"];
+    const sub = String(row1[i] ?? "").trim();
+    if (sub && lastMainHeader) {
+      headers[i] = `${lastMainHeader} ${sub}`;
+    } else if (sub) {
+      headers[i] = sub;
+    } else if (lastMainHeader) {
+      headers[i] = lastMainHeader;
+    }
+  }
+  return headers.filter((header) => header.trim() !== "");
+}
 
-  const hasId = idAliases.some(a => keys.has(a));
-  const hasName = nameAliases.some(a => keys.has(a));
-  const hasCode = codeAliases.some(a => keys.has(a));
-  const hasTitle = titleAliases.some(a => keys.has(a));
+/** Pick the full column set that matches the uploaded header layout. */
+export function resolveExpectedMarksTemplateHeaders(uploadedHeaders: string[]): readonly string[] {
+  const keys = new Set(uploadedHeaders.map((header) => normalizeExcelHeaderKey(header)));
+  const joined = uploadedHeaders.map((header) => String(header).toLowerCase()).join("|");
 
-  const missing = [];
-  if (!hasId) missing.push("Student ID / Registration No");
-  if (!hasName) missing.push("Student Name");
-  if (!hasCode) missing.push("Course Code");
-  if (!hasTitle) missing.push("Course Title");
+  if (
+    joined.includes("cia max marks theory") ||
+    joined.includes("cia min") ||
+    uploadedHeaders.filter(Boolean).length >= 33
+  ) {
+    return GCU_MARKS_TEMPLATE_HEADERS_WITH_STATIC_LIMITS;
+  }
+  if (keys.has("ciamarksobtainedtheory") || joined.includes("cia marks obtained theory")) {
+    return GCU_MARKS_TEMPLATE_HEADERS_SPLIT_OBTAINED;
+  }
+  if (keys.has("ciaobtained") || keys.has("status")) {
+    return GCU_MARKS_TEMPLATE_HEADERS;
+  }
+  if (keys.has("studentid") && keys.has("marksobtained") && keys.has("maxmarks")) {
+    return MARKS_TEMPLATE_HEADERS_FULL;
+  }
+  return GCU_MARKS_TEMPLATE_HEADERS_LEGACY;
+}
+
+export function validateMarksTemplateHeadersAgainstExpected(
+  uploadedHeaders: string[],
+  expectedHeaders: readonly string[],
+): void {
+  const cleaned = uploadedHeaders.map((header) => String(header).trim()).filter(Boolean);
+  if (cleaned.length === 0) {
+    throw new Error("No column headers found in the Excel sheet.");
+  }
+
+  const uploadedKeys = new Set(cleaned.map(normalizeExcelHeaderKey));
+  const missing = expectedHeaders.filter(
+    (column) => !uploadedKeys.has(normalizeExcelHeaderKey(column)),
+  );
 
   if (missing.length > 0) {
     throw new Error(
-      `Missing critical columns: ${missing.join(", ")}. Please ensure your Excel has these fields.`
+      `Missing required columns (${missing.length}): ${missing.join(", ")}. ` +
+        `The marks template requires all ${expectedHeaders.length} columns. Download the official template.`,
     );
   }
+}
+
+/** Ensure every column from the detected marks template is present in the upload. */
+export function validateMarksTemplateHeaders(uploadedHeaders: string[]): void {
+  const cleaned = uploadedHeaders.map((header) => String(header).trim()).filter(Boolean);
+  if (cleaned.length === 0) {
+    throw new Error("No column headers found in the Excel sheet.");
+  }
+
+  const expectedHeaders = resolveExpectedMarksTemplateHeaders(cleaned);
+  validateMarksTemplateHeadersAgainstExpected(cleaned, expectedHeaders);
+}
+
+/** @deprecated Use validateMarksTemplateHeaders — kept for callers passing a parsed row object. */
+export function validateMarksTemplateColumns(sampleRow: Record<string, unknown>): void {
+  validateMarksTemplateHeaders(Object.keys(sampleRow));
 }
 
 const TEMPLATE_SAMPLE_COURSES = [
