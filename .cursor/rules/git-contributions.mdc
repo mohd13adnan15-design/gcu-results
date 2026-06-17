@@ -1,0 +1,15 @@
+---
+description: Keep git commits attributed to the human developer for GitHub contributions.
+alwaysApply: true
+---
+
+When creating git commits in this repository:
+
+- Do not add `Co-authored-by: Cursor`, `Made-with: Cursor`, or any Cursor/agent attribution trailers.
+- Do not pass `--trailer` flags that add Cursor as co-author.
+- Use only the human author's commit message (subject and body).
+- Always commit with the verified GitHub identity so contributions count on the profile:
+  `git -c user.name="Mohammad Anwar Attar" -c user.email="mohd13adnan15@gmail.com" commit ...`
+  Do not use `www.adi15042006@gmail.com` — that email is not linked to the GitHub account.
+
+The repository uses a `prepare-commit-msg` hook that strips Cursor co-author lines if they are added accidentally.

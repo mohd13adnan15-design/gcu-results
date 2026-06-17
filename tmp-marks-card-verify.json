@@ -1,0 +1,14 @@
+{
+  "single": {
+    "size": 8334060,
+    "hasMarksCard": true,
+    "hasStudent": true,
+    "hasCourse": true
+  },
+  "all": {
+    "size": 8344035,
+    "hasMarksCard": true,
+    "hasStudent": true,
+    "hasCourse": true
+  }
+}

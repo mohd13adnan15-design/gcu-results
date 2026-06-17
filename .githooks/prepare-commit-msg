@@ -1,0 +1,11 @@
+#!/bin/sh
+# Strip Cursor co-author trailers so commits attribute only to the human author.
+MSG_FILE="$1"
+if [ ! -f "$MSG_FILE" ]; then
+  exit 0
+fi
+
+tmp="${MSG_FILE}.tmp"
+grep -v -i 'cursoragent@cursor.com' "$MSG_FILE" | grep -v -i 'Co-authored-by: Cursor' > "$tmp" || true
+mv "$tmp" "$MSG_FILE"
+exit 0
