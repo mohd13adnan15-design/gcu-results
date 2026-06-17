@@ -1,5 +1,5 @@
 import type { StudentMarksheet } from "./marksheet";
-import { groupCoursesBySection } from "./marksheet";
+import { groupCoursesForGradeCardDisplay } from "./marksheet";
 
 /** A4 page size in points (matches jsPDF). 1pt ≈ 1px in template. */
 export const A4_WIDTH = 595.28;
@@ -86,6 +86,9 @@ export function formatSemesterDisplay(label: string) {
 export function formatProgrammeTitleDisplay(title: string) {
   return (title || "").trim().replace(/,\s*/g, ", ");
 }
+
+/** Programme titles may wrap up to this many lines on grade/marks cards. */
+export const PROGRAMME_TITLE_MAX_LINES = 3;
 
 /** Front-page header — QR, logo, and photo on one row (official GCU grade card). */
 export const FRONT_PAGE_HEADER = {
@@ -278,13 +281,16 @@ function estimateCourseRowHeight(title: string): number {
 
 /** Estimate main content height from school name through date line (pt). */
 export function estimateGradeCardContentHeight(marksheet: StudentMarksheet): number {
-  const groups = groupCoursesBySection(marksheet.courses);
+  const groups = groupCoursesForGradeCardDisplay(marksheet.courses);
   let height = FRONT_PAGE_HEADER.schoolNameGapBelow + 90 + 28;
   height += 24;
   for (const group of groups) {
     height += 15;
-    for (const course of group.courses) {
-      height += estimateCourseRowHeight(course.course_title);
+    for (const block of group.blocks) {
+      if (block.subsectionLabel) height += 15;
+      for (const course of block.courses) {
+        height += estimateCourseRowHeight(course.course_title);
+      }
     }
   }
   height += 20 + 48 + 32;

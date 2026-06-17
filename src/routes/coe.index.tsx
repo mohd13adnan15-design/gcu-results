@@ -47,6 +47,11 @@ import {
   type ExtractedStudentPhoto,
 } from "@/lib/student-photo-zip";
 import { notificationPortalLabel } from "@/lib/portal";
+import {
+  formatPartialUploadMessage,
+  formatUploadError,
+  formatUploadSuccessMessage,
+} from "@/lib/upload-toast-messages";
 import { subscribePostgresChanges } from "@/lib/supabase-realtime";
 import { fetchMarksConfiguration } from "@/lib/marks-configuration";
 
@@ -568,7 +573,7 @@ function MarksUploader() {
 
   async function handleUploadPhotosOnly() {
     if (!zipFile) {
-      toast.error("Please select a student photos ZIP file.");
+      toast.error("Select a photos ZIP file.");
       return;
     }
 
@@ -580,13 +585,13 @@ function MarksUploader() {
       try {
         uploadedImages = await extractStudentPhotosFromZip(zipFile);
       } catch (err) {
-        toast.error("Failed to extract ZIP file. Ensure it is a valid ZIP archive.");
+        toast.error("Invalid ZIP file.");
         console.error("ZIP extraction error:", err);
         return;
       }
 
       if (uploadedImages.size === 0) {
-        toast.error("No JPG or PNG images found in the ZIP.");
+        toast.error("No images in ZIP.");
         return;
       }
 
@@ -595,7 +600,7 @@ function MarksUploader() {
         .select("id, student_id, image_path");
       if (studentErr) throw new Error(studentErr.message);
       if (!studentRows?.length) {
-        toast.error("No students in the database yet. Upload the Excel marks sheet first.");
+        toast.error("Upload marks sheet first.");
         return;
       }
 
@@ -632,22 +637,19 @@ function MarksUploader() {
       await persistStudentPhotoUpdates(supabase, photoResult.dbUpdates);
 
       if (photoResult.photosMatched === 0) {
-        toast.error(
-          "No photos matched existing students. Name each file with the registration number (e.g. 23MSDA105.jpg).",
-        );
+        toast.error("No photos matched. Use registration no as filename.");
         return;
       }
 
       toast.success(
-        `Uploaded ${photoResult.photosMatched} student photo(s).` +
-          (photoResult.photosMissing > 0
-            ? ` ${photoResult.photosMissing} student(s) had no matching file in the ZIP.`
-            : ""),
+        photoResult.photosMissing > 0
+          ? `${photoResult.photosMatched} photos uploaded. ${photoResult.photosMissing} unmatched.`
+          : `${photoResult.photosMatched} photos uploaded.`,
       );
       setZipFile(null);
     } catch (error) {
       console.error("Photos-only upload failed:", error);
-      toast.error(error instanceof Error ? error.message : "Photo upload failed.");
+      toast.error(formatUploadError(error));
     } finally {
       console.groupEnd();
       setBusy(false);
@@ -656,7 +658,7 @@ function MarksUploader() {
 
   async function handleUploadAll() {
     if (!excelFile && !zipFile) {
-      toast.error("Please select an Excel marks sheet and/or a student photos ZIP file.");
+      toast.error("Select an Excel file and/or a photos ZIP.");
       return;
     }
 
@@ -666,7 +668,7 @@ function MarksUploader() {
     }
 
     if (!excelFile) {
-      toast.error("Please select an Excel marks sheet file.");
+      toast.error("Select an Excel marks sheet.");
       return;
     }
     setBusy(true);
@@ -685,7 +687,7 @@ function MarksUploader() {
           uploadedImages = await extractStudentPhotosFromZip(zipFile);
           console.log("Successfully extracted images from ZIP:", uploadedImages.size);
         } catch (err) {
-          toast.error("Failed to extract ZIP file. Ensure it is a valid ZIP archive.");
+          toast.error("Invalid ZIP file.");
           console.error("ZIP extraction error:", err);
           setBusy(false);
           console.groupEnd();
@@ -694,7 +696,16 @@ function MarksUploader() {
       }
 
       // 2. Read Excel file
-      const buf = await excelFile.arrayBuffer();
+      let buf: ArrayBuffer;
+      try {
+        buf = await excelFile.arrayBuffer();
+      } catch (readErr) {
+        console.error("Excel read error:", readErr);
+        toast.error(formatUploadError(readErr));
+        setBusy(false);
+        console.groupEnd();
+        return;
+      }
       const wb = XLSX.read(buf, { type: "array", cellFormula: false, cellHTML: false, cellText: false, cellDates: true });
       const sheetName = wb.SheetNames[0]; // Always read the first sheet safely
       const sheet = wb.Sheets[sheetName];
@@ -702,7 +713,7 @@ function MarksUploader() {
       const aoa = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: "", blankrows: false });
 
       if (aoa.length === 0) {
-        toast.error("The sheet is empty.");
+        toast.error("Excel sheet is empty.");
         console.groupEnd();
         setBusy(false);
         return;
@@ -764,7 +775,7 @@ function MarksUploader() {
       console.log("Total raw rows read:", rows.length);
 
       if (rows.length === 0) {
-        toast.error("The sheet is empty.");
+        toast.error("Excel sheet is empty.");
         console.groupEnd();
         setBusy(false);
         return;
@@ -797,7 +808,7 @@ function MarksUploader() {
       console.log("Rejected rows:", rejected.length);
 
       if (parsed.length === 0) {
-        toast.error(`No valid rows found. ${rejected.length} rows were rejected due to missing critical fields.`);
+        toast.error(`No valid rows. ${rejected.length} skipped.`);
         console.groupEnd();
         setBusy(false);
         return;
@@ -1144,27 +1155,20 @@ function MarksUploader() {
       const failCount = rejected.length;
 
       if (failCount > 0) {
-        const firstFew = rejected.slice(0, 3).map(r => `Row ${r.row}: ${r.reason}`).join("\n");
-        const photoNote =
-          uploadedImages.size > 0
-            ? `\n📷 Photos: ${photosMatched} matched, ${photosMissing} missing (use registration no as filename, e.g. 23MSDA105.jpg).`
-            : "";
-        toast.error(
-          `Upload partially successful.\n` +
-          `✅ ${successCount} rows parsed (${studentCount} students).\n` +
-          `❌ ${failCount} rows failed validation.${photoNote}\n` +
-          `First few errors:\n${firstFew}${failCount > 3 ? "\n...see console for more" : ""}`,
-          { duration: 6000 }
+        toast.warning(
+          formatPartialUploadMessage(
+            successCount,
+            studentCount,
+            rejected,
+            photosMatched,
+            photosMissing,
+          ),
+          { duration: 5000 },
         );
         console.table(rejected);
       } else {
-        const photoNote =
-          uploadedImages.size > 0
-            ? ` ${photosMatched} student photo(s) matched from ZIP.`
-            : "";
         toast.success(
-          `Successfully processed ${successCount} rows for ${studentCount} students.` +
-          ` All grade cards generated and synced.${photoNote}`
+          formatUploadSuccessMessage(successCount, studentCount, photosMatched),
         );
         setExcelFile(null);
         setZipFile(null);
@@ -1172,7 +1176,7 @@ function MarksUploader() {
 
     } catch (error) {
       console.error("Critical Upload Failure:", error);
-      toast.error(error instanceof Error ? error.message : "Upload failed unexpectedly.");
+      toast.error(formatUploadError(error));
     } finally {
       console.groupEnd();
       setBusy(false);

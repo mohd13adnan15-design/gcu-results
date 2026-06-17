@@ -5,6 +5,7 @@ import {
   computeGradeCardAdaptiveLayout,
   formatGradeCardNumber,
   formatProgrammeTitleDisplay,
+  PROGRAMME_TITLE_MAX_LINES,
   formatSemesterDisplay,
   formatSgpa,
   FRONT_PAGE_FOOTER,
@@ -41,7 +42,8 @@ import {
 } from "./marks-configuration";
 import {
   buildMarksheetFileName,
-  groupCoursesBySection,
+  groupCoursesForGradeCardDisplay,
+  isPracticalSectionName,
   prepareCoursesForDisplay,
   type StudentMarksheet,
 } from "./marksheet";
@@ -578,7 +580,7 @@ function drawDetailsTable(
     const maxV1Width = (x + width) - rightValueWidth - rightLabelWidth - col1ValueX - 10;
 
     doc.setFont("times", "bold");
-    const v1Lines = fitLines(doc, v1, maxV1Width, i === 0 ? 2 : 3);
+    const v1Lines = fitLines(doc, v1, maxV1Width, i === 0 ? PROGRAMME_TITLE_MAX_LINES : 3);
 
     // Left Column
     doc.setFont("times", "normal");
@@ -626,50 +628,62 @@ function drawMarksTable(
   });
   y += headerHeight;
 
-  for (const group of groupCoursesBySection(marksheet.courses)) {
+  for (const group of groupCoursesForGradeCardDisplay(marksheet.courses)) {
     const sectionHeight = 15 * scale;
     setStroke(doc);
     doc.rect(x, y, width, sectionHeight, "S");
     doc.setFont("times", "bold");
-    const isPractical = group.section.trim().toLowerCase().includes("practical");
-    doc.setFontSize((isPractical ? 9.5 : 13.5) * scale);
-    setText(doc, isPractical ? BLACK : RED);
-    const displayText = isPractical ? "Practical" : group.section;
-    doc.text(displayText, isPractical ? x + 4 : x + width / 2, y + 11.5 * scale, {
-      align: isPractical ? "left" : "center",
+    const isPracticalSection = isPracticalSectionName(group.section);
+    doc.setFontSize((isPracticalSection ? 9.5 : 13.5) * scale);
+    setText(doc, isPracticalSection ? BLACK : RED);
+    doc.text(group.section, isPracticalSection ? x + 4 : x + width / 2, y + 11.5 * scale, {
+      align: isPracticalSection ? "left" : "center",
     });
     y += sectionHeight;
 
-    for (const course of group.courses) {
-      let displayTitle = course.course_title;
+    for (const block of group.blocks) {
+      if (block.subsectionLabel) {
+        const subsectionHeight = 15 * scale;
+        setStroke(doc);
+        doc.rect(x, y, width, subsectionHeight, "S");
+        doc.setFont("times", "bold");
+        doc.setFontSize(9.5 * scale);
+        setText(doc, BLACK);
+        doc.text(block.subsectionLabel, x + 4, y + 11.5 * scale, { align: "left" });
+        y += subsectionHeight;
+      }
 
-      const titleLines = fitLines(doc, displayTitle, widths[2] - 7, 3);
-      const rowHeight =
-        (titleLines.length > 2 ? 30 : titleLines.length > 1 ? 24 : 18) * scale;
+      for (const course of block.courses) {
+        let displayTitle = course.course_title;
 
-      drawTableRow(
-        doc,
-        x,
-        y,
-        widths,
-        [
-          String(course.sl_no),
-          course.course_code,
-          displayTitle,
-          formatNumber(course.course_credits),
-          formatNumber(course.credits_earned),
-          course.grade_obtained,
-          formatNumber(course.grade_points),
-        ],
-        rowHeight,
-        {
-          fontSize: 8.2 * scale,
-          boldIndexes: [],
-          alignments: ["center", "center", "left", "center", "center", "center", "center"],
-          maxLines: [1, 1, 3, 1, 1, 1, 1],
-        },
-      );
-      y += rowHeight;
+        const titleLines = fitLines(doc, displayTitle, widths[2] - 7, 3);
+        const rowHeight =
+          (titleLines.length > 2 ? 30 : titleLines.length > 1 ? 24 : 18) * scale;
+
+        drawTableRow(
+          doc,
+          x,
+          y,
+          widths,
+          [
+            String(course.sl_no),
+            course.course_code,
+            displayTitle,
+            formatNumber(course.course_credits),
+            formatNumber(course.credits_earned),
+            course.grade_obtained,
+            formatNumber(course.grade_points),
+          ],
+          rowHeight,
+          {
+            fontSize: 8.2 * scale,
+            boldIndexes: [],
+            alignments: ["center", "center", "left", "center", "center", "center", "center"],
+            maxLines: [1, 1, 3, 1, 1, 1, 1],
+          },
+        );
+        y += rowHeight;
+      }
     }
   }
 
@@ -1379,7 +1393,7 @@ function drawMarksCardDetailsTable(
       formatProgrammeTitleDisplay(marksheet.programme_title),
       "PROGRAMME CODE",
       marksheet.programme_code,
-      2,
+      PROGRAMME_TITLE_MAX_LINES,
     ],
     ["NAME OF THE STUDENT", marksheet.student_name, "REGISTRATION NO", marksheet.registration_no, 3],
     [

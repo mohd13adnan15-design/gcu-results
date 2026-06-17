@@ -1,7 +1,7 @@
-import { forwardRef, useEffect, useMemo, useState } from "react";
+import { forwardRef, Fragment, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 
-import { groupCoursesBySection, type StudentMarksheet } from "@/lib/marksheet";
+import { groupCoursesForGradeCardDisplay, isPracticalSectionName, type StudentMarksheet } from "@/lib/marksheet";
 import {
   A4_HEIGHT,
   A4_WIDTH,
@@ -13,6 +13,7 @@ import {
   formatGradeCardDate,
   formatGradeCardNumber,
   formatProgrammeTitleDisplay,
+  PROGRAMME_TITLE_MAX_LINES,
   formatSemesterDisplay,
   formatSgpa,
   FRONT_PAGE_FOOTER,
@@ -386,8 +387,8 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
                 ))}
               </tr>
             </thead>
-            {groupCoursesBySection(marksheet.courses).map((group, groupIdx) => {
-              const isPractical = group.section.trim().toLowerCase().includes("practical");
+            {groupCoursesForGradeCardDisplay(marksheet.courses).map((group, groupIdx) => {
+              const isPracticalSection = isPracticalSectionName(group.section);
               return (
                 <tbody key={groupIdx}>
                   <tr>
@@ -397,26 +398,49 @@ export const GradeCardTemplate = forwardRef<HTMLDivElement, GradeCardTemplatePro
                         border: `0.45px solid ${GRADE_CARD_COLORS.border}`,
                         height: 15,
                         fontWeight: "bold",
-                        fontSize: isPractical ? 9.5 : 13.5,
-                        color: isPractical ? GRADE_CARD_COLORS.dark : GRADE_CARD_COLORS.red,
-                        textAlign: isPractical ? "left" : "center",
-                        paddingLeft: isPractical ? 4 : 0,
+                        fontSize: isPracticalSection ? 9.5 : 13.5,
+                        color: isPracticalSection ? GRADE_CARD_COLORS.dark : GRADE_CARD_COLORS.red,
+                        textAlign: isPracticalSection ? "left" : "center",
+                        paddingLeft: isPracticalSection ? 4 : 0,
                         verticalAlign: "middle",
                       }}
                     >
-                      {isPractical ? "Practical" : group.section}
+                      {group.section}
                     </td>
                   </tr>
-                  {group.courses.map((course) => (
-                    <tr key={`${course.sl_no}-${course.course_code}`}>
-                      <td style={cellStyle("center")}>{course.sl_no}</td>
-                      <td style={cellStyle("center")}>{course.course_code}</td>
-                      <td style={cellStyle("left")}>{course.course_title}</td>
-                      <td style={cellStyle("center")}>{formatGradeCardNumber(course.course_credits)}</td>
-                      <td style={cellStyle("center")}>{formatGradeCardNumber(course.credits_earned)}</td>
-                      <td style={cellStyle("center")}>{course.grade_obtained}</td>
-                      <td style={cellStyle("center")}>{formatGradeCardNumber(course.grade_points)}</td>
-                    </tr>
+                  {group.blocks.map((block, blockIdx) => (
+                    <Fragment key={blockIdx}>
+                      {block.subsectionLabel ? (
+                        <tr>
+                          <td
+                            colSpan={7}
+                            style={{
+                              border: `0.45px solid ${GRADE_CARD_COLORS.border}`,
+                              height: 15,
+                              fontWeight: "bold",
+                              fontSize: 9.5,
+                              color: GRADE_CARD_COLORS.dark,
+                              textAlign: "left",
+                              paddingLeft: 4,
+                              verticalAlign: "middle",
+                            }}
+                          >
+                            {block.subsectionLabel}
+                          </td>
+                        </tr>
+                      ) : null}
+                      {block.courses.map((course) => (
+                        <tr key={`${course.sl_no}-${course.course_code}`}>
+                          <td style={cellStyle("center")}>{course.sl_no}</td>
+                          <td style={cellStyle("center")}>{course.course_code}</td>
+                          <td style={cellStyle("left")}>{course.course_title}</td>
+                          <td style={cellStyle("center")}>{formatGradeCardNumber(course.course_credits)}</td>
+                          <td style={cellStyle("center")}>{formatGradeCardNumber(course.credits_earned)}</td>
+                          <td style={cellStyle("center")}>{course.grade_obtained}</td>
+                          <td style={cellStyle("center")}>{formatGradeCardNumber(course.grade_points)}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
                 </tbody>
               );
@@ -597,7 +621,7 @@ function StudentDetailsSection({ marksheet }: { marksheet: StudentMarksheet }) {
       leftValue: formatProgrammeTitleDisplay(marksheet.programme_title),
       rightLabel: "PROGRAMME CODE",
       rightValue: marksheet.programme_code,
-      leftMaxLines: 2 as const,
+      leftMaxLines: PROGRAMME_TITLE_MAX_LINES as const,
     },
     {
       leftLabel: "NAME OF THE STUDENT",

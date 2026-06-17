@@ -86,6 +86,19 @@ export type MarksheetCourseGroup = {
   courses: MarksheetCourse[];
 };
 
+export type MarksheetCourseDisplayBlock = {
+  /** Renders a practical sub-header when set (under a category section). */
+  subsectionLabel: string | null;
+  courses: MarksheetCourse[];
+};
+
+export type MarksheetCourseDisplayGroup = {
+  section: string;
+  blocks: MarksheetCourseDisplayBlock[];
+};
+
+export const GRADE_CARD_PRACTICAL_SUBSECTION_LABEL = "PRACTICAL";
+
 export type MarksheetGradeScaleRow = {
   slNo: number;
   marksRange: string;
@@ -538,19 +551,114 @@ export function prepareCoursesForDisplay(courses: MarksheetCourse[]): MarksheetC
   return reorderLeadingPracticalCourses(courses);
 }
 
-export function groupCoursesBySection(courses: MarksheetCourse[]): MarksheetCourseGroup[] {
-  return prepareCoursesForDisplay(courses).reduce<MarksheetCourseGroup[]>((groups, course) => {
-      const isPractical = isPracticalCourse(course);
-      const effectiveSection = isPractical ? "PRACTICAL" : course.section;
-      const previous = groups.at(-1);
+function normalizeSectionLabel(section: string | undefined): string {
+  return (section || "").trim() || "CORE COURSE";
+}
 
-      if (previous?.section === effectiveSection) {
-        previous.courses.push(course);
-      } else {
-        groups.push({ section: effectiveSection, courses: [course] });
-      }
-      return groups;
-    }, []);
+function sectionMergeKey(section: string): string {
+  return normalizeSectionLabel(section).toLowerCase();
+}
+
+export function groupCoursesBySection(courses: MarksheetCourse[]): MarksheetCourseGroup[] {
+  const prepared = prepareCoursesForDisplay(courses);
+  if (prepared.length === 0) return [];
+
+  type Segment = { section: string; courses: MarksheetCourse[]; startIdx: number };
+  const segments: Segment[] = [];
+
+  prepared.forEach((course, startIdx) => {
+    const section = normalizeSectionLabel(course.section);
+    const previous = segments.at(-1);
+    if (previous?.section === section) {
+      previous.courses.push(course);
+    } else {
+      segments.push({ section, courses: [course], startIdx });
+    }
+  });
+
+  const mergedByKey = new Map<
+    string,
+    { section: string; courses: MarksheetCourse[]; firstStart: number }
+  >();
+
+  for (const segment of segments) {
+    if (isPracticalSectionName(segment.section)) continue;
+
+    const key = sectionMergeKey(segment.section);
+    const existing = mergedByKey.get(key);
+    if (existing) {
+      existing.courses.push(...segment.courses);
+      continue;
+    }
+
+    mergedByKey.set(key, {
+      section: segment.section,
+      courses: [...segment.courses],
+      firstStart: segment.startIdx,
+    });
+  }
+
+  const emitted = new Set<string>();
+  const groups: MarksheetCourseGroup[] = [];
+
+  for (const segment of segments) {
+    if (isPracticalSectionName(segment.section)) {
+      groups.push({ section: segment.section, courses: segment.courses });
+      continue;
+    }
+
+    const key = sectionMergeKey(segment.section);
+    if (emitted.has(key)) continue;
+
+    emitted.add(key);
+    const merged = mergedByKey.get(key);
+    if (!merged) continue;
+
+    groups.push({
+      section: merged.section,
+      courses: [...merged.courses].sort((a, b) => a.sl_no - b.sl_no),
+    });
+  }
+
+  return groups;
+}
+
+export function isPracticalSectionName(section: string): boolean {
+  return section.trim().toLowerCase().includes("practical");
+}
+
+/** Category section + optional PRACTICAL sub-block for grade card display. */
+export function groupCoursesForGradeCardDisplay(
+  courses: MarksheetCourse[],
+): MarksheetCourseDisplayGroup[] {
+  return groupCoursesBySection(courses).map((group) => {
+    if (isPracticalSectionName(group.section)) {
+      return {
+        section: group.section,
+        blocks: [{ subsectionLabel: null, courses: group.courses }],
+      };
+    }
+
+    const theory: MarksheetCourse[] = [];
+    const practical: MarksheetCourse[] = [];
+    for (const course of group.courses) {
+      if (isPracticalCourse(course)) practical.push(course);
+      else theory.push(course);
+    }
+
+    const blocks: MarksheetCourseDisplayBlock[] = [];
+    if (theory.length > 0) {
+      blocks.push({ subsectionLabel: null, courses: theory });
+    }
+    if (practical.length > 0) {
+      blocks.push({
+        subsectionLabel: GRADE_CARD_PRACTICAL_SUBSECTION_LABEL,
+        courses: practical,
+      });
+    }
+
+    return { section: group.section, blocks };
+  });
 }
 
 export function buildMarksheetFileName(marksheet: StudentMarksheet, extension: "pdf") {

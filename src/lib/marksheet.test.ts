@@ -9,6 +9,8 @@ import {
   buildMarksheetFileName,
   calculateMarksheetTotals,
   groupCoursesBySection,
+  groupCoursesForGradeCardDisplay,
+  GRADE_CARD_PRACTICAL_SUBSECTION_LABEL,
   reorderLeadingPracticalCourses,
   pickStudentPhotoPath,
   studentMarksToMarksheet,
@@ -104,6 +106,147 @@ describe("marksheet data helpers", () => {
       "SKILL ENHANCEMENT COURSE",
       "PRACTICAL",
       "OPEN ELECTIVE COURSE",
+    ]);
+  });
+
+  it("merges scattered courses under the same category into one section", () => {
+    const groups = groupCoursesBySection([
+      {
+        sl_no: 1,
+        section: "Soft Core Course",
+        course_code: "SC01",
+        course_title: "Soft Core One",
+        course_credits: 4,
+        credits_earned: 4,
+        grade_obtained: "A",
+        grade_points: 8,
+      },
+      {
+        sl_no: 2,
+        section: "Soft Core Course",
+        course_code: "SC02",
+        course_title: "Soft Core Two",
+        course_credits: 4,
+        credits_earned: 4,
+        grade_obtained: "A",
+        grade_points: 8,
+      },
+      {
+        sl_no: 3,
+        section: "Core Course",
+        course_code: "C01",
+        course_title: "Core One",
+        course_credits: 4,
+        credits_earned: 4,
+        grade_obtained: "A",
+        grade_points: 8,
+      },
+      {
+        sl_no: 4,
+        section: "Soft Core Course",
+        course_code: "SC03",
+        course_title: "Soft Core Three",
+        course_credits: 4,
+        credits_earned: 4,
+        grade_obtained: "A",
+        grade_points: 8,
+      },
+      {
+        sl_no: 5,
+        section: "Soft Core Course",
+        course_code: "SC04",
+        course_title: "Soft Core Four",
+        course_credits: 4,
+        credits_earned: 4,
+        grade_obtained: "A",
+        grade_points: 8,
+      },
+      {
+        sl_no: 6,
+        section: "Soft Core Course",
+        course_code: "SC05",
+        course_title: "Soft Core Five",
+        course_credits: 4,
+        credits_earned: 4,
+        grade_obtained: "A",
+        grade_points: 8,
+      },
+    ]);
+
+    expect(groups.map((group) => group.section)).toEqual(["Soft Core Course", "Core Course"]);
+    expect(groups[0]?.courses.map((course) => course.course_code)).toEqual([
+      "SC01",
+      "SC02",
+      "SC03",
+      "SC04",
+      "SC05",
+    ]);
+  });
+
+  it("keeps uploaded course category when course type is practical", () => {
+    const groups = groupCoursesBySection([
+      {
+        sl_no: 1,
+        section: "Soft Core Course",
+        course_code: "SUB101P",
+        course_title: "Soft Core Lab",
+        course_type: "PRACTICAL",
+        course_credits: 2,
+        credits_earned: 2,
+        grade_obtained: "A",
+        grade_points: 8,
+      },
+      {
+        sl_no: 2,
+        section: "Core Course",
+        course_code: "SUB102",
+        course_title: "Theory Subject",
+        course_type: "THEORY",
+        course_credits: 4,
+        credits_earned: 4,
+        grade_obtained: "A+",
+        grade_points: 9,
+      },
+    ]);
+    expect(groups.map((group) => group.section)).toEqual(["Core Course", "Soft Core Course"]);
+  });
+
+  it("adds a PRACTICAL sub-header under category sections for practical courses", () => {
+    const groups = groupCoursesForGradeCardDisplay([
+      {
+        sl_no: 1,
+        section: "Soft Core Course",
+        course_code: "04BMAEC23471",
+        course_title: "DISSERTATION",
+        course_type: "PRACTICAL",
+        course_credits: 8,
+        credits_earned: 0,
+        grade_obtained: "RA",
+        grade_points: 0,
+      },
+      {
+        sl_no: 2,
+        section: "Soft Core Course",
+        course_code: "04BMAEC23472",
+        course_title: "INTERNSHIP",
+        course_type: "PRACTICAL",
+        course_credits: 16,
+        credits_earned: 0,
+        grade_obtained: "RA",
+        grade_points: 0,
+      },
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.section).toBe("Soft Core Course");
+    expect(groups[0]?.blocks).toEqual([
+      {
+        subsectionLabel: GRADE_CARD_PRACTICAL_SUBSECTION_LABEL,
+        courses: [
+          expect.objectContaining({ course_title: "DISSERTATION" }),
+          expect.objectContaining({ course_title: "INTERNSHIP" }),
+        ],
+      },
     ]);
   });
 

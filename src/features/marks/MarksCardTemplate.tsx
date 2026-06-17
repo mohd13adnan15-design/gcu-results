@@ -14,6 +14,7 @@ import {
   formatGradeCardDate,
   formatGradeCardNumber,
   formatProgrammeTitleDisplay,
+  PROGRAMME_TITLE_MAX_LINES,
   formatSemesterDisplay,
   FRONT_PAGE_FOOTER,
   FRONT_PAGE_HEADER,
@@ -546,7 +547,7 @@ function StudentDetailsSection({ marksheet }: { marksheet: StudentMarksheet }) {
       leftValue: formatProgrammeTitleDisplay(marksheet.programme_title),
       rightLabel: "PROGRAMME CODE",
       rightValue: marksheet.programme_code,
-      leftMaxLines: 2 as const,
+      leftMaxLines: PROGRAMME_TITLE_MAX_LINES as const,
     },
     {
       leftLabel: "NAME OF THE STUDENT",
