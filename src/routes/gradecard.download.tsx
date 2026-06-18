@@ -40,7 +40,10 @@ export function GradecardQrDownloadPage() {
         setMarksheet(row);
         const sheets = await fetchAllStudentMarksheets(supabase, row.student_id);
         if (active) {
-          setAllMarksheets(sheets.length > 0 ? sheets : [row]);
+          const scoped = (sheets.length > 0 ? sheets : [row]).filter(
+            (sheet) => sheet.student_id === row.student_id,
+          );
+          setAllMarksheets(scoped);
         }
       } catch (error) {
         if (active) toast.error(error instanceof Error ? error.message : "Could not load grade card");

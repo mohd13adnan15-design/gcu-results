@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
-import QRCode from "qrcode";
+import { buildDocumentQrDataUrl } from "@/lib/qr-document-links";
+import type { QrDocumentKind } from "@/lib/qr-document-links";
 
 import {
   computeGradeCardAdaptiveLayout,
@@ -278,7 +279,7 @@ export async function generateMarksheetPdf(
   const enrichedMarksheet = applyMarksConfigurationToMarksheet(marksheet, config);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-  const qr = await generateDynamicQrDataUrl(enrichedMarksheet);
+  const qr = await generateGradeCardQrDataUrl(enrichedMarksheet);
   const assets = await loadMarksheetPdfAssets(options.photoUrl);
   const rightSignature = isMarksheetAfterJuly2024(marksheet)
     ? assets.rightSignatureNew
@@ -324,7 +325,7 @@ export async function generateAllSemestersPdf(
     const marksheet = sorted[i];
     if (i > 0) doc.addPage();
 
-    const qr = await generateDynamicQrDataUrl(marksheet);
+    const qr = await generateGradeCardQrDataUrl(marksheet);
     const rightSignature = isMarksheetAfterJuly2024(marksheet)
       ? assets.rightSignatureNew
       : assets.rightSignatureOld;
@@ -1021,22 +1022,21 @@ function fitImageInBox(
   };
 }
 
-async function generateDynamicQrDataUrl(marksheet: StudentMarksheet): Promise<LoadedDataUrl | null> {
-  try {
-    const base =
-      typeof window !== "undefined" && window.location.origin ? window.location.origin : "https://example.com";
-    const qrUrl = new URL("/gradecard/download", base);
-    qrUrl.searchParams.set("reg", marksheet.registration_no);
-    const dataUrl = await QRCode.toDataURL(qrUrl.toString(), {
-      errorCorrectionLevel: "M",
-      margin: 1,
-      color: { dark: "#1a1a1a", light: "#f6f1e4" },
-      width: 180,
-    });
-    return { dataUrl, type: inferPdfImageType(dataUrl) };
-  } catch {
-    return null;
-  }
+async function generateDocumentQrDataUrl(
+  kind: QrDocumentKind,
+  marksheet: StudentMarksheet,
+): Promise<LoadedDataUrl | null> {
+  const dataUrl = await buildDocumentQrDataUrl(kind, marksheet.registration_no, { width: 180 });
+  if (!dataUrl) return null;
+  return { dataUrl, type: inferPdfImageType(dataUrl) };
+}
+
+async function generateGradeCardQrDataUrl(marksheet: StudentMarksheet): Promise<LoadedDataUrl | null> {
+  return generateDocumentQrDataUrl("grade", marksheet);
+}
+
+async function generateMarksCardQrDataUrl(marksheet: StudentMarksheet): Promise<LoadedDataUrl | null> {
+  return generateDocumentQrDataUrl("marks", marksheet);
 }
 
 async function trimImageEdges(source: string, trimPx: number): Promise<string> {
@@ -1189,7 +1189,7 @@ export async function generateMarksCardPdf(
   const enrichedMarksheet = applyMarksConfigurationToMarksheet(semesterMarksheet, config);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-  const qr = await generateDynamicQrDataUrl(enrichedMarksheet);
+  const qr = await generateMarksCardQrDataUrl(enrichedMarksheet);
   const assets = await loadMarksheetPdfAssets(options.photoUrl);
   const rightSignature = isMarksheetAfterJuly2024(enrichedMarksheet)
     ? assets.rightSignatureNew
@@ -1236,7 +1236,7 @@ export async function generateAllMarksCardsPdf(
     const marksheet = sorted[i]!;
     if (i > 0) doc.addPage();
 
-    const qr = await generateDynamicQrDataUrl(marksheet);
+    const qr = await generateMarksCardQrDataUrl(marksheet);
     const rightSignature = isMarksheetAfterJuly2024(marksheet)
       ? assets.rightSignatureNew
       : assets.rightSignatureOld;

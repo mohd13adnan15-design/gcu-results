@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useMemo, useState } from "react";
-import QRCode from "qrcode";
 
 import { prepareCoursesForDisplay, type StudentMarksheet } from "@/lib/marksheet";
+import { buildDocumentQrDataUrl } from "@/lib/qr-document-links";
 import {
   calculateMarksCardTotals,
   filterMarksheetForMarksCard,
@@ -108,16 +108,7 @@ export const MarksCardTemplate = forwardRef<HTMLDivElement, MarksCardTemplatePro
       let cancelled = false;
       void (async () => {
         try {
-          const base =
-            typeof window !== "undefined" && window.location.origin
-              ? window.location.origin
-              : "https://example.com";
-          const qrUrl = new URL("/gradecard/download", base);
-          qrUrl.searchParams.set("reg", marksheet.registration_no);
-          const dataUrl = await QRCode.toDataURL(qrUrl.toString(), {
-            errorCorrectionLevel: "M",
-            margin: 1,
-            color: { dark: "#1a1a1a", light: "#f6f1e4" },
+          const dataUrl = await buildDocumentQrDataUrl("marks", marksheet.registration_no, {
             width: 220,
           });
           if (!cancelled) setQrDataUrl(dataUrl);
