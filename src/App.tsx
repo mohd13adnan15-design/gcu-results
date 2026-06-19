@@ -31,8 +31,6 @@ import { StudentLibraryPage } from "@/routes/student.library";
 import { StudentCertificateFlowPage } from "@/routes/student.certificate-flow";
 import { StudentMarksCardPage } from "@/routes/student.marks-card";
 import { GradecardQrDownloadPage } from "@/routes/gradecard.download";
-import { MarkscardQrDownloadPage } from "@/routes/markscard.download";
-import { QrScanResolverPage } from "@/routes/scan.$kind.$reg";
 import { CoeDegreeCertificatePage } from "@/routes/coe.degree-certificate";
 import { CoeDegreeCertificatePreviewPage } from "@/routes/coe.degree-certificate.preview.$studentId";
 import { StudentDegreeCertificatePage } from "@/routes/student.degree-certificate";
@@ -159,8 +157,6 @@ export function App() {
           <Route path="student/marks-card" element={<StudentMarksCardPage />} />
           <Route path="student/degree-certificate" element={<StudentDegreeCertificatePage />} />
           <Route path="gradecard/download" element={<GradecardQrDownloadPage />} />
-          <Route path="markscard/download" element={<MarkscardQrDownloadPage />} />
-          <Route path="scan/:kind/:reg" element={<QrScanResolverPage />} />
           <Route path="degree/download" element={<DegreeQrDownloadPage />} />
           <Route path="degree/verify" element={<DegreeVerifyPage />} />
 

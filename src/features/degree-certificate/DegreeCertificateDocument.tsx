@@ -1,4 +1,5 @@
-import { forwardRef, useEffect, useState } from "react";
+import { forwardRef, useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 
 import {
   DEGREE_CERTIFICATE_ASSETS,
@@ -8,7 +9,7 @@ import {
   DEGREE_CERT_A4_HEIGHT,
   DEGREE_CERT_A4_WIDTH,
 } from "@/lib/degree-certificate/constants";
-import { buildDocumentQrDataUrl } from "@/lib/qr-document-links";
+import { buildDegreeDownloadUrl } from "@/lib/degree-certificate/data";
 import type { DegreeCertificateView } from "@/lib/degree-certificate/types";
 
 type Props = {
@@ -533,22 +534,29 @@ export const DegreeCertificateDocument = forwardRef<HTMLDivElement, Props>(
   function DegreeCertificateDocument({ data, className = "", showPageLabels = false }, ref) {
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
+    const qrTarget = useMemo(() => {
+      if (!data.registrationNo) return null;
+      return buildDegreeDownloadUrl(data.registrationNo);
+    }, [data.registrationNo]);
+
     useEffect(() => {
-      if (!data.registrationNo) {
+      if (!qrTarget) {
         setQrDataUrl(null);
         return;
       }
       let cancelled = false;
-      void buildDocumentQrDataUrl("degree", data.registrationNo, {
+      void QRCode.toDataURL(qrTarget, {
+        errorCorrectionLevel: "M",
+        margin: 1,
         width: 280,
-        light: "#ffffff",
+        color: { dark: "#1a1a1a", light: "#ffffff" },
       }).then((url) => {
         if (!cancelled) setQrDataUrl(url);
       });
       return () => {
         cancelled = true;
       };
-    }, [data.registrationNo]);
+    }, [qrTarget]);
 
     return (
       <div

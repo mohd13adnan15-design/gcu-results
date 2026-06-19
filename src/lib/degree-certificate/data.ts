@@ -6,7 +6,6 @@ import {
   resolveStudentPhotoUrl,
   type StudentMarksheet,
 } from "@/lib/marksheet";
-import { buildDocumentQrTarget } from "@/lib/qr-document-links";
 
 import {
   calculateCgpaFromSemesters,
@@ -399,7 +398,14 @@ export async function allocateDegreeCertificateNumber(
 }
 
 export function buildDegreeDownloadUrl(registrationNo: string, origin?: string): string {
-  return buildDocumentQrTarget("degree", registrationNo, origin);
+  const base =
+    origin ??
+    (typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : "https://example.com");
+  const url = new URL("/degree/download", base);
+  url.searchParams.set("reg", registrationNo.trim());
+  return url.toString();
 }
 
 export function buildDegreeVerificationUrl(
