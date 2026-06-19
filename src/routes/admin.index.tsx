@@ -300,11 +300,11 @@ export function AdminPage() {
       if (sortKey === "request") {
         const aTime = a.student.marksheet_verification_requested_at
           ? new Date(a.student.marksheet_verification_requested_at).getTime()
-          : Number.MAX_SAFE_INTEGER;
+          : 0;
         const bTime = b.student.marksheet_verification_requested_at
           ? new Date(b.student.marksheet_verification_requested_at).getTime()
-          : Number.MAX_SAFE_INTEGER;
-        return aTime - bTime;
+          : 0;
+        return bTime - aTime;
       }
       if (sortKey === "name") {
         return a.student.full_name.localeCompare(b.student.full_name);
@@ -482,7 +482,7 @@ export function AdminPage() {
             onChange={(e) => setSortKey(e.target.value as "request" | "roll" | "name" | "dept")}
             className="rounded-md border border-border bg-cream px-3 py-2 text-sm text-primary"
           >
-            <option value="request">Request date (first come)</option>
+            <option value="request">Request date (newest first)</option>
             <option value="roll">Roll number</option>
             <option value="name">Name</option>
             <option value="dept">Department</option>

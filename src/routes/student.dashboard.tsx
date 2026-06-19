@@ -125,12 +125,14 @@ function Dashboard() {
     return <p className="text-muted-foreground">Loading…</p>;
   }
 
-  const feesPct = Math.round((student.fees_paid / Math.max(1, student.fees_total)) * 100);
+  const feesPct = student.fees_paid === student.fees_total
+    ? 100
+    : Math.min(99, Math.round((student.fees_paid / Math.max(1, student.fees_total)) * 100));
   const hostelPct = student.in_hostel
     ? Math.round((student.hostel_paid / Math.max(1, student.hostel_total)) * 100)
     : 0;
 
-  const feesOk = student.fees_cleared;
+  const feesOk = student.fees_cleared && student.fees_paid > 0 && student.fees_paid === student.fees_total;
   const hostelOk = !student.in_hostel || student.hostel_cleared;
   const libraryOk = !student.in_library || (student.library_cleared && !hasLibraryPenalty);
   const feeClearance = getFeeClearanceForCertificate({ student, hasLibraryPenalty });

@@ -26,12 +26,11 @@ function FeesView() {
 
   if (!student) return <p className="text-muted-foreground">Loading…</p>;
 
-  const pct = Math.min(
-    100,
-    Math.round((student.fees_paid / Math.max(1, student.fees_total)) * 100),
-  );
+  const pct = student.fees_paid === student.fees_total
+    ? 100
+    : Math.min(99, Math.round((student.fees_paid / Math.max(1, student.fees_total)) * 100));
   const pending = Math.max(0, student.fees_total - student.fees_paid);
-  const paidFull = student.fees_cleared || pct >= 100;
+  const paidFull = student.fees_cleared && student.fees_paid > 0 && student.fees_paid === student.fees_total;
 
   return (
     <div className="space-y-6">

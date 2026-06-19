@@ -34,7 +34,7 @@ export function getFeeClearanceForCertificate({
   student: Student;
   hasLibraryPenalty?: boolean;
 }): FeeClearanceForCertificate {
-  const feesOk = Boolean(student.fees_cleared);
+  const feesOk = Boolean(student.fees_cleared) && student.fees_paid > 0 && student.fees_paid === student.fees_total;
   const hostelOk = !student.in_hostel || Boolean(student.hostel_cleared);
   const libraryOk = !student.in_library || (Boolean(student.library_cleared) && !hasLibraryPenalty);
   return {
@@ -76,7 +76,7 @@ export function getMarksheetEligibility({
   hasMarksheet: boolean;
   hasLibraryPenalty?: boolean;
 }): MarksheetEligibility {
-  const feesOk = Boolean(student.fees_cleared);
+  const feesOk = Boolean(student.fees_cleared) && student.fees_paid > 0 && student.fees_paid === student.fees_total;
   const hostelOk = !student.in_hostel || Boolean(student.hostel_cleared);
   const libraryOk = !student.in_library || (Boolean(student.library_cleared) && !hasLibraryPenalty);
   const facultyOk = Boolean(student.faculty_verified) && studentRequestedMarksheetVerification(student);

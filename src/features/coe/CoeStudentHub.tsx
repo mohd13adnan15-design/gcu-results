@@ -132,14 +132,18 @@ export function CoeStudentHub({ studentId }: Props) {
     const hostel_paid = Number(fd.get("hostel_paid") ?? 0);
     const hostel_total = Number(fd.get("hostel_total") ?? 0);
 
+    const isFeesPaid = Number.isFinite(fees_paid) ? fees_paid : 0;
+    const isFeesTotal = Number.isFinite(fees_total) ? fees_total : 0;
+    const autoFeesCleared = isFeesPaid > 0 && isFeesPaid === isFeesTotal;
+
     const { error } = await supabase
       .from("students")
       .update({
-        fees_paid: Number.isFinite(fees_paid) ? fees_paid : 0,
-        fees_total: Number.isFinite(fees_total) ? fees_total : 0,
+        fees_paid: isFeesPaid,
+        fees_total: isFeesTotal,
         hostel_paid: Number.isFinite(hostel_paid) ? hostel_paid : 0,
         hostel_total: Number.isFinite(hostel_total) ? hostel_total : 0,
-        fees_cleared: fd.get("fees_cleared") === "on",
+        fees_cleared: autoFeesCleared,
         hostel_cleared: fd.get("hostel_cleared") === "on",
         library_cleared: fd.get("library_cleared") === "on",
       })
@@ -511,14 +515,14 @@ export function CoeStudentHub({ studentId }: Props) {
                   />
                 </div>
               </div>
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm opacity-80 cursor-not-allowed">
                 <input
                   type="checkbox"
-                  name="fees_cleared"
-                  defaultChecked={student.fees_cleared}
-                  className="h-4 w-4 accent-[var(--color-primary)]"
+                  disabled
+                  checked={student.fees_paid > 0 && student.fees_paid === student.fees_total}
+                  className="h-4 w-4 accent-[var(--color-primary)] cursor-not-allowed"
                 />
-                Academic fees cleared
+                Academic fees cleared (Auto-computed)
               </label>
             </div>
 

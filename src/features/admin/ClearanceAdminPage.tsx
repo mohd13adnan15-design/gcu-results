@@ -330,7 +330,7 @@ export function ClearanceAdminPage({ kind }: Props) {
       .from("students")
       .select("*")
       .eq(membership as string, true)
-      .order("student_id");
+      .order("created_at", { ascending: false });
     if (error) toast.error(error.message);
     
     const studentsList = (data as Student[]) ?? [];
@@ -396,6 +396,9 @@ export function ClearanceAdminPage({ kind }: Props) {
       payload[money.paid] = total;
       payload[money.total] = total;
     }
+    if (money && !nextCleared) {
+      payload[money.paid] = 0;
+    }
 
     const { error } = await supabase.from("students").update(payload as never).eq("id", id);
     if (error) return toast.error(error.message);
@@ -409,6 +412,13 @@ export function ClearanceAdminPage({ kind }: Props) {
             [cfg.cleared]: true,
             [money.paid]: total,
             [money.total]: total,
+          } as Student;
+        }
+        if (money && !nextCleared) {
+          return {
+            ...s,
+            [cfg.cleared]: false,
+            [money.paid]: 0,
           } as Student;
         }
         return { ...s, [cfg.cleared]: nextCleared } as Student;
@@ -450,7 +460,7 @@ export function ClearanceAdminPage({ kind }: Props) {
       return;
     }
 
-    const cleared = total > 0 && paid >= total;
+    const cleared = paid > 0 && paid >= total;
     const payload: Record<string, unknown> = {
       [money.paid]: paid,
       [money.total]: total,
@@ -607,7 +617,7 @@ export function ClearanceAdminPage({ kind }: Props) {
             const effectivePaid = data.paid ?? 0;
             const effectiveTotal =
               data.total !== null ? data.total : (stu ? Number(stu[money.total as string] ?? money.defaultTotal) : money.defaultTotal);
-            finalCleared = effectiveTotal > 0 && effectivePaid >= effectiveTotal;
+            finalCleared = effectivePaid > 0 && effectivePaid >= effectiveTotal;
             
             payload[money.paid] = effectivePaid;
             if (data.total !== null) payload[money.total as string] = data.total;
@@ -957,7 +967,7 @@ export function ClearanceAdminPage({ kind }: Props) {
                   const total = Number(manualData.total) || money.defaultTotal;
                   payload[money.paid] = paid;
                   payload[money.total] = total;
-                  finalCleared = total > 0 && paid >= total;
+                  finalCleared = paid > 0 && paid >= total;
                 }
                 payload[cfg.cleared] = finalCleared;
 
